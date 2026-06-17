@@ -43,9 +43,13 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
   fading out and idling when scrolled away/backgrounded and resuming on return.
 - **The aura shader is shared, not forked.** A `u_white` (0..1) uniform
   desaturates the same material's palette toward a soft cool neutral; the
-  amber/ember work reveals (`u_white` 0) are untouched. The field keeps opacity
-  low (`maxFade` 0.22), motion slow, and the demand loop throttled to ~30fps via
+  amber/ember work reveals (`u_white` 0) are untouched. Calibrated to be clearly
+  perceptible yet tasteful: `maxFade` 0.42 with a lifted white-variant
+  brightness, and a `timeScale` ~1.9 so the noise visibly drifts while staying
+  slow (gen rows keep `timeScale` 1). The demand loop is throttled to ~30fps via
   a `throttleMs`-gated `invalidate` so it is never continuous 60fps work.
+  Verified on a real-GPU headless capture: a two-timepoint pixel diff shows the
+  whole pattern moving on both gate and home.
 - **Software-renderer fallback.** When WebGL is software-rasterized (SwiftShader
   / llvmpipe / WARP — i.e. headless Chrome / Lighthouse / no GPU), a fullscreen
   fbm every frame is a long main-thread task, so the field paints a **single
@@ -131,21 +135,23 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
 
 ## Verification (local prod build, Lighthouse desktop, headless Chrome)
 
-- **Performance 98 · SEO 100 · Best-Practices 96 · Accessibility 100.**
-  LCP 0.7s · FCP 0.2s · CLS 0 · TBT 130ms · TTI 1.5s.
+- **Performance 95 (real-GPU headless) / 98 (SwiftShader, static guard) · SEO
+  100 · Best-Practices 96 · Accessibility 100.**
+  LCP 0.7s · FCP 0.2s · CLS 0 · TBT 170ms · TTI 1.5s (real GPU).
 - Headless run (driven via CDP) confirms: hero/gate paint as static HTML; after
   first paint + idle the shared canvas initialises and the **ambient white field
   renders behind the gate and persists behind the hero**; the open gen row still
   paints the **amber** aura via scissor over the white field; the **Vini
   Montarello** row reveals the real site preview with the "visit site ↗" overlay
   (CLS 0, no layout shift on open); reduced motion mounts no canvas.
-- **Performance 98 (was 100).** The gap is the one-time three/r3f init now
-  mounting on the gate (B1 requires the field there). It is not continuous jank:
-  TTI settles at 1.5s and TBT is 130ms. Headless Lighthouse uses **SwiftShader**
-  (software WebGL); the field detects that and paints a single static frame
-  rather than looping — without that fallback the continuous fbm was TBT 2.8s /
-  Performance 65. On real GPU hardware the per-frame main-thread cost is
-  sub-millisecond, so the animated field stays well within budget.
+- **Performance 95–98 (was 100).** The gap is the one-time three/r3f init now
+  mounting on the gate (B1 requires the field there) plus the field's modest
+  load-window cost. It is not continuous jank: TTI settles at 1.5s and TBT is
+  130–170ms. Headless CI Lighthouse uses **SwiftShader** (software WebGL); the
+  field detects that and paints a single static frame rather than looping (→ 98)
+  — without that fallback the continuous fbm was TBT 2.8s / Performance 65. On
+  real GPU hardware the animated field's per-frame main-thread cost is
+  sub-millisecond, so it stays within budget (→ 95).
 - **Best-Practices 96** is solely the `/_vercel/insights/script.js` 404, which
   only happens off-Vercel (the script is injected by Vercel's edge). Expected
   100 in production.
