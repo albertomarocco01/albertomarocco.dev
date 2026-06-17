@@ -168,6 +168,10 @@ a {
   letter-spacing: -0.02em;
   color: var(--ink);
 }
+.g-name em {
+  font-style: italic;
+  color: var(--ink-dim);
+}
 .g-enter {
   font-family: var(--mono);
   font-size: 0.74rem;

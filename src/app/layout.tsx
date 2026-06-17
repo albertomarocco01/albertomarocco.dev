@@ -28,11 +28,11 @@ const DESCRIPTION =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
   title: {
-    default: "Alberto Marocco — Creative Technologist",
-    template: "%s — Alberto Marocco",
+    default: "Alberto Marocco.dev — Creative Technologist",
+    template: "%s — Alberto Marocco.dev",
   },
   description: DESCRIPTION,
-  applicationName: "Alberto Marocco",
+  applicationName: "Alberto Marocco.dev",
   authors: [{ name: "Alberto Marocco", url: SITE }],
   creator: "Alberto Marocco",
   keywords: [
@@ -52,13 +52,13 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: SITE,
-    siteName: "Alberto Marocco",
-    title: "Alberto Marocco — Creative Technologist",
+    siteName: "Alberto Marocco.dev",
+    title: "Alberto Marocco.dev — Creative Technologist",
     description: DESCRIPTION,
   },
   twitter: {
     card: "summary_large_image",
-    title: "Alberto Marocco — Creative Technologist",
+    title: "Alberto Marocco.dev — Creative Technologist",
     description: DESCRIPTION,
   },
   robots: { index: true, follow: true },
