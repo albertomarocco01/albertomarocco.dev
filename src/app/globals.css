@@ -74,8 +74,8 @@ a {
   pointer-events: none;
   /* canvas itself is transparent; it only paints where a <View> scissors it */
 }
-/* full-viewport tracker the entrance wash scissors into */
-.wash-track {
+/* full-viewport tracker the ambient white field scissors into */
+.ambient-track {
   position: fixed;
   inset: 0;
   z-index: 1;
@@ -149,7 +149,11 @@ a {
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: var(--void);
+  /* Transparent on purpose: the shared canvas (z-index 1) paints the ambient
+     white field behind the gate (B1), and the gate text sits above it. The home
+     content below stays hidden until entry via .wrap's opacity, so nothing else
+     shows through — just void + glow + the faint field + the gate's own text. */
+  background: transparent;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -609,7 +613,7 @@ footer.foot a:focus-visible {
     animation: none;
   }
   .field-canvas,
-  .wash-track {
+  .ambient-track {
     opacity: 0 !important;
   }
   .cur-dot,

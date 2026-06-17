@@ -16,7 +16,7 @@ interface AppState {
   enter: () => void;
   /** user prefers reduced motion — no shader loop, no gate, no cursor */
   reducedMotion: boolean;
-  /** entered AND past requestIdleCallback — safe to mount the WebGL field */
+  /** past first paint + requestIdleCallback — safe to mount the WebGL field */
   fieldReady: boolean;
 }
 
@@ -45,10 +45,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  // The hero paints with zero 3D. Only after entry + an idle slot do we let the
-  // WebGL field (and the gen-row aura chunks) mount — keeps 3D off the LCP path.
+  // The hero (and the gate) paint with zero 3D. Only after first paint + an idle
+  // slot do we let the WebGL field (and the gen-row aura chunks) mount — keeps 3D
+  // off the LCP path. Intentionally NOT gated on `entered`: the ambient white
+  // field lives behind the gate too (B1), so it readies as soon as the browser
+  // is idle, not only once the user enters.
   useEffect(() => {
-    if (!entered || fieldReady) return;
+    if (fieldReady) return;
     const ric = window.requestIdleCallback as
       | typeof window.requestIdleCallback
       | undefined;
@@ -58,7 +61,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     const id = window.setTimeout(() => setFieldReady(true), 200);
     return () => window.clearTimeout(id);
-  }, [entered, fieldReady]);
+  }, [fieldReady]);
 
   // Lock scrolling (and hide the scrollbar) while the entrance gate is shown.
   // The reserved scrollbar gutter (globals.css) keeps this shift-free. Under

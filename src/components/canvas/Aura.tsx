@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { AuraMaterial, type AuraMaterialImpl } from "./aura-material";
@@ -21,13 +21,24 @@ interface AuraProps {
    * directly each frame instead. Falls back to the viewport (entrance wash).
    */
   sizeRef?: RefObject<HTMLElement | null>;
+  /** desaturate toward the ambient cool-white tint (gate/home field) */
+  white?: boolean;
+  /** opacity ceiling the fade settles to when active (white field stays faint) */
+  maxFade?: number;
+  /**
+   * Cap the render cadence (ms between frames). 0 = run at the demand loop's
+   * natural rate (per-row reveals, brief). The persistent ambient field passes
+   * ~30ms so it never drives a continuous 60fps loop on the main thread.
+   */
+  throttleMs?: number;
 }
 
 /**
  * The aura, rendered as a fullscreen triangle inside whichever <View> hosts it.
  * Render-on-demand: u_time + u_fade advance only while active (or while the
- * fade is still settling), each frame requesting the next via invalidate().
- * Under reduced motion it paints a single static frame and never loops.
+ * fade is still settling), each frame requesting the next via invalidate()
+ * (optionally throttled). Under reduced motion it paints a single static frame
+ * and never loops.
  */
 export function Aura({
   variant = "amber",
@@ -35,9 +46,13 @@ export function Aura({
   reducedMotion,
   fadeSpeed = 6,
   sizeRef,
+  white = false,
+  maxFade = 1,
+  throttleMs = 0,
 }: AuraProps) {
   const matRef = useRef<AuraMaterialImpl>(null);
   const invalidate = useThree((s) => s.invalidate);
+  const nextTimer = useRef<number | null>(null);
 
   // Fullscreen triangle in clip space (one tiny geometry per Aura instance).
   const geometry = useMemo(() => {
@@ -53,10 +68,32 @@ export function Aura({
   }, []);
   useEffect(() => () => geometry.dispose(), [geometry]);
 
+  // Request the next frame, capping cadence to throttleMs when set. A single
+  // pending timer at a time keeps the chain from compounding.
+  const requestNext = useCallback(() => {
+    if (throttleMs <= 0) {
+      invalidate();
+      return;
+    }
+    if (nextTimer.current != null) return;
+    nextTimer.current = window.setTimeout(() => {
+      nextTimer.current = null;
+      invalidate();
+    }, throttleMs);
+  }, [invalidate, throttleMs]);
+
   // Kick a frame whenever active flips (the demand loop is otherwise idle).
   useEffect(() => {
-    invalidate();
-  }, [active, invalidate]);
+    requestNext();
+  }, [active, requestNext]);
+
+  // Drop any pending throttle timer on unmount.
+  useEffect(
+    () => () => {
+      if (nextTimer.current != null) window.clearTimeout(nextTimer.current);
+    },
+    [],
+  );
 
   useFrame((_, delta) => {
     const m = matRef.current;
@@ -67,8 +104,9 @@ export function Aura({
     const h = Math.max(el ? el.clientHeight : window.innerHeight, 1);
     m.uniforms.u_res.value.set(w, h); // only the ratio is used by the shader
     m.uniforms.u_cool.value = variant === "ember" ? 1 : 0;
+    m.uniforms.u_white.value = white ? 1 : 0;
 
-    const target = active ? 1 : 0;
+    const target = active ? maxFade : 0;
 
     if (reducedMotion) {
       // Single static frame: snap fade, hold time, never re-invalidate.
@@ -81,8 +119,8 @@ export function Aura({
     if (active) m.uniforms.u_time.value += delta;
 
     // Keep the loop alive while open or while the fade-out completes.
-    if (active || m.uniforms.u_fade.value > 0.01) {
-      invalidate();
+    if (active || m.uniforms.u_fade.value > 0.003) {
+      requestNext();
     }
   });
 

@@ -11,6 +11,11 @@ import { extend, type ThreeElement } from "@react-three/fiber";
  * per-view scissor the raw frag-coord is offset by the view's screen position,
  * which would skew the vignette; the varying keeps it view-local and centred.
  * u_res is kept solely for the aspect ratio. u_fade drives opacity in/out.
+ *
+ * u_white (0..1) desaturates the whole palette toward a soft, cool neutral —
+ * the same material renders both the amber/ember work reveals (u_white 0) and
+ * the ambient white field on the gate/home (u_white 1). One shader, two moods;
+ * the noise + vignette math is identical for both.
  */
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -25,8 +30,9 @@ const fragmentShader = /* glsl */ `
   varying vec2 vUv;
   uniform float u_time;
   uniform vec2  u_res;
-  uniform float u_cool; // variant 0..1: clean amber -> dusty ember
-  uniform float u_fade; // master opacity
+  uniform float u_cool;  // variant 0..1: clean amber -> dusty ember
+  uniform float u_white; // tint 0..1: warm work aura -> ambient cool white
+  uniform float u_fade;  // master opacity
 
   float hash(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
   float noise(vec2 p){ vec2 i=floor(p),f=fract(p);
@@ -44,6 +50,11 @@ const fragmentShader = /* glsl */ `
     vec3 base = vec3(0.033,0.029,0.030), mid = vec3(0.105,0.092,0.082);
     vec3 amber = vec3(0.64,0.43,0.22), ember = vec3(0.50,0.27,0.16);
     vec3 hot = mix(amber, ember, u_cool);
+    // Ambient white field: a soft, faintly cool neutral that stays distinct
+    // from the warm work aura. Same structure, desaturated by u_white.
+    base = mix(base, vec3(0.034,0.035,0.039), u_white);
+    mid  = mix(mid,  vec3(0.098,0.101,0.110), u_white);
+    hot  = mix(hot,  vec3(0.70,0.71,0.745),   u_white);
     vec3 col = mix(base, mid, clamp(f*1.5,0.,1.));
     col = mix(col, hot, pow(clamp(r.x*r.y*1.7,0.,1.),2.0)*0.55);
     float vig = smoothstep(1.25,0.25,length(uv-0.5));
@@ -57,6 +68,7 @@ export const AuraMaterial = shaderMaterial(
     u_time: 0,
     u_res: new THREE.Vector2(1, 1),
     u_cool: 0,
+    u_white: 0,
     u_fade: 0,
   },
   vertexShader,
@@ -70,6 +82,7 @@ export type AuraMaterialImpl = THREE.ShaderMaterial & {
     u_time: { value: number };
     u_res: { value: THREE.Vector2 };
     u_cool: { value: number };
+    u_white: { value: number };
     u_fade: { value: number };
   };
 };
