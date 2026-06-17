@@ -31,6 +31,8 @@ interface AuraProps {
    * ~30ms so it never drives a continuous 60fps loop on the main thread.
    */
   throttleMs?: number;
+  /** multiply the drift rate; >1 makes the noise visibly move while staying slow */
+  timeScale?: number;
 }
 
 /**
@@ -49,6 +51,7 @@ export function Aura({
   white = false,
   maxFade = 1,
   throttleMs = 0,
+  timeScale = 1,
 }: AuraProps) {
   const matRef = useRef<AuraMaterialImpl>(null);
   const invalidate = useThree((s) => s.invalidate);
@@ -116,7 +119,7 @@ export function Aura({
 
     const d = Math.min(1, delta * fadeSpeed);
     m.uniforms.u_fade.value += (target - m.uniforms.u_fade.value) * d;
-    if (active) m.uniforms.u_time.value += delta;
+    if (active) m.uniforms.u_time.value += delta * timeScale;
 
     // Keep the loop alive while open or while the fade-out completes.
     if (active || m.uniforms.u_fade.value > 0.003) {
