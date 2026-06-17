@@ -1,40 +1,54 @@
+/*
+  albertomarocco.dev — design system
+  Tokens, base, and the page chrome, ported from alberto-marocco-prototype-v2.html.
+  One authored stylesheet on purpose: a single hand-crafted page reads as deliberate,
+  and 1:1 fidelity with the reference is the priority. See DECISIONS.md.
+*/
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --void: #0a0a0c; /* near-black, faintly cool background */
+  --void-2: #0c0c10;
+  --ink: #c7c4bc; /* low-contrast off-white body */
+  --ink-dim: #6d6a64; /* meta / secondary */
+  --ink-ghost: #393833; /* collapsed titles, almost gone */
+  --hairline: rgba(199, 196, 188, 0.09);
+  --hairline-hot: rgba(199, 196, 188, 0.22);
+  --accent: rgba(176, 120, 70, 0.55); /* amber — the single accent, used with restraint */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+  --serif: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-html {
-  height: 100%;
-}
-
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --row-h: 5.4rem;
+  --reveal-h: clamp(220px, 36vh, 400px);
+  --reveal-gap: 1.6rem;
 }
 
 * {
   box-sizing: border-box;
-  padding: 0;
+}
+
+html {
+  background: var(--void);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
   margin: 0;
+  padding: 0;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+  cursor: none;
+}
+@media (hover: none) {
+  body {
+    cursor: auto;
+  }
 }
 
 a {
@@ -42,8 +56,557 @@ a {
   text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+/* ---- shared WebGL field: ONE canvas, painted only inside open-row rects via scissor ---- */
+.field-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  /* canvas itself is transparent; it only paints where a <View> scissors it */
+}
+/* full-viewport tracker the entrance wash scissors into */
+.wash-track {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(120, 110, 95, 0.1), transparent 55%),
+    radial-gradient(90% 60% at 50% 120%, rgba(70, 80, 110, 0.06), transparent 60%);
+}
+
+.grain {
+  position: fixed;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.045;
+  mix-blend-mode: screen;
+}
+
+/* ---- custom cursor ---- */
+.cur-dot,
+.cur-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 95;
+  pointer-events: none;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  will-change: transform;
+}
+.cur-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--ink);
+}
+.cur-ring {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--hairline-hot);
+  transition:
+    width 0.5s var(--ease),
+    height 0.5s var(--ease),
+    border-color 0.5s var(--ease),
+    opacity 0.5s var(--ease);
+  opacity: 0.7;
+}
+.cur-ring.is-hot {
+  width: 64px;
+  height: 64px;
+  border-color: var(--ink-dim);
+  opacity: 1;
+}
+@media (hover: none) {
+  .cur-dot,
+  .cur-ring {
+    display: none;
+  }
+}
+
+/* ---- entrance gate ---- */
+.gate {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--void);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 2rem;
+  transition:
+    opacity 1s var(--ease),
+    visibility 1s var(--ease);
+}
+.gate.gone {
+  opacity: 0;
+  visibility: hidden;
+}
+.g-eyebrow {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.34em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+}
+.g-name {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(2rem, 7vw, 4rem);
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.g-enter {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.28em;
+  text-transform: lowercase;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--hairline-hot);
+  padding: 1rem 2.2rem;
+  border-radius: 2px;
+  cursor: none;
+  transition:
+    border-color 0.6s var(--ease),
+    color 0.6s var(--ease),
+    letter-spacing 0.6s var(--ease);
+}
+.g-enter:hover,
+.g-enter:focus-visible {
+  border-color: var(--ink-dim);
+  letter-spacing: 0.34em;
+  outline: none;
+}
+@media (hover: none) {
+  .g-enter {
+    cursor: pointer;
+  }
+}
+
+/* ---- shell ---- */
+.wrap {
+  position: relative;
+  z-index: 2;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 clamp(1.4rem, 5vw, 5rem);
+  opacity: 0;
+  transition: opacity 1.2s var(--ease) 0.2s;
+}
+.wrap.in {
+  opacity: 1;
+}
+
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: space-between;
+  padding: 1.4rem clamp(1.4rem, 5vw, 5rem);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+  opacity: 0;
+  transition: opacity 1.2s var(--ease) 0.4s;
+}
+.topbar.in {
+  opacity: 1;
+}
+.topbar nav {
+  display: flex;
+  gap: 1.6rem;
+}
+.topbar a {
+  color: var(--ink-dim);
+  transition: color 0.5s var(--ease);
+}
+.topbar a:hover,
+.topbar a:focus-visible {
+  color: var(--ink);
+  outline: none;
+}
+
+/* ---- hero ---- */
+.hero {
+  min-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.34em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+}
+.name {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(2.8rem, 9vw, 7.5rem);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  margin: 1.4rem 0 0;
+  color: var(--ink);
+}
+.name em {
+  font-style: italic;
+  color: var(--ink-dim);
+}
+.lede {
+  max-width: 34ch;
+  margin-top: 2.2rem;
+  font-size: clamp(1rem, 2vw, 1.18rem);
+  line-height: 1.6;
+  color: var(--ink-dim);
+}
+
+/* ---- ticker ---- */
+.ticker {
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 1rem 0;
+  margin: 2rem 0 4rem;
+}
+.ticker-track {
+  display: inline-block;
+  will-change: transform;
+  animation: scrollx 38s linear infinite;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.24em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+}
+.ticker-track span {
+  padding: 0 1.4rem;
+  opacity: 0.7;
+}
+@keyframes scrollx {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* ---- work rows ---- */
+.sect-label {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.3em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+  padding: 0 0 1.2rem;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--hairline);
+}
+.rows {
+  border-bottom: 1px solid var(--hairline);
+}
+.row {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  color: inherit;
+  cursor: none;
+  padding: 0;
+  font: inherit;
+  transition:
+    opacity 0.6s var(--ease),
+    background-color 0.8s var(--ease);
+}
+.row:first-child {
+  border-top: 0;
+}
+@media (hover: none) {
+  .row {
+    cursor: pointer;
+  }
+}
+.rows.has-open .row:not(.open) {
+  opacity: 0.4;
+}
+
+.row-head {
+  position: relative;
+  display: grid;
+  grid-template-columns: 3.2rem 1fr auto;
+  align-items: center;
+  gap: 1.2rem;
+  height: var(--row-h);
+  transition: height 0.55s var(--ease);
+}
+.row-head::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1px;
+  height: 0;
+  background: var(--accent);
+  transform: translateY(-50%);
+  transition: height 0.6s var(--ease);
+}
+.row.open .row-head::before {
+  height: 58%;
+}
+.row-idx {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--ink-ghost);
+  transition: color 0.8s var(--ease);
+}
+.row-title {
+  font-family: var(--serif);
+  font-size: clamp(1.5rem, 4.2vw, 2.6rem);
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  color: var(--ink-ghost);
+  transition:
+    color 0.45s var(--ease),
+    transform 0.6s var(--ease);
+}
+.row-meta {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: lowercase;
+  color: var(--ink-ghost);
+  text-align: right;
+  white-space: nowrap;
+  transition: color 0.8s var(--ease);
+}
+.row-meta .arrow {
+  display: inline-block;
+  margin-left: 0.7rem;
+  transform: translateX(-4px);
+  opacity: 0;
+  transition:
+    opacity 0.8s var(--ease),
+    transform 0.8s var(--ease);
+}
+
+.row-reveal {
+  position: relative;
+  height: 0;
+  overflow: hidden;
+}
+/* drei <View>'s own div — the scissor tracker. Fills the reveal box (which
+   grows via GSAP), so the shared canvas paints the aura into the open row and
+   wipes in with the height. Transparent + inert; the canvas sits behind. */
+.aura-view {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.reveal-inner {
+  position: relative;
+  height: var(--reveal-h);
+  margin: 0 0 var(--reveal-gap);
+  border-radius: 2px;
+  overflow: hidden;
+  /* opacity + the directional clip wipe are driven by GSAP (see Row.tsx);
+     --reveal-clip goes 100 (closed) → 0 (open). */
+  --reveal-clip: 100;
+  opacity: 0;
+  clip-path: inset(0 0 calc(var(--reveal-clip) * 1%) 0);
+}
+/* gen rows are transparent so the shared canvas shows through (scissor paints
+   here). The ::before is the static amber fallback plate shown before WebGL is
+   live (or when it is unavailable); it crossfades out once the canvas paints. */
+.reveal-inner.gen {
+  background: transparent;
+}
+.reveal-inner.gen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 140% at 50% 120%, rgba(120, 80, 45, 0.2), transparent 60%),
+    linear-gradient(160deg, #15110d, #0c0a0a 60%, #181009);
+  transition: opacity 0.8s var(--ease);
+}
+.reveal-inner.gen.ember::before {
+  background: radial-gradient(120% 140% at 50% 120%, rgba(110, 60, 40, 0.2), transparent 60%),
+    linear-gradient(160deg, #140f0c, #0b0908 60%, #150c08);
+}
+.canvas-live .reveal-inner.gen::before {
+  opacity: 0;
+}
+.reveal-media {
+  position: absolute;
+  inset: 0;
+  transform: scale(1.04);
+  transition: transform 1.2s var(--ease);
+  background: linear-gradient(135deg, #16161b, #0e0e12 60%, #141319);
+}
+.reveal-caption {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  padding: 1.2rem 1.4rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  background: linear-gradient(to top, rgba(8, 8, 10, 0.72), transparent);
+}
+.c-desc {
+  max-width: 42ch;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.c-cue {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+
+.row.open .row-head {
+  height: calc(var(--row-h) + 0.4rem);
+}
+.row.open .row-title {
+  color: var(--ink);
+  transform: translateX(8px);
+}
+.row.open .row-idx {
+  color: var(--ink-dim);
+}
+.row.open .row-meta {
+  color: var(--ink-dim);
+}
+.row.open .row-meta .arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+.row.open .reveal-media {
+  transform: scale(1);
+}
+.row:focus-visible {
+  outline: none;
+}
+.row:focus-visible .row-title,
+.row:focus-visible .row-idx {
+  color: var(--ink-dim);
+}
+
+/* ---- about (small, deep) ---- */
+.about {
+  max-width: 52ch;
+  margin: 8rem 0 0;
+  font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+  line-height: 1.6;
+  color: var(--ink);
+  font-weight: 300;
+}
+.a-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.3em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+  margin-bottom: 1.4rem;
+}
+
+/* ---- footer ---- */
+footer.foot {
+  margin-top: 8rem;
+  padding: 2.4rem 0 3rem;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2rem 2.4rem;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+}
+footer.foot a {
+  color: var(--ink-dim);
+  transition: color 0.5s var(--ease);
+}
+footer.foot a:hover,
+footer.foot a:focus-visible {
+  color: var(--ink);
+  outline: none;
+}
+.foot .spacer {
+  flex: 1;
+}
+.foot .vat {
+  color: var(--ink-ghost);
+}
+
+/* visually-hidden but available to assistive tech */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- reduced motion: no shader, instant transitions, no gate, no custom cursor ---- */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .ticker-track {
+    animation: none;
+  }
+  .field-canvas,
+  .wash-track {
+    opacity: 0 !important;
+  }
+  .cur-dot,
+  .cur-ring {
+    display: none;
+  }
+  .gate {
+    display: none;
+  }
+  .wrap,
+  .topbar {
+    opacity: 1;
   }
 }
