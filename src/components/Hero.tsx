@@ -2,7 +2,9 @@
 export function Hero() {
   return (
     <header className="hero">
-      <p className="eyebrow">creative technologist · full-stack developer</p>
+      <p className="eyebrow">
+        full-stack developer &amp; creative technologist based in Turin
+      </p>
       <h1 className="name">
         Alberto
         <br />

@@ -13,8 +13,12 @@ export function Gate() {
 
   return (
     <div className={`gate${entered ? " gone" : ""}`} aria-hidden={entered}>
-      <div className="g-eyebrow">creative technologist · turin</div>
-      <div className="g-name">Alberto Marocco</div>
+      <div className="g-eyebrow">
+        full-stack developer &amp; creative technologist based in Turin
+      </div>
+      <div className="g-name">
+        Alberto Marocco<em>.dev</em>
+      </div>
       <button className="g-enter" type="button" onClick={enter}>
         enter the field ✲
       </button>
