@@ -31,7 +31,7 @@ export const WORK: Work[] = [
     meta: "web · 2025",
     description:
       "Winery brand & e-commerce. Full-stack build, slow scroll, product as ritual.",
-    cue: "view live ↗",
+    cue: "visit site",
     type: "web",
     href: "https://vinimontarello.it",
     external: true,
