@@ -22,7 +22,7 @@ export function AmbientField({ active }: { active: boolean }) {
         white
         active={active}
         reducedMotion={false}
-        maxFade={0.16}
+        maxFade={0.22}
         fadeSpeed={1.4}
         throttleMs={33}
       />
