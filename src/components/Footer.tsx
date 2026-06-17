@@ -2,15 +2,17 @@
 export function Footer() {
   return (
     <footer className="foot">
-      <span className="vat">P.IVA 00000000000</span>
+      <span className="vat">P.IVA — placeholder</span>
       <a
-        href="https://instagram.com/albertomarocco"
+        href="https://www.instagram.com/alberto.marocco/"
         target="_blank"
         rel="noopener noreferrer"
       >
         instagram ↗
       </a>
-      <a href="mailto:hello@albertomarocco.dev">hello@albertomarocco.dev</a>
+      <a href="mailto:albertomarocco.dev@gmail.com">
+        albertomarocco.dev@gmail.com
+      </a>
       <span className="spacer" />
       <span className="vat">albertomarocco.dev</span>
     </footer>
