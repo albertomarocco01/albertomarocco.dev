@@ -52,9 +52,9 @@ const fragmentShader = /* glsl */ `
     vec3 hot = mix(amber, ember, u_cool);
     // Ambient white field: a soft, faintly cool neutral that stays distinct
     // from the warm work aura. Same structure, desaturated by u_white.
-    base = mix(base, vec3(0.040,0.042,0.048), u_white);
-    mid  = mix(mid,  vec3(0.150,0.155,0.168), u_white);
-    hot  = mix(hot,  vec3(0.84,0.85,0.88),    u_white);
+    base = mix(base, vec3(0.046,0.048,0.055), u_white);
+    mid  = mix(mid,  vec3(0.175,0.181,0.196), u_white);
+    hot  = mix(hot,  vec3(0.88,0.89,0.92),    u_white);
     vec3 col = mix(base, mid, clamp(f*1.5,0.,1.));
     col = mix(col, hot, pow(clamp(r.x*r.y*1.7,0.,1.),2.0)*0.55);
     float vig = smoothstep(1.25,0.25,length(uv-0.5));

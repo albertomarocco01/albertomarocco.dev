@@ -32,10 +32,10 @@ export function AmbientField({
         white
         active={active}
         reducedMotion={staticOnly}
-        maxFade={0.42}
+        maxFade={0.6}
         fadeSpeed={1.4}
         throttleMs={33}
-        timeScale={1.9}
+        timeScale={3.1}
       />
     </View>
   );

@@ -44,8 +44,8 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
 - **The aura shader is shared, not forked.** A `u_white` (0..1) uniform
   desaturates the same material's palette toward a soft cool neutral; the
   amber/ember work reveals (`u_white` 0) are untouched. Calibrated to be clearly
-  perceptible yet tasteful: `maxFade` 0.42 with a lifted white-variant
-  brightness, and a `timeScale` ~1.9 so the noise visibly drifts while staying
+  perceptible yet tasteful: `maxFade` 0.6 with a lifted white-variant
+  brightness, and a `timeScale` ~3.1 so the noise clearly drifts while staying
   slow (gen rows keep `timeScale` 1). The demand loop is throttled to ~30fps via
   a `throttleMs`-gated `invalidate` so it is never continuous 60fps work.
   Verified on a real-GPU headless capture: a two-timepoint pixel diff shows the
