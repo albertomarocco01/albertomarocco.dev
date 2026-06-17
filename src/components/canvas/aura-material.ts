@@ -16,6 +16,11 @@ import { extend, type ThreeElement } from "@react-three/fiber";
  * the same material renders both the amber/ember work reveals (u_white 0) and
  * the ambient white field on the gate/home (u_white 1). One shader, two moods;
  * the noise + vignette math is identical for both.
+ *
+ * u_mouse (view-local UV) + u_mouseStr (recent pointer speed, decaying) stir the
+ * domain-warp coordinates with a pointer-centred swirl/smear — the white field's
+ * cursor reactivity. u_mouseStr 0 is an exact identity, so the work reveals
+ * (which never set it) are untouched.
  */
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -33,6 +38,8 @@ const fragmentShader = /* glsl */ `
   uniform float u_cool;  // variant 0..1: clean amber -> dusty ember
   uniform float u_white; // tint 0..1: warm work aura -> ambient cool white
   uniform float u_fade;  // master opacity
+  uniform vec2  u_mouse; // pointer in view-local UV (0..1), centred at rest
+  uniform float u_mouseStr; // recent pointer speed (0..1), decays to 0 at rest
 
   float hash(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
   float noise(vec2 p){ vec2 i=floor(p),f=fract(p);
@@ -43,6 +50,19 @@ const fragmentShader = /* glsl */ `
   void main(){
     vec2 uv = vUv;
     vec2 p = (uv-0.5)*vec2(u_res.x/u_res.y, 1.0)*2.4;
+
+    // Pointer-stirred domain warp ("effetto smosso"): a soft swirl + smear
+    // around the cursor whose magnitude follows recent pointer speed
+    // (u_mouseStr, decaying). u_mouseStr 0 ⇒ identity, so the amber work
+    // reveals (which never set it) are untouched — only the white field stirs.
+    vec2 mp = (u_mouse-0.5)*vec2(u_res.x/u_res.y, 1.0)*2.4;
+    vec2 md = p - mp;
+    float infl = exp(-dot(md,md)*1.1);          // soft, wide halo around the cursor
+    float ang = infl * u_mouseStr * 2.4;         // swirl angle, scaled by speed
+    float s = sin(ang), c = cos(ang);
+    p = mp + mat2(c,-s,s,c)*md;                  // stir the field near the cursor
+    p -= md * infl * u_mouseStr * 0.8;           // and smear it toward the pointer
+
     float t = u_time*0.035;
     vec2 q = vec2(fbm(p+t), fbm(p+vec2(5.2,1.3)-t));
     vec2 r = vec2(fbm(p+3.6*q+vec2(1.7,9.2)+t*0.6), fbm(p+3.6*q+vec2(8.3,2.8)-t*0.5));
@@ -70,6 +90,8 @@ export const AuraMaterial = shaderMaterial(
     u_cool: 0,
     u_white: 0,
     u_fade: 0,
+    u_mouse: new THREE.Vector2(0.5, 0.5),
+    u_mouseStr: 0,
   },
   vertexShader,
   fragmentShader,
@@ -84,6 +106,8 @@ export type AuraMaterialImpl = THREE.ShaderMaterial & {
     u_cool: { value: number };
     u_white: { value: number };
     u_fade: { value: number };
+    u_mouse: { value: THREE.Vector2 };
+    u_mouseStr: { value: number };
   };
 };
 

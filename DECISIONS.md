@@ -50,6 +50,19 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
   a `throttleMs`-gated `invalidate` so it is never continuous 60fps work.
   Verified on a real-GPU headless capture: a two-timepoint pixel diff shows the
   whole pattern moving on both gate and home.
+- **Cursor-reactive white field ("effetto smosso").** Two more shared uniforms,
+  `u_mouse` (vec2, view-local UV) and `u_mouseStr` (recent pointer speed, 0..1,
+  decaying), drive a pointer-centred swirl + smear of the domain-warp
+  coordinates. `Aura` tracks `window` pointermove (white field only), normalises
+  to UV, lerps the position (soft lag) and decays the speed term each frame; the
+  ambient loop (already alive while the field is visible) reads them, so the
+  field stirs toward the cursor and settles when it rests. `u_mouseStr` 0 is an
+  exact identity, so the amber work reveals — which never set it — are
+  unaffected. Off under the software-renderer static guard and reduced motion (no
+  pointer loop, no extra main-thread cost on the LCP path). Verified real-GPU:
+  isolating drift, a fresh stir changes the cursor region ~1.75× a same-window
+  drift baseline, and the amplified diff shows a clean swirl centred on the
+  pointer.
 - **Software-renderer fallback.** When WebGL is software-rasterized (SwiftShader
   / llvmpipe / WARP — i.e. headless Chrome / Lighthouse / no GPU), a fullscreen
   fbm every frame is a long main-thread task, so the field paints a **single
@@ -94,6 +107,17 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
   `CustomEase` named `field`.
 - **Lenis** is mounted at the root and driven by the GSAP ticker (so scroll and
   GSAP share one clock); disabled under reduced motion.
+- **The entrance is an orchestrated "opening".** `enter()` no longer just toggles
+  a CSS cross-fade; a short GSAP timeline (the `field` ease) lifts + fades the
+  gate name/CTA, blooms the white field briefly to carry through (a one-shot
+  `brightness` pulse on the canvas via an `html.entering` class — decoupled from
+  the R3F loop, so it never touches the field's calibration), then rises the home
+  in with a staggered eyebrow → name → lede and eases the topbar in. Hosted in
+  `Shell` (it spans the gate, hero and topbar). GSAP now owns those entrance
+  opacities, so the matching CSS `transition`s on `.gate`/`.wrap`/`.topbar` were
+  removed to avoid double-animation (`.gone` is gone; `.in` remains as the
+  final/no-motion state). Under reduced motion the timeline is skipped entirely —
+  the gate isn't rendered and CSS shows the content instantly.
 
 ## Content / placeholders — NEED REAL VALUES
 
@@ -135,11 +159,12 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
 
 ## Verification (local prod build, Lighthouse desktop, headless Chrome)
 
-- **Performance ~90–95 (real-GPU headless, the animated field runs during the
-  trace) / 98 (SwiftShader, static guard) · SEO 100 · Best-Practices 96 ·
-  Accessibility 100.**
-  LCP 0.7s · FCP 0.2s · CLS 0 · TBT ~260ms · TTI 1.6s (real GPU). Run-to-run TBT
-  is noisy on this machine (130–360ms); LCP/CLS/FCP are stable.
+- **Performance ~85–95 · SEO 100 · Best-Practices 96 · Accessibility 100.**
+  LCP 0.7s · FCP 0.2s · CLS 0 · Speed Index 1.0s. Run-to-run TBT is noisy on
+  this machine (240–380ms across desktop runs); LCP/CLS/FCP are stable. The
+  cursor reactivity and the entrance add no load-trace cost: the pointer loop is
+  disabled under the software-renderer guard Lighthouse hits, and the entrance
+  timeline only runs on the `enter()` click, never during the load trace.
 - Headless run (driven via CDP) confirms: hero/gate paint as static HTML; after
   first paint + idle the shared canvas initialises and the **ambient white field
   renders behind the gate and persists behind the hero**; the open gen row still

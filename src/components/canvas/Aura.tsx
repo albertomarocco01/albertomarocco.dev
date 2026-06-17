@@ -57,6 +57,14 @@ export function Aura({
   const invalidate = useThree((s) => s.invalidate);
   const nextTimer = useRef<number | null>(null);
 
+  // Pointer state for the white field's cursor-reactive stir. Kept in refs so
+  // pointermove never re-renders: target = latest position, smooth = lerped
+  // (lag), str = recent speed that decays each frame. UV space (y up), centred.
+  const mTarget = useRef(new THREE.Vector2(0.5, 0.5));
+  const mSmooth = useRef(new THREE.Vector2(0.5, 0.5));
+  const mStr = useRef(0);
+  const mPrev = useRef(new THREE.Vector2(0.5, 0.5));
+
   // Fullscreen triangle in clip space (one tiny geometry per Aura instance).
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry();
@@ -98,6 +106,25 @@ export function Aura({
     [],
   );
 
+  // Cursor reactivity — white ambient field only. Track the pointer in UV space
+  // and accumulate a recent-speed term; the demand loop (already alive while the
+  // field is visible) reads + decays it each frame, so the field stirs toward
+  // the cursor and settles when it rests. Skipped under the static guard
+  // (software WebGL / reduced motion) — no pointer loop there.
+  useEffect(() => {
+    if (!white || reducedMotion) return;
+    const onMove = (e: PointerEvent) => {
+      const nx = e.clientX / Math.max(window.innerWidth, 1);
+      const ny = 1 - e.clientY / Math.max(window.innerHeight, 1); // flip to UV
+      const speed = Math.hypot(nx - mPrev.current.x, ny - mPrev.current.y);
+      mPrev.current.set(nx, ny);
+      mTarget.current.set(nx, ny);
+      mStr.current = Math.min(1, mStr.current + speed * 9);
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    return () => window.removeEventListener("pointermove", onMove);
+  }, [white, reducedMotion]);
+
   useFrame((_, delta) => {
     const m = matRef.current;
     if (!m) return;
@@ -120,6 +147,16 @@ export function Aura({
     const d = Math.min(1, delta * fadeSpeed);
     m.uniforms.u_fade.value += (target - m.uniforms.u_fade.value) * d;
     if (active) m.uniforms.u_time.value += delta * timeScale;
+
+    // White field: lerp the pointer toward its target (soft lag) and decay the
+    // recent-speed term, then feed both to the shader. Amber rows leave these at
+    // their defaults (centred / 0), so the warp is a no-op for the work reveals.
+    if (white) {
+      mSmooth.current.lerp(mTarget.current, Math.min(1, delta * 6));
+      mStr.current *= Math.max(0, 1 - delta * 2.4);
+      m.uniforms.u_mouse.value.copy(mSmooth.current);
+      m.uniforms.u_mouseStr.value = mStr.current;
+    }
 
     // Keep the loop alive while open or while the fade-out completes.
     if (active || m.uniforms.u_fade.value > 0.003) {

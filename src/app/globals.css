@@ -82,6 +82,25 @@ a {
   pointer-events: none;
 }
 
+/* Entrance bloom: as the gate dissolves, the white field carries through with a
+   brief one-shot brightness swell, then settles. Added/removed by the GSAP
+   entrance timeline (`html.entering`); `both` holds the resting value so
+   removing the class is seamless. Skipped under reduced motion (no entrance). */
+html.entering .field-canvas {
+  animation: field-bloom 1.8s var(--ease) both;
+}
+@keyframes field-bloom {
+  0% {
+    filter: brightness(1);
+  }
+  38% {
+    filter: brightness(1.22);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
 .glow {
   position: fixed;
   inset: 0;
@@ -160,13 +179,7 @@ a {
   align-items: center;
   text-align: center;
   gap: 2rem;
-  transition:
-    opacity 1s var(--ease),
-    visibility 1s var(--ease);
-}
-.gate.gone {
-  opacity: 0;
-  visibility: hidden;
+  /* Fade-out is owned by the GSAP entrance (Shell), not a CSS transition. */
 }
 .g-eyebrow {
   font-family: var(--mono);
@@ -222,7 +235,7 @@ a {
   margin: 0 auto;
   padding: 0 clamp(1.4rem, 5vw, 5rem);
   opacity: 0;
-  transition: opacity 1.2s var(--ease) 0.2s;
+  /* Revealed by the GSAP entrance; `.in` is the final/no-motion state. */
 }
 .wrap.in {
   opacity: 1;
@@ -243,7 +256,7 @@ a {
   text-transform: lowercase;
   color: var(--ink-dim);
   opacity: 0;
-  transition: opacity 1.2s var(--ease) 0.4s;
+  /* Eased in by the GSAP entrance; `.in` is the final/no-motion state. */
 }
 .topbar.in {
   opacity: 1;
