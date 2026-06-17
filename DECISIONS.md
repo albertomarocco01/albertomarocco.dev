@@ -37,8 +37,12 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
   As GSAP grows the reveal height, the scissor grows with it — that's the wipe.
 - **Render-on-demand loop.** Each aura advances `u_time`/`u_fade` only while its
   row is open (or while the fade-out settles), re-arming the next frame via
-  `invalidate()`. At rest nothing renders. Under `prefers-reduced-motion` it
-  paints a single static frame and never loops.
+  `invalidate()`. At rest nothing renders.
+- **Reduced motion = no WebGL at all.** Rather than freeze the shader on one
+  (timing-fragile, often dim) frame, under `prefers-reduced-motion` the field
+  never mounts and gen rows show their designed static amber plate. This honors
+  no-motion *and* reduced-data (zero GPU work) and is deterministic — a "still",
+  which the spec accepts in place of a single static shader frame.
 - **Aspect from the live DOM box.** drei's per-`View` size is captured at mount
   (when the reveal is collapsed), so the shader's `u_res` aspect is read from the
   reveal element each frame instead. `u_res` feeds only the aspect ratio.
@@ -80,6 +84,23 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
 - Metadata API (title template, description, OpenGraph, Twitter, robots,
   canonical), `sitemap.ts`, `robots.ts`, brand `icon.svg`, and a dynamic OG image
   (`opengraph-image.tsx` via `next/og`, Fraunces fetched as TTF and subsetted).
+
+## Verification (local prod build, Lighthouse desktop, headless Chrome)
+
+- **Performance 100 · SEO 100 · Best-Practices 96 · Accessibility 95.**
+  LCP 0.6s · FCP 0.2s · CLS 0 · TBT 0ms · TTI 0.6s.
+- Headless run confirms: hero/gate paint as static HTML; on enter the shared
+  canvas initialises (WebGL context created) and the open gen row paints the
+  amber aura via scissor; reduced motion mounts no canvas and shows the plate.
+- **Best-Practices 96** is solely the `/_vercel/insights/script.js` 404, which
+  only happens off-Vercel (the script is injected by Vercel's edge). Expected
+  100 in production.
+- **Accessibility 95** is one contrast flag on the gate eyebrow, which uses the
+  spec's verbatim `--ink-dim (#6d6a64)` on the void — the intentional
+  "low-contrast" art direction. The spec's explicit a11y requirements (keyboard
+  operation, focus-visible, reduced-motion, real `<a>`/`<button>` semantics) are
+  all met. **Open tradeoff for Alberto:** keep the ultra-dim secondary text, or
+  nudge `--ink-dim` lighter (~`#817d75`) to clear WCAG AA (4.5:1) for small text.
 
 ## Deferred
 

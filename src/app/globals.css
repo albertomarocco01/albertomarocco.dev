@@ -448,13 +448,13 @@ a {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(120% 140% at 50% 120%, rgba(120, 80, 45, 0.2), transparent 60%),
-    linear-gradient(160deg, #15110d, #0c0a0a 60%, #181009);
+  background: radial-gradient(135% 130% at 50% 116%, rgba(152, 98, 52, 0.34), rgba(80, 56, 36, 0.06) 46%, transparent 66%),
+    linear-gradient(165deg, #1a130d, #0c0a09 55%, #1e1209);
   transition: opacity 0.8s var(--ease);
 }
 .reveal-inner.gen.ember::before {
-  background: radial-gradient(120% 140% at 50% 120%, rgba(110, 60, 40, 0.2), transparent 60%),
-    linear-gradient(160deg, #140f0c, #0b0908 60%, #150c08);
+  background: radial-gradient(135% 130% at 50% 116%, rgba(140, 72, 46, 0.32), rgba(72, 42, 30, 0.06) 46%, transparent 66%),
+    linear-gradient(165deg, #170f0c, #0b0908 55%, #1a0d08);
 }
 .canvas-live .reveal-inner.gen::before {
   opacity: 0;

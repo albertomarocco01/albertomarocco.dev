@@ -105,7 +105,7 @@ export function Row({
 
   const reveal = (
     <div className="row-reveal" ref={revealRef}>
-      {isGen && fieldReady && (
+      {isGen && fieldReady && !reducedMotion && (
         <GenAura
           sizeRef={revealRef}
           variant={work.variant}
