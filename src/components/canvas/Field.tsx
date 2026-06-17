@@ -1,10 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, type RootState } from "@react-three/fiber";
 import { View, Preload } from "@react-three/drei";
 import { useApp } from "@/components/providers/AppProvider";
 import { AmbientField } from "./AmbientField";
+
+/**
+ * True when WebGL is software-rendered (no GPU): SwiftShader (headless Chrome /
+ * Lighthouse), llvmpipe, Microsoft Basic Render, etc. Software-rasterizing a
+ * fullscreen fbm every frame is a long main-thread task, so we render the
+ * ambient field as a single static frame there instead of a continuous loop —
+ * the GPU does the work for everyone else. Mirrors the repo's existing
+ * "WebGL unavailable → static plate" stance.
+ */
+function isSoftwareRenderer(
+  gl: WebGLRenderingContext | WebGL2RenderingContext,
+): boolean {
+  try {
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    const renderer = ext
+      ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL))
+      : "";
+    return /swiftshader|llvmpipe|software|microsoft basic|softpipe|warp/i.test(
+      renderer,
+    );
+  } catch {
+    return false; // assume hardware if the query is blocked
+  }
+}
 
 /**
  * The single persistent WebGL canvas for the whole app. Fixed, transparent, and
@@ -21,6 +45,8 @@ export function Field() {
   // main-thread work); it resumes on return. Starts true so it's already alive
   // behind the gate (the hero sits at the top of the page).
   const [active, setActive] = useState(true);
+  // Set once the renderer is known; until then assume hardware (animate).
+  const [staticOnly, setStaticOnly] = useState(false);
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -54,7 +80,7 @@ export function Field() {
 
   return (
     <>
-      {!reducedMotion && <AmbientField active={active} />}
+      {!reducedMotion && <AmbientField active={active} staticOnly={staticOnly} />}
       <Canvas
         className="field-canvas"
         // R3F sets inline position:relative on its container; override here so
@@ -75,9 +101,10 @@ export function Field() {
           premultipliedAlpha: false,
           powerPreference: "low-power",
         }}
-        onCreated={() =>
-          document.documentElement.classList.add("canvas-live")
-        }
+        onCreated={(state: RootState) => {
+          document.documentElement.classList.add("canvas-live");
+          if (isSoftwareRenderer(state.gl.getContext())) setStaticOnly(true);
+        }}
       >
         <View.Port />
         <Preload all />

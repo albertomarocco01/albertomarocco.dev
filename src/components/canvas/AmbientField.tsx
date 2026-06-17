@@ -14,14 +14,24 @@ import { Aura } from "./Aura";
  * gentle `fadeSpeed` eases it in/out, and `throttleMs` caps the loop to ~30fps
  * so it never becomes continuous 60fps main-thread work. The owning Field gates
  * `active` on hero-visibility + tab-visibility, so at rest nothing renders.
+ *
+ * `staticOnly` (software-rendered WebGL, e.g. SwiftShader / Lighthouse) paints
+ * one static frame and never loops — software-rasterizing a fullscreen fbm each
+ * frame would be a long main-thread task. On a real GPU the loop runs.
  */
-export function AmbientField({ active }: { active: boolean }) {
+export function AmbientField({
+  active,
+  staticOnly = false,
+}: {
+  active: boolean;
+  staticOnly?: boolean;
+}) {
   return (
     <View className="ambient-track">
       <Aura
         white
         active={active}
-        reducedMotion={false}
+        reducedMotion={staticOnly}
         maxFade={0.22}
         fadeSpeed={1.4}
         throttleMs={33}
