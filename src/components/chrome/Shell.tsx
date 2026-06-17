@@ -24,7 +24,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
       const href = e.currentTarget.getAttribute("href");
       if (!href || !href.startsWith("#")) return;
       e.preventDefault();
-      lenis.scrollTo(href, {
+      // `#top` is the document top (no such element to query) — scroll to 0;
+      // section anchors scroll to their selector. Same duration/easing.
+      lenis.scrollTo(href === "#top" ? 0 : href, {
         duration: NAV_SCROLL_DURATION,
         easing: fieldEasing,
       });
@@ -38,7 +40,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
         skip to work
       </a>
       <div className={`topbar${entered ? " in" : ""}`}>
-        <span>alberto marocco</span>
+        <a href="#top" onClick={onNavClick}>
+          alberto marocco
+        </a>
         <nav aria-label="primary">
           <a href="#work" onClick={onNavClick}>
             work
