@@ -135,9 +135,11 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
 
 ## Verification (local prod build, Lighthouse desktop, headless Chrome)
 
-- **Performance 95 (real-GPU headless) / 98 (SwiftShader, static guard) · SEO
-  100 · Best-Practices 96 · Accessibility 100.**
-  LCP 0.7s · FCP 0.2s · CLS 0 · TBT 170ms · TTI 1.5s (real GPU).
+- **Performance ~90–95 (real-GPU headless, the animated field runs during the
+  trace) / 98 (SwiftShader, static guard) · SEO 100 · Best-Practices 96 ·
+  Accessibility 100.**
+  LCP 0.7s · FCP 0.2s · CLS 0 · TBT ~260ms · TTI 1.6s (real GPU). Run-to-run TBT
+  is noisy on this machine (130–360ms); LCP/CLS/FCP are stable.
 - Headless run (driven via CDP) confirms: hero/gate paint as static HTML; after
   first paint + idle the shared canvas initialises and the **ambient white field
   renders behind the gate and persists behind the hero**; the open gen row still
