@@ -8,6 +8,11 @@ import { AuraMaterial, type AuraMaterialImpl } from "./aura-material";
 // AuraMaterial must be extended once; importing for its side effect.
 void AuraMaterial;
 
+// White-field cursor parallax tuning (the lean's *strength* is DISP_STRENGTH in
+// the shader). Both are deliberately gentle: heavy smoothing, slow return.
+const DISP_SMOOTH = 2.2; // pointer-follow lerp rate — low = heavily smoothed/laggy
+const DISP_DECAY = 0.7; // engagement decay per second — low = slower return to rest
+
 interface AuraProps {
   variant?: "amber" | "ember";
   /** the owning row (or the wash) is open — drive the loop */
@@ -57,13 +62,13 @@ export function Aura({
   const invalidate = useThree((s) => s.invalidate);
   const nextTimer = useRef<number | null>(null);
 
-  // Pointer state for the white field's cursor-reactive stir. Kept in refs so
-  // pointermove never re-renders: target = latest position, smooth = lerped
-  // (lag), str = recent speed that decays each frame. UV space (y up), centred.
+  // Pointer state for the white field's gentle cursor parallax. Kept in refs so
+  // pointermove never re-renders. UV space (y up). `target` is the latest
+  // pointer; `smooth` lags it heavily; `engage` rises on movement and decays
+  // slowly so the lean eases back to rest when the cursor stops.
   const mTarget = useRef(new THREE.Vector2(0.5, 0.5));
   const mSmooth = useRef(new THREE.Vector2(0.5, 0.5));
-  const mStr = useRef(0);
-  const mPrev = useRef(new THREE.Vector2(0.5, 0.5));
+  const mEngage = useRef(0);
 
   // Fullscreen triangle in clip space (one tiny geometry per Aura instance).
   const geometry = useMemo(() => {
@@ -106,20 +111,18 @@ export function Aura({
     [],
   );
 
-  // Cursor reactivity — white ambient field only. Track the pointer in UV space
-  // and accumulate a recent-speed term; the demand loop (already alive while the
-  // field is visible) reads + decays it each frame, so the field stirs toward
-  // the cursor and settles when it rests. Skipped under the static guard
-  // (software WebGL / reduced motion) — no pointer loop there.
+  // Cursor parallax — white ambient field only. Just record the pointer position
+  // (UV) and (re)engage; the demand loop (already alive while the field is
+  // visible) does the smoothing + decay each frame. No velocity, no stirring.
+  // Skipped under the static guard (software WebGL / reduced motion).
   useEffect(() => {
     if (!white || reducedMotion) return;
     const onMove = (e: PointerEvent) => {
-      const nx = e.clientX / Math.max(window.innerWidth, 1);
-      const ny = 1 - e.clientY / Math.max(window.innerHeight, 1); // flip to UV
-      const speed = Math.hypot(nx - mPrev.current.x, ny - mPrev.current.y);
-      mPrev.current.set(nx, ny);
-      mTarget.current.set(nx, ny);
-      mStr.current = Math.min(1, mStr.current + speed * 9);
+      mTarget.current.set(
+        e.clientX / Math.max(window.innerWidth, 1),
+        1 - e.clientY / Math.max(window.innerHeight, 1), // flip to UV (y up)
+      );
+      mEngage.current = 1;
     };
     window.addEventListener("pointermove", onMove, { passive: true });
     return () => window.removeEventListener("pointermove", onMove);
@@ -148,14 +151,16 @@ export function Aura({
     m.uniforms.u_fade.value += (target - m.uniforms.u_fade.value) * d;
     if (active) m.uniforms.u_time.value += delta * timeScale;
 
-    // White field: lerp the pointer toward its target (soft lag) and decay the
-    // recent-speed term, then feed both to the shader. Amber rows leave these at
-    // their defaults (centred / 0), so the warp is a no-op for the work reveals.
+    // White field: heavily smooth the pointer toward its target and decay the
+    // engagement, then feed the resulting small offset (centred = rest) to the
+    // shader. The work reveals leave u_disp at its default (0), a no-op there.
     if (white) {
-      mSmooth.current.lerp(mTarget.current, Math.min(1, delta * 6));
-      mStr.current *= Math.max(0, 1 - delta * 2.4);
-      m.uniforms.u_mouse.value.copy(mSmooth.current);
-      m.uniforms.u_mouseStr.value = mStr.current;
+      mSmooth.current.lerp(mTarget.current, Math.min(1, delta * DISP_SMOOTH));
+      mEngage.current *= Math.max(0, 1 - delta * DISP_DECAY);
+      m.uniforms.u_disp.value.set(
+        (mSmooth.current.x - 0.5) * mEngage.current,
+        (mSmooth.current.y - 0.5) * mEngage.current,
+      );
     }
 
     // Keep the loop alive while open or while the fade-out completes.

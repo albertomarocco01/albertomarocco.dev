@@ -41,31 +41,37 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
   home stays hidden until entry via `.wrap` opacity. It runs only while it can
   be seen — `active` is gated on hero `IntersectionObserver` + tab visibility,
   fading out and idling when scrolled away/backgrounded and resuming on return.
-- **The aura shader is shared, not forked.** A `u_white` (0..1) uniform
-  desaturates the same material's palette toward a soft cool neutral; the
-  amber/ember work reveals (`u_white` 0) are untouched. Calibrated to be clearly
-  perceptible yet tasteful: `maxFade` 0.6 with a lifted white-variant
-  brightness, and a `timeScale` ~3.1 so the noise clearly drifts while staying
-  slow (gen rows keep `timeScale` 1). The demand loop is throttled to ~30fps via
-  a `throttleMs`-gated `invalidate` so it is never continuous 60fps work.
-  Verified on a real-GPU headless capture: a two-timepoint pixel diff shows the
-  whole pattern moving on both gate and home.
-- **Cursor-reactive white field ("effetto smosso").** Two more shared uniforms,
-  `u_mouse` (vec2, view-local UV) and `u_mouseStr` (recent pointer speed, 0..1,
-  decaying), drive a pointer-centred swirl + smear of the domain-warp
-  coordinates. `Aura` tracks `window` pointermove (white field only), normalises
-  to UV, lerps the position (soft lag) and decays the speed term each frame; the
-  ambient loop (already alive while the field is visible) reads them, so the
-  field stirs toward the cursor and settles when it rests. `u_mouseStr` 0 is an
-  exact identity, so the amber work reveals — which never set it — are
-  unaffected. Off under the software-renderer static guard and reduced motion (no
-  pointer loop, no extra main-thread cost on the LCP path). Verified real-GPU:
-  isolating drift, a fresh stir changes the cursor region ~1.75× a same-window
-  drift baseline, and the amplified diff shows a clean swirl centred on the
-  pointer.
+- **One shared material, branched on `u_white` — not forked.** The same
+  `AuraMaterial` renders two looks from one `if (u_white > 0.5)`:
+  - **`u_white` 0 — the amber/ember WORK reveals:** the domain-warped value-noise
+    fbm "smoke", ported verbatim from the prototype. Kept **byte-for-byte** (the
+    branch holds the original GLSL; the only edit is aliasing `u_res.x/u_res.y`
+    to a local `aspect`, the same value).
+  - **`u_white` 1 — the ambient WHITE field (gate/home):** a small set of soft,
+    slowly-drifting **luminous blobs** — out-of-focus orbs on near-black, not the
+    old desaturated smoke. ~7 gaussian orbs (`BLOB_COUNT`) wander on independent
+    low-frequency sin/cos paths; a soft-saturate (`1 - exp(-field·gain)`) keeps
+    edges blurry and the alpha follows presence so the gaps stay true near-black
+    (orbs, not a wash). All look knobs are named `#define`s in the shader
+    (`BLOB_COUNT/SIZE/SOFT`, `DRIFT_SPEED/AMP`, `DISP_STRENGTH`,
+    `FIELD_GAIN/OPACITY`). The blob field is *cheaper* than the smoke (a handful
+    of gaussians vs a 5-octave domain warp). `maxFade` 0.6 envelope, `timeScale`
+    ~3.1, ~30fps `throttleMs`. Verified real-GPU: a two-timepoint diff
+    (meanAbsDiff ~4) shows the orbs drifting.
+- **Calm cursor parallax (replaced the old swirl).** The white field gently
+  *leans* toward the pointer — no rotation, no velocity-driven stirring. `Aura`
+  records the pointer (UV, white field only) and re-engages on movement; the loop
+  heavily smooths a lagging follow (`DISP_SMOOTH`) and decays the engagement
+  (`DISP_DECAY`) so the lean eases back to rest when the cursor stops, feeding a
+  small `u_disp` offset (rest = 0) the shader applies to the orb centres (each
+  orb parallaxing a touch differently for depth). Max lean ~a few % of the
+  viewport. `u_disp` 0 is an exact identity, so the work reveals — which never set
+  it — are untouched. Off under the software-renderer static guard and reduced
+  motion (no pointer loop, no LCP cost). Verified real-GPU: the amplified
+  two-cursor diff is a smooth global shift with **no swirl**.
 - **Software-renderer fallback.** When WebGL is software-rasterized (SwiftShader
   / llvmpipe / WARP — i.e. headless Chrome / Lighthouse / no GPU), a fullscreen
-  fbm every frame is a long main-thread task, so the field paints a **single
+  shader every frame is a long main-thread task, so the field paints a **single
   static frame** instead of looping (`WEBGL_debug_renderer_info` detection). Real
   GPUs animate — their per-frame main-thread cost is sub-millisecond.
 - **DPR capped at 1.5** for the whole canvas (was 2). The continuous ambient
@@ -160,11 +166,13 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
 ## Verification (local prod build, Lighthouse desktop, headless Chrome)
 
 - **Performance ~85–95 · SEO 100 · Best-Practices 96 · Accessibility 100.**
-  LCP 0.7s · FCP 0.2s · CLS 0 · Speed Index 1.0s. Run-to-run TBT is noisy on
-  this machine (240–380ms across desktop runs); LCP/CLS/FCP are stable. The
-  cursor reactivity and the entrance add no load-trace cost: the pointer loop is
-  disabled under the software-renderer guard Lighthouse hits, and the entrance
-  timeline only runs on the `enter()` click, never during the load trace.
+  LCP 0.7s · FCP 0.2s · CLS 0 · Speed Index ~1.0s. Run-to-run TBT is noisy on
+  this machine (250–430ms across desktop runs, with the occasional cold outlier);
+  LCP/CLS/FCP are stable. The blob field does not regress this — it is *cheaper*
+  per fragment than the old smoke, and under the software-renderer guard
+  Lighthouse hits it paints one static frame. The cursor parallax and the
+  entrance add no load-trace cost: the pointer loop is disabled under that guard,
+  and the entrance timeline only runs on the `enter()` click, never during load.
 - Headless run (driven via CDP) confirms: hero/gate paint as static HTML; after
   first paint + idle the shared canvas initialises and the **ambient white field
   renders behind the gate and persists behind the hero**; the open gen row still
