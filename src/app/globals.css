@@ -435,6 +435,10 @@ a {
   position: relative;
   height: 0;
   overflow: hidden;
+  /* Isolate the reveal's internal layout/paint from the rest of the page so the
+     GSAP height tween doesn't recalc unrelated subtrees each frame (lower INP).
+     `overflow: hidden` already establishes the size containment context. */
+  contain: layout paint;
 }
 /* drei <View>'s own div — the scissor tracker. Fills the reveal box (which
    grows via GSAP), so the shared canvas paints the aura into the open row and
