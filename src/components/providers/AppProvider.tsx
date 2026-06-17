@@ -60,6 +60,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(id);
   }, [entered, fieldReady]);
 
+  // Lock scrolling (and hide the scrollbar) while the entrance gate is shown.
+  // The reserved scrollbar gutter (globals.css) keeps this shift-free. Under
+  // reduced motion the gate is skipped, so the page is never locked.
+  useEffect(() => {
+    const locked = !entered && !reducedMotion;
+    const root = document.documentElement;
+    root.classList.toggle("gate-locked", locked);
+    return () => root.classList.remove("gate-locked");
+  }, [entered, reducedMotion]);
+
   const enter = useCallback(() => setEntered(true), []);
 
   const value = useMemo<AppState>(
