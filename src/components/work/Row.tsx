@@ -2,6 +2,7 @@
 
 import { useRef, type MouseEvent } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import type { Work } from "@/lib/work";
@@ -89,6 +90,10 @@ export function Row({
   );
 
   const isGen = work.type === "gen";
+  // A real, optimized capture of the live site (Vini Montarello). next/image
+  // serves it lazily with a blur-up placeholder, sized to the reveal box (CLS 0),
+  // with a "visit site" overlay making the preview read as the clickable link.
+  const hasPreview = !isGen && !!work.image;
 
   const head = (
     <div className="row-head">
@@ -119,16 +124,36 @@ export function Row({
         }`}
         ref={innerRef}
       >
-        {!isGen && (
-          <div
-            className="reveal-media"
-            style={{ background: work.mediaGradient }}
-            aria-hidden="true"
-          />
+        {hasPreview ? (
+          <div className="reveal-media preview">
+            <Image
+              className="preview-img"
+              src={work.image!}
+              alt={work.imageAlt ?? `${work.title} — site preview`}
+              fill
+              sizes="(max-width: 720px) 92vw, (max-width: 1280px) 86vw, 1120px"
+              placeholder="blur"
+              draggable={false}
+            />
+            <span className="preview-cta">
+              <span>{work.cue}</span>
+              <span className="preview-arrow" aria-hidden="true">
+                ↗
+              </span>
+            </span>
+          </div>
+        ) : (
+          !isGen && (
+            <div
+              className="reveal-media"
+              style={{ background: work.mediaGradient }}
+              aria-hidden="true"
+            />
+          )
         )}
         <div className="reveal-caption">
           <span className="c-desc">{work.description}</span>
-          <span className="c-cue">{work.cue}</span>
+          {!hasPreview && <span className="c-cue">{work.cue}</span>}
         </div>
       </div>
     </div>
