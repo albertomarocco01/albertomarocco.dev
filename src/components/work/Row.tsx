@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import type { Work } from "@/lib/work";
+import type { WorkText } from "@/lib/i18n";
 import { registerGsap, FIELD_EASE, TIMING } from "@/lib/motion";
 
 // Lazy 3D: keeps three/r3f/drei out of the initial page chunk.
@@ -24,6 +25,8 @@ export interface RowHandlers {
 
 interface RowProps extends RowHandlers {
   work: Work;
+  /** translatable copy (description, cue) for this row, from the dictionary */
+  text: WorkText;
   isOpen: boolean;
   reducedMotion: boolean;
   /** field is mounted — safe to render the aura View */
@@ -32,6 +35,7 @@ interface RowProps extends RowHandlers {
 
 export function Row({
   work,
+  text,
   isOpen,
   reducedMotion,
   fieldReady,
@@ -136,7 +140,7 @@ export function Row({
               draggable={false}
             />
             <span className="preview-cta">
-              <span>{work.cue}</span>
+              <span>{text.cue}</span>
               <span className="preview-arrow" aria-hidden="true">
                 ↗
               </span>
@@ -152,8 +156,8 @@ export function Row({
           )
         )}
         <div className="reveal-caption">
-          <span className="c-desc">{work.description}</span>
-          {!hasPreview && <span className="c-cue">{work.cue}</span>}
+          <span className="c-desc">{text.description}</span>
+          {!hasPreview && <span className="c-cue">{text.cue}</span>}
         </div>
       </div>
     </div>

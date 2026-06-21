@@ -1,10 +1,11 @@
 import { Fragment } from "react";
-import { TICKER_ITEMS } from "@/lib/work";
 
 // Slow mono marquee carrying real info. Two identical halves so the
-// -50% translate loops seamlessly. Pauses under reduced motion (CSS).
-export function Ticker() {
-  const half = TICKER_ITEMS.flatMap((item) => [item, "·"]);
+// -50% translate loops seamlessly. Pauses under reduced motion (CSS). Items
+// come in as a prop (the active dictionary's ticker), keeping this a server
+// component.
+export function Ticker({ items }: { items: string[] }) {
+  const half = items.flatMap((item) => [item, "·"]);
   const track = [...half, ...half];
   return (
     <div className="ticker" aria-hidden="true">

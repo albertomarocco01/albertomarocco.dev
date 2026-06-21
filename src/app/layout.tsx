@@ -10,6 +10,7 @@ import { Grain } from "@/components/chrome/Grain";
 import { Cursor } from "@/components/chrome/Cursor";
 import { Shell } from "@/components/chrome/Shell";
 import { FieldMount } from "@/components/canvas/FieldMount";
+import { getDictionary, getLocale } from "@/lib/i18n";
 
 // Distinctive display serif — variable, with italic + optical size. Not Inter.
 const fraunces = Fraunces({
@@ -68,17 +69,21 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
   return (
-    <html lang="en" className={fraunces.variable}>
+    <html lang={locale} className={fraunces.variable}>
       <body>
         <AppProvider>
           <Glow />
           <FieldMount />
           <SmoothScroll>
-            <Shell>{children}</Shell>
+            <Shell dict={dict} locale={locale}>
+              {children}
+            </Shell>
           </SmoothScroll>
           <Grain />
           <Cursor />

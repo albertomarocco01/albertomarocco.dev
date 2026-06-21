@@ -1,12 +1,12 @@
+import type { Dictionary } from "@/lib/i18n";
+
 // Short, deep. The thesis: this site runs his own generative work, live.
-export function About() {
+// Copy comes in as a prop so the component stays server-rendered.
+export function About({ about }: { about: Dictionary["about"] }) {
   return (
     <section id="about" className="about">
-      <span className="a-label">about</span>
-      Computer Science graduate (University of Turin, 2025) working at the seam
-      between web engineering and immersive visuals. I make sites that perform
-      and installations that breathe — and this one runs my own generative work,
-      live, as the proof.
+      <span className="a-label">{about.label}</span>
+      {about.body}
     </section>
   );
 }

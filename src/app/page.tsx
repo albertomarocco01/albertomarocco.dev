@@ -3,21 +3,24 @@ import { Ticker } from "@/components/Ticker";
 import { WorkRows } from "@/components/work/WorkRows";
 import { About } from "@/components/About";
 import { Footer } from "@/components/Footer";
+import { getDictionary, getLocale } from "@/lib/i18n";
 
-export default function Home() {
+export default async function Home() {
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
   return (
     <>
-      <Hero />
-      <Ticker />
-      <section id="work" aria-label="Selected work">
+      <Hero hero={dict.hero} />
+      <Ticker items={dict.ticker} />
+      <section id="work" aria-label={dict.work.aria}>
         <div className="sect-label">
-          <span>selected work</span>
-          <span>2024 — 2025</span>
+          <span>{dict.work.label}</span>
+          <span>{dict.work.years}</span>
         </div>
-        <WorkRows />
+        <WorkRows items={dict.work.items} />
       </section>
-      <About />
-      <Footer />
+      <About about={dict.about} />
+      <Footer footer={dict.footer} />
     </>
   );
 }
