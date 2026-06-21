@@ -65,6 +65,8 @@ export const fieldEasing = cubicBezier(...FIELD_BEZIER);
 /** Slow, harmonious in-page nav scroll — Lenis `scrollTo` duration in seconds. */
 export const NAV_SCROLL_DURATION = 1.6;
 
+export const TOPBAR_REVEAL_TOP = 80; // px from top where the bar always shows
+
 // Interaction timings (seconds) — ported 1:1 from the prototype.
 export const TIMING = {
   barHeight: 0.55,

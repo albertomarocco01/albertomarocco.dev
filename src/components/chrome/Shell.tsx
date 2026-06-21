@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useLenis } from "lenis/react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
@@ -10,6 +10,7 @@ import {
   FIELD_EASE,
   fieldEasing,
   NAV_SCROLL_DURATION,
+  TOPBAR_REVEAL_TOP,
 } from "@/lib/motion";
 
 /**
@@ -20,6 +21,11 @@ import {
 export function Shell({ children }: { children: React.ReactNode }) {
   const { entered, reducedMotion } = useApp();
   const lenis = useLenis();
+  const topbarRef = useRef<HTMLDivElement>(null);
+  // Last applied tuck state, held in a ref so the scroll subscription can toggle
+  // the class without ever calling setState in the hot loop (same hot-path
+  // discipline as Cursor.tsx).
+  const tuckedRef = useRef(false);
 
   // The entrance: a short, orchestrated "opening" into the home. The gate
   // name/CTA lift and fade, the white field blooms briefly to carry through
@@ -77,12 +83,51 @@ export function Shell({ children }: { children: React.ReactNode }) {
     [lenis, reducedMotion],
   );
 
+  // Auto-hide the (transparent, scrim-free) topbar so it never collides with
+  // the "selected work" label and the ghosted row titles below: tuck it away on
+  // scroll down, reveal it on scroll up, always show it near the very top.
+  // Driven off the shared Lenis instance and applied as a single class toggle
+  // through `topbarRef` — no setState on the scroll tick. CSS owns the cheap
+  // transform transition; GSAP still owns the entrance opacity, so the two
+  // compose without fighting. Skipped under reduced motion: the bar stays
+  // statically visible, exactly as before.
+  useLenis(
+    (instance) => {
+      if (reducedMotion) return;
+      const bar = topbarRef.current;
+      if (!bar) return;
+      // 1 = scrolling down, -1 = up. Tuck only while actively scrolling down
+      // past the threshold; anything else (top of page, scrolling up) shows it.
+      const tucked =
+        instance.scroll > TOPBAR_REVEAL_TOP && instance.direction === 1;
+      if (tucked === tuckedRef.current) return;
+      tuckedRef.current = tucked;
+      bar.classList.toggle("is-tucked", tucked);
+    },
+    [reducedMotion],
+  );
+
+  // Keyboard access: if focus moves into the topbar while it's tucked, reveal it
+  // so every nav link stays reachable. `focusin` bubbles (the native `focus`
+  // event does not), so one listener on the bar covers all its descendants.
+  useEffect(() => {
+    const bar = topbarRef.current;
+    if (!bar) return;
+    const reveal = () => {
+      if (!tuckedRef.current) return;
+      tuckedRef.current = false;
+      bar.classList.remove("is-tucked");
+    };
+    bar.addEventListener("focusin", reveal);
+    return () => bar.removeEventListener("focusin", reveal);
+  }, []);
+
   return (
     <>
       <a href="#work" className="sr-only">
         skip to work
       </a>
-      <div className={`topbar${entered ? " in" : ""}`}>
+      <div ref={topbarRef} className={`topbar${entered ? " in" : ""}`}>
         <a href="#top" onClick={onNavClick}>
           alberto marocco
         </a>

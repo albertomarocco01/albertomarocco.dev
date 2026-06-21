@@ -257,9 +257,16 @@ html.entering .field-canvas {
   color: var(--ink-dim);
   opacity: 0;
   /* Eased in by the GSAP entrance; `.in` is the final/no-motion state. */
+  /* Auto-hide on scroll: a cheap CSS transform micro-transition (CSS owns
+     cheap transitions, GSAP owns the entrance opacity — they never collide). */
+  transition: transform 0.5s var(--ease);
+  will-change: transform;
 }
 .topbar.in {
   opacity: 1;
+}
+.topbar.is-tucked {
+  transform: translateY(-100%);
 }
 .topbar nav {
   display: flex;
