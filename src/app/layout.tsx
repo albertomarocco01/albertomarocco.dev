@@ -8,7 +8,6 @@ import { SmoothScroll } from "@/components/providers/SmoothScroll";
 import { Glow } from "@/components/chrome/Glow";
 import { Grain } from "@/components/chrome/Grain";
 import { Cursor } from "@/components/chrome/Cursor";
-import { Gate } from "@/components/chrome/Gate";
 import { Shell } from "@/components/chrome/Shell";
 import { FieldMount } from "@/components/canvas/FieldMount";
 
@@ -78,7 +77,6 @@ export default function RootLayout({
         <AppProvider>
           <Glow />
           <FieldMount />
-          <Gate />
           <SmoothScroll>
             <Shell>{children}</Shell>
           </SmoothScroll>

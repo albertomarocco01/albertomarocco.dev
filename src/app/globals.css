@@ -31,16 +31,9 @@
 html {
   background: var(--void);
   -webkit-text-size-adjust: 100%;
-  /* Reserve the scrollbar space at all times so locking the page while the
-     entrance gate is up (or releasing it on enter) never shifts layout. */
+  /* Reserve the scrollbar space at all times so the layout never shifts when a
+     scrollbar appears or disappears. */
   scrollbar-gutter: stable;
-}
-
-/* While the entrance gate is shown, lock the page and hide the scrollbar.
-   Driven by AppProvider off the entered/reduced-motion state. */
-html.gate-locked,
-html.gate-locked body {
-  overflow: hidden;
 }
 
 body {
@@ -82,9 +75,9 @@ a {
   pointer-events: none;
 }
 
-/* Entrance bloom: as the gate dissolves, the white field carries through with a
-   brief one-shot brightness swell, then settles. Added/removed by the GSAP
-   entrance timeline (`html.entering`); `both` holds the resting value so
+/* Entrance bloom: as the page opens on load, the white field carries through
+   with a brief one-shot brightness swell, then settles. Added/removed by the
+   GSAP entrance timeline (`html.entering`); `both` holds the resting value so
    removing the class is seamless. Skipped under reduced motion (no entrance). */
 html.entering .field-canvas {
   animation: field-bloom 1.8s var(--ease) both;
@@ -163,70 +156,6 @@ html.entering .field-canvas {
   }
 }
 
-/* ---- entrance gate ---- */
-.gate {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  /* Transparent on purpose: the shared canvas (z-index 1) paints the ambient
-     white field behind the gate (B1), and the gate text sits above it. The home
-     content below stays hidden until entry via .wrap's opacity, so nothing else
-     shows through — just void + glow + the faint field + the gate's own text. */
-  background: transparent;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  gap: 2rem;
-  /* Fade-out is owned by the GSAP entrance (Shell), not a CSS transition. */
-}
-.g-eyebrow {
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.34em;
-  text-transform: lowercase;
-  color: var(--ink-dim);
-}
-.g-name {
-  font-family: var(--serif);
-  font-weight: 300;
-  font-size: clamp(2rem, 7vw, 4rem);
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
-.g-name em {
-  font-style: italic;
-  color: var(--ink-dim);
-}
-.g-enter {
-  font-family: var(--mono);
-  font-size: 0.74rem;
-  letter-spacing: 0.28em;
-  text-transform: lowercase;
-  color: var(--ink);
-  background: transparent;
-  border: 1px solid var(--hairline-hot);
-  padding: 1rem 2.2rem;
-  border-radius: 2px;
-  cursor: none;
-  transition:
-    border-color 0.6s var(--ease),
-    color 0.6s var(--ease),
-    letter-spacing 0.6s var(--ease);
-}
-.g-enter:hover,
-.g-enter:focus-visible {
-  border-color: var(--ink-dim);
-  letter-spacing: 0.34em;
-  outline: none;
-}
-@media (hover: none) {
-  .g-enter {
-    cursor: pointer;
-  }
-}
-
 /* ---- shell ---- */
 .wrap {
   position: relative;
@@ -234,8 +163,8 @@ html.entering .field-canvas {
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 clamp(1.4rem, 5vw, 5rem);
-  opacity: 0;
-  /* Revealed by the GSAP entrance; `.in` is the final/no-motion state. */
+  /* Visible from first paint (protects LCP). `.in` remains as a harmless final
+     state; only the topbar still fades in via GSAP. */
 }
 .wrap.in {
   opacity: 1;
@@ -693,7 +622,7 @@ footer.foot a:focus-visible {
   border: 0;
 }
 
-/* ---- reduced motion: no shader, instant transitions, no gate, no custom cursor ---- */
+/* ---- reduced motion: no shader, instant transitions, no entrance, no custom cursor ---- */
 @media (prefers-reduced-motion: reduce) {
   * {
     transition-duration: 0.001ms !important;
@@ -709,9 +638,6 @@ footer.foot a:focus-visible {
   }
   .cur-dot,
   .cur-ring {
-    display: none;
-  }
-  .gate {
     display: none;
   }
   .wrap,

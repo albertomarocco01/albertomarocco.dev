@@ -14,9 +14,9 @@ import {
 } from "@/lib/motion";
 
 /**
- * Page chrome: the fixed top bar and the content wrap, both of which fade in
- * once the gate is passed. Server-rendered page content is passed through as
- * children so the hero paints as static HTML.
+ * Page chrome: the fixed top bar (faded in as the entrance auto-plays on load)
+ * and the content wrap (visible from first paint). Server-rendered page content
+ * is passed through as children so the hero paints as static HTML.
  */
 export function Shell({ children }: { children: React.ReactNode }) {
   const { entered, reducedMotion } = useApp();
@@ -27,14 +27,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
   // discipline as Cursor.tsx).
   const tuckedRef = useRef(false);
 
-  // The entrance: a short, orchestrated "opening" into the home. The gate
-  // name/CTA lift and fade, the white field blooms briefly to carry through
-  // (a CSS brightness pulse on the canvas, see globals.css), then the home
-  // rises in — eyebrow → name → lede — and the topbar eases in. All on the
-  // signature `field` ease, slow and settling. GSAP owns these opacities here
-  // (the matching CSS transitions were removed so they don't double-animate);
-  // the `.in`/aria states remain as the no-motion final state. Under reduced
-  // motion this is skipped entirely — content is shown instantly by CSS.
+  // The entrance now auto-plays on load (no gate to click). The white field
+  // blooms once via CSS (`html.entering`, a 1.8s brightness pulse — see
+  // globals.css) and the topbar eases in over it on the signature `field` ease.
+  // The hero is deliberately NOT animated: it paints as static server HTML and
+  // stays visible from first paint, so the opening never costs LCP. Skipped
+  // entirely under reduced motion — content is shown instantly by CSS.
   useGSAP(
     () => {
       if (!entered || reducedMotion) return;
@@ -43,22 +41,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
       root.classList.add("entering");
 
       const tl = gsap.timeline({
-        defaults: { ease: FIELD_EASE },
         onComplete: () => root.classList.remove("entering"),
       });
 
-      tl.to(
-        ".gate > *",
-        { y: -14, autoAlpha: 0, duration: 0.8, stagger: 0.07 },
-        0,
-      )
-        .set(".gate", { autoAlpha: 0, pointerEvents: "none" }, 0.95)
-        .from(
-          ".hero .eyebrow, .hero .name, .hero .lede",
-          { y: 22, autoAlpha: 0, duration: 1.1, stagger: 0.22 },
-          0.6,
-        )
-        .from(".topbar", { autoAlpha: 0, duration: 1.2 }, 0.85);
+      // Only the topbar fades in; the hero is untouched.
+      tl.from(".topbar", { autoAlpha: 0, duration: 1.2, ease: FIELD_EASE })
+        // Hold the timeline open for the full 1.8s field bloom so removing
+        // `entering` never cuts the brightness pulse short.
+        .to({}, { duration: 0.6 });
     },
     { dependencies: [entered, reducedMotion] },
   );

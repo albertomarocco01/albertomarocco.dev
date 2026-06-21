@@ -2,7 +2,6 @@
 
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -10,11 +9,9 @@ import {
 } from "react";
 
 interface AppState {
-  /** the entrance gate has been passed (or skipped under reduced motion) */
+  /** the entrance has played — auto-triggered on mount (immediate under reduced motion) */
   entered: boolean;
-  /** pass the gate — fades content in and triggers the canvas wash */
-  enter: () => void;
-  /** user prefers reduced motion — no shader loop, no gate, no cursor */
+  /** user prefers reduced motion — no shader loop, no entrance, no cursor */
   reducedMotion: boolean;
   /** past first paint + requestIdleCallback — safe to mount the WebGL field */
   fieldReady: boolean;
@@ -33,7 +30,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [fieldReady, setFieldReady] = useState(false);
 
-  // Detect reduced-motion on mount; if set, skip the gate entirely.
+  // Detect reduced-motion on mount; if set, enter immediately (no entrance).
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     const apply = () => {
@@ -45,11 +42,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  // The hero (and the gate) paint with zero 3D. Only after first paint + an idle
-  // slot do we let the WebGL field (and the gen-row aura chunks) mount — keeps 3D
-  // off the LCP path. Intentionally NOT gated on `entered`: the ambient white
-  // field lives behind the gate too (B1), so it readies as soon as the browser
-  // is idle, not only once the user enters.
+  // Auto-play the entrance on load — there's no gate to click anymore. Flip on
+  // the next animation frame so the hero has painted as static HTML first; the
+  // opening (topbar fade + field bloom, see Shell) then plays over it without
+  // ever hiding the hero, so LCP is unaffected. Under reduced motion the effect
+  // above already set `entered`, making this a harmless idempotent no-op.
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // The hero paints with zero 3D. Only after first paint + an idle slot do we
+  // let the WebGL field (and the gen-row aura chunks) mount — keeps 3D off the
+  // LCP path. Intentionally NOT gated on `entered`: the ambient white field
+  // readies as soon as the browser is idle.
   useEffect(() => {
     if (fieldReady) return;
     const ric = window.requestIdleCallback as
@@ -63,21 +69,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(id);
   }, [fieldReady]);
 
-  // Lock scrolling (and hide the scrollbar) while the entrance gate is shown.
-  // The reserved scrollbar gutter (globals.css) keeps this shift-free. Under
-  // reduced motion the gate is skipped, so the page is never locked.
-  useEffect(() => {
-    const locked = !entered && !reducedMotion;
-    const root = document.documentElement;
-    root.classList.toggle("gate-locked", locked);
-    return () => root.classList.remove("gate-locked");
-  }, [entered, reducedMotion]);
-
-  const enter = useCallback(() => setEntered(true), []);
-
   const value = useMemo<AppState>(
-    () => ({ entered, enter, reducedMotion, fieldReady }),
-    [entered, enter, reducedMotion, fieldReady],
+    () => ({ entered, reducedMotion, fieldReady }),
+    [entered, reducedMotion, fieldReady],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
