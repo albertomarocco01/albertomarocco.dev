@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { WORK, type Work } from "@/lib/work";
+import type { WorkText } from "@/lib/i18n";
 import { TIMING } from "@/lib/motion";
 import { useApp } from "@/components/providers/AppProvider";
 import { Row } from "./Row";
@@ -10,8 +11,11 @@ import { Row } from "./Row";
  * The signature interaction. One row open at a time; hover-intent (open delay,
  * close grace) avoids flicker on quick sweeps; focus opens instantly; siblings
  * dim via CSS. Touch taps toggle gen rows and follow links on web rows.
+ *
+ * `items` is the active dictionary's per-work copy, keyed by `work.id`; each
+ * Row reads its own description/cue from it.
  */
-export function WorkRows() {
+export function WorkRows({ items }: { items: Record<string, WorkText> }) {
   const { reducedMotion, fieldReady } = useApp();
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -83,6 +87,7 @@ export function WorkRows() {
         <Row
           key={work.id}
           work={work}
+          text={items[work.id]}
           isOpen={openId === work.id}
           reducedMotion={reducedMotion}
           fieldReady={fieldReady}

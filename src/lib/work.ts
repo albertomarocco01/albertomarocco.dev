@@ -9,13 +9,13 @@ import viniMontarello from "@/assets/work/vini-montarello.webp";
 
 export type WorkVariant = "amber" | "ember";
 
+// Translatable copy (description, cue) lives in the dictionary, keyed by `id`
+// (see src/lib/i18n.ts). This file stays structural and language-neutral.
 export interface Work {
   id: string;
   index: string;
   title: string;
   meta: string;
-  description: string;
-  cue: string;
   type: "web" | "gen";
   /** present on `gen` rows — selects the shader colour family */
   variant?: WorkVariant;
@@ -37,9 +37,6 @@ export const WORK: Work[] = [
     index: "01",
     title: "Vini Montarello",
     meta: "web · 2025",
-    description:
-      "Winery brand & e-commerce. Full-stack build, slow scroll, product as ritual.",
-    cue: "visit site",
     type: "web",
     href: "https://vinimontarello.it",
     external: true,
@@ -53,9 +50,6 @@ export const WORK: Work[] = [
     index: "02",
     title: "Liminal Field",
     meta: "installation · led · 2025",
-    description:
-      "Real-time generative loop for a 6×3m LED wall — domain-warped noise field, painted live by the shared WebGL canvas.",
-    cue: "live · webgl",
     type: "gen",
     variant: "amber",
   },
@@ -64,9 +58,6 @@ export const WORK: Work[] = [
     index: "03",
     title: "Aura Loops",
     meta: "generative · touchdesigner · 2024",
-    description:
-      "Seamless ambient loops, prototyped in shader and finished in TouchDesigner for the install.",
-    cue: "live · webgl",
     type: "gen",
     variant: "ember",
   },
@@ -75,23 +66,9 @@ export const WORK: Work[] = [
     index: "04",
     title: "Studio — next",
     meta: "web · soon",
-    description:
-      "Physics-based web experience, in progress — Next.js + React Three Fiber.",
-    cue: "coming soon",
     type: "web",
     href: "#work",
     external: false,
     mediaGradient: "linear-gradient(135deg,#101520,#0a0c10 55%,#141b22)",
   },
-];
-
-// Slow mono marquee — real info only (discipline · location · availability).
-export const TICKER_ITEMS = [
-  "generative visuals",
-  "full-stack web",
-  "led walls",
-  "webgl / webgpu",
-  "touchdesigner",
-  "based in turin",
-  "available 2026",
 ];

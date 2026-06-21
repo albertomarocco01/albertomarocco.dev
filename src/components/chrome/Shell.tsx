@@ -5,6 +5,8 @@ import { useLenis } from "lenis/react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { useApp } from "@/components/providers/AppProvider";
+import { LocaleToggle } from "@/components/chrome/LocaleToggle";
+import type { Dictionary, Locale } from "@/lib/i18n";
 import {
   registerGsap,
   FIELD_EASE,
@@ -18,7 +20,15 @@ import {
  * once the gate is passed. Server-rendered page content is passed through as
  * children so the hero paints as static HTML.
  */
-export function Shell({ children }: { children: React.ReactNode }) {
+export function Shell({
+  children,
+  dict,
+  locale,
+}: {
+  children: React.ReactNode;
+  dict: Dictionary;
+  locale: Locale;
+}) {
   const { entered, reducedMotion } = useApp();
   const lenis = useLenis();
   const topbarRef = useRef<HTMLDivElement>(null);
@@ -125,20 +135,23 @@ export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <a href="#work" className="sr-only">
-        skip to work
+        {dict.nav.skip}
       </a>
       <div ref={topbarRef} className={`topbar${entered ? " in" : ""}`}>
-        <a href="#top" onClick={onNavClick}>
-          alberto marocco
-        </a>
+        <div className="topbar-left">
+          <a href="#top" onClick={onNavClick}>
+            alberto marocco
+          </a>
+          <LocaleToggle locale={locale} labels={dict.locale} />
+        </div>
         <nav aria-label="primary">
           <a href="#work" onClick={onNavClick}>
-            work
+            {dict.nav.work}
           </a>
           <a href="#about" onClick={onNavClick}>
-            about
+            {dict.nav.about}
           </a>
-          <a href="mailto:albertomarocco.dev@gmail.com">contact</a>
+          <a href="mailto:albertomarocco.dev@gmail.com">{dict.nav.contact}</a>
         </nav>
       </div>
       <div className={`wrap${entered ? " in" : ""}`}>{children}</div>

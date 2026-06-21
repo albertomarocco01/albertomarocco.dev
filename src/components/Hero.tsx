@@ -1,19 +1,17 @@
-// Static, server-rendered hero — zero 3D, the LCP-critical layer.
-export function Hero() {
+import type { Dictionary } from "@/lib/i18n";
+
+// Static, server-rendered hero — zero 3D, the LCP-critical layer. Copy comes in
+// as a prop so the component stays a server component (no client JS).
+export function Hero({ hero }: { hero: Dictionary["hero"] }) {
   return (
     <header className="hero">
-      <p className="eyebrow">
-        full-stack developer &amp; creative technologist based in Turin
-      </p>
+      <p className="eyebrow">{hero.eyebrow}</p>
       <h1 className="name">
         Alberto
         <br />
         Marocco<em>.</em>
       </h1>
-      <p className="lede">
-        I build high-performance web interfaces and generative visuals — where
-        robust code meets real-time graphics, for screens and LED walls alike.
-      </p>
+      <p className="lede">{hero.lede}</p>
     </header>
   );
 }
