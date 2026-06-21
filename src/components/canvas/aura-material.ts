@@ -15,15 +15,30 @@ import { extend, type ThreeElement } from "@react-three/fiber";
  * The shader branches on u_white:
  *   • u_white 0 — the amber/ember WORK reveals: domain-warped value-noise fbm
  *     "smoke", ported verbatim from the prototype. UNCHANGED.
- *   • u_white 1 — the ambient WHITE field on the gate/home: a soft field of a
- *     few slowly-drifting luminous blobs (out-of-focus orbs) on near-black.
+ *   • u_white 1 — the ambient WHITE field on the gate/home: a small set of soft
+ *     luminous blobs (out-of-focus orbs) on near-black. Their centres + radii are
+ *     no longer drifted on sin/cos paths in the shader — they are driven by a tiny
+ *     JS physics sim (Aura.tsx, elastic collisions + soft walls + an energetic→
+ *     calm energy envelope) and handed in via the u_blobs[] uniform. The shader
+ *     only sums the soft gaussians at those centres, so the metaball merge reads
+ *     exactly as before while all the motion lives in JS.
  * Branching on u_white means the white refinements never touch the work aura.
  *
  * u_disp (view-local UV offset, rest = 0) is the cursor's gentle parallax: the
  * white field leans softly toward the pointer by a few percent, heavily smoothed
  * and decaying back to rest (computed in Aura.tsx). The work reveals never set
  * it, so they are unaffected. Tunables for the blob look live as #defines below.
+ *
+ * BLOB_COUNT is the single compile-time orb count: exported from here (Aura.tsx
+ * imports it to size the physics array) and interpolated into the GLSL #define
+ * and u_blobs[] length below — one source of truth, mirrored in both places.
  */
+
+// Number of soft orbs. Single source of truth: exported for the JS physics sim
+// (Aura.tsx) and interpolated into the fragment shader so the u_blobs[] length
+// and the loop bound always match. Keep small — the loop runs per pixel.
+export const BLOB_COUNT = 9;
+
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
   void main() {
@@ -41,6 +56,7 @@ const fragmentShader = /* glsl */ `
   uniform float u_white; // 0 = warm work smoke, 1 = ambient white blob field
   uniform float u_fade;  // master opacity (in/out envelope)
   uniform vec2  u_disp;  // cursor parallax offset in view-local UV (rest = 0)
+  uniform vec3  u_blobs[${BLOB_COUNT}]; // white field only: xy = orb centre (aspect-corrected, centred at 0), z = collision-core radius
 
   float hash(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
   float noise(vec2 p){ vec2 i=floor(p),f=fract(p);
@@ -48,44 +64,33 @@ const fragmentShader = /* glsl */ `
     vec2 u=f*f*(3.-2.*f); return mix(mix(a,b,u.x),mix(c,d,u.x),u.y); }
   float fbm(vec2 p){ float v=0.,a=.5; for(int i=0;i<5;i++){ v+=a*noise(p); p*=2.0; a*=.5; } return v; }
 
-  // ---- white ambient field tunables (soft drifting blobs) ----
-  #define BLOB_COUNT 7         // number of soft orbs
-  #define BLOB_SIZE 0.34       // base orb radius (normalized-height units)
+  // ---- white ambient field tunables (soft luminous orbs; motion lives in JS) ----
+  #define BLOB_COUNT ${BLOB_COUNT} // orb count — mirrors the exported TS const above (single source of truth)
+  #define BLOB_SIZE 2.34       // visual gaussian radius = core radius (u_blobs.z) × this; >1 so the glow exceeds the collision core and orbs merge softly before they bounce
   #define BLOB_SOFT 1.20       // falloff softness — higher = blurrier / more out-of-focus
-  #define DRIFT_SPEED 0.05     // how fast the orbs wander on their paths
-  #define DRIFT_AMP 0.22       // how far the orbs wander
   #define DISP_STRENGTH 0.11   // cursor parallax max (fraction of normalized space)
   #define FIELD_GAIN 0.85      // brightness/presence gain on the summed field
   #define FIELD_OPACITY 0.72   // overall opacity multiplier for the blob field
-  #define TAU 6.2831853
 
   void main(){
     vec2 uv = vUv;
     float aspect = u_res.x/u_res.y;
 
     if (u_white > 0.5) {
-      // Aspect-correct normalized space, centred at 0. The cursor gently
-      // offsets the whole field (parallax), each orb leaning a touch differently
-      // for a hint of depth — no rotation, no velocity stirring.
+      // Aspect-correct normalized space, centred at 0. The cursor gently offsets
+      // the whole field (parallax), each orb leaning a touch differently for a
+      // hint of depth — no rotation, no velocity stirring. Orb centres + radii
+      // come from the JS physics sim via u_blobs; here we only sum the gaussians.
       vec2 p = (uv - 0.5) * vec2(aspect, 1.0);
       vec2 disp = u_disp * DISP_STRENGTH;
-      float bt = u_time * DRIFT_SPEED;
 
       float field = 0.0;
       for (int i = 0; i < BLOB_COUNT; i++) {
-        float fi = float(i);
-        float a = hash(vec2(fi, 1.7));
-        float b = hash(vec2(fi, 9.1));
-        float c = hash(vec2(fi, 4.3));
-        // anchor spread across (and a little beyond) the view
-        vec2 anchor = (vec2(a, b) * 2.0 - 1.0) * vec2(aspect * 0.55, 0.55);
-        // slow, low-frequency drift — per-orb phase + speed
-        float sp = 0.7 + 0.7 * c;
-        vec2 drift = vec2(sin(bt * sp + a * TAU), cos(bt * sp * 0.85 + b * TAU)) * DRIFT_AMP;
-        float depth = 0.55 + 0.9 * c;             // per-orb parallax depth
-        vec2 center = anchor + drift + disp * depth;
+        vec3 blob = u_blobs[i];
+        float depth = 0.55 + 0.9 * hash(vec2(float(i), 4.3)); // per-orb parallax depth (matches the old per-orb lean)
+        vec2 center = blob.xy + disp * depth;
         vec2 d = p - center;
-        float radius = BLOB_SIZE * (0.75 + 0.6 * a);
+        float radius = blob.z * BLOB_SIZE;             // visual glow radius (see BLOB_SIZE)
         field += exp(-dot(d, d) / (radius * radius * BLOB_SOFT)); // soft gaussian
       }
 
@@ -125,6 +130,9 @@ export const AuraMaterial = shaderMaterial(
     u_white: 0,
     u_fade: 0,
     u_disp: new THREE.Vector2(0, 0),
+    // One vec3 per orb (xy = centre, z = core radius); Aura.tsx mutates these
+    // each frame from the physics sim. Default-zeroed; sized by BLOB_COUNT.
+    u_blobs: Array.from({ length: BLOB_COUNT }, () => new THREE.Vector3()),
   },
   vertexShader,
   fragmentShader,
@@ -140,6 +148,7 @@ export type AuraMaterialImpl = THREE.ShaderMaterial & {
     u_white: { value: number };
     u_fade: { value: number };
     u_disp: { value: THREE.Vector2 };
+    u_blobs: { value: THREE.Vector3[] };
   };
 };
 
