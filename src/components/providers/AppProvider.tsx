@@ -8,6 +8,21 @@ import {
   useState,
 } from "react";
 
+// Silence THREE.Clock deprecation warnings coming from React Three Fiber (R3F v9)
+if (typeof window !== "undefined") {
+  const originalWarn = console.warn;
+  console.warn = (...args: any[]) => {
+    if (
+      args[0] &&
+      typeof args[0] === "string" &&
+      args[0].includes("THREE.Clock")
+    ) {
+      return;
+    }
+    originalWarn.apply(console, args);
+  };
+}
+
 interface AppState {
   /** the entrance has played — auto-triggered on mount (immediate under reduced motion) */
   entered: boolean;
