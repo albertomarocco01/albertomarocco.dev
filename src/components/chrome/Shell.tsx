@@ -93,7 +93,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <a href="#about" onClick={onNavClick}>
             about
           </a>
-          <a href="mailto:hello@albertomarocco.dev">contact</a>
+          <a href="mailto:albertomarocco.dev@gmail.com">contact</a>
         </nav>
       </div>
       <div className={`wrap${entered ? " in" : ""}`}>{children}</div>
