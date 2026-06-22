@@ -111,7 +111,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // The intro is done once the min hold has elapsed AND the field is live (or
   // immediately under reduced motion, where minElapsed was forced true and the
   // field never mounts — so gate the field requirement on motion preference).
-  const introDone = minElapsed && (reducedMotion || fieldReady);
+ const introDone = minElapsed;
 
   // Mark <html> while the intro is active so CSS can raise the canvas above the
   // veil (bubbles play on the dark loading screen) and drop it back behind the
