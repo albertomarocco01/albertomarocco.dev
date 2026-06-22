@@ -48,4 +48,13 @@ Replace the placeholders flagged in [DECISIONS.md](DECISIONS.md): real **P.IVA**
 **Instagram** handle, the **Studio — next** destination, and real media for the
 `web` rows. Run a Lighthouse pass on the Vercel preview (target ~100 / low LCP /
 no CLS) and confirm cookieless analytics.
+
+Note on **first-visit LCP**: the first visit shows a short loading screen (an
+opaque void panel with the name, ~0.9s hold + 0.7s crossfade) that auto-skips on
+repeat visits via the `intro-seen` cookie and under reduced motion. Because it
+covers the hero from first paint, Lighthouse (cookieless, so always "first
+visit") will measure LCP at the loader's crossfade rather than the instant hero
+— a consciously accepted tradeoff, kept under the 2.5s "good" threshold by the
+short duration. Repeat visits restore the instant-hero LCP. See the intro entry
+in DECISIONS.md.
 ```

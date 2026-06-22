@@ -94,6 +94,56 @@ html.entering .field-canvas {
   }
 }
 
+/* ---- intro / loading screen (first visit only) ----
+   A full-viewport opaque void panel with the name + eyebrow centred — the old
+   "enter the field" gate aesthetic minus the button. Sits above the topbar (70)
+   and below the custom cursor (95) so the cursor still works over it. GSAP owns
+   its opacity (the hold + crossfade, see Intro.tsx); CSS sets no opacity
+   transition here so the two never fight. Rendered only when the `intro-seen`
+   cookie is absent and never under reduced motion. */
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: var(--void);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.4rem;
+  text-align: center;
+}
+.intro-eyebrow {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.34em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+}
+.intro-name {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(2.4rem, 7vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.intro-dot {
+  color: #b07846; /* amber period — matches the hero/OG */
+}
+/* Thin amber hairline as a quiet progress/breath cue — GSAP fills it (scaleX
+   0 → 1) over the hold. No spinner. */
+.intro-line {
+  width: clamp(120px, 18vw, 200px);
+  height: 1px;
+  background: #b07846;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
 .glow {
   position: fixed;
   inset: 0;
@@ -674,6 +724,11 @@ footer.foot a:focus-visible {
   .field-canvas,
   .ambient-track {
     opacity: 0 !important;
+  }
+  /* Intro early-returns null under reduced motion; this also hides it pre-paint
+     (before the client detects the preference) so it never flashes for a frame. */
+  .intro {
+    display: none;
   }
   .cur-dot,
   .cur-ring {

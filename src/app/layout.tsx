@@ -9,8 +9,10 @@ import { Glow } from "@/components/chrome/Glow";
 import { Grain } from "@/components/chrome/Grain";
 import { Cursor } from "@/components/chrome/Cursor";
 import { Shell } from "@/components/chrome/Shell";
+import { Intro } from "@/components/chrome/Intro";
 import { FieldMount } from "@/components/canvas/FieldMount";
 import { getDictionary, getLocale } from "@/lib/i18n";
+import { cookies } from "next/headers";
 
 // Distinctive display serif — variable, with italic + optical size. Not Inter.
 const fraunces = Fraunces({
@@ -74,12 +76,18 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const locale = await getLocale();
   const dict = getDictionary(locale);
+  // First-visit only: show the loading screen when the `intro-seen` cookie is
+  // absent. Repeat visits (cookie present) skip it so the hero paints instantly
+  // (preserving LCP). Reading cookies() already opts this route into dynamic
+  // rendering — same as getLocale, expected and acceptable here.
+  const showIntro = !(await cookies()).get("intro-seen");
   return (
     <html lang={locale} className={fraunces.variable}>
       <body>
-        <AppProvider>
+        <AppProvider showIntro={showIntro}>
           <Glow />
           <FieldMount />
+          {showIntro && <Intro eyebrow={dict.intro.eyebrow} />}
           <SmoothScroll>
             <Shell dict={dict} locale={locale}>
               {children}

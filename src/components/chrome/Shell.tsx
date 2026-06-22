@@ -29,7 +29,7 @@ export function Shell({
   dict: Dictionary;
   locale: Locale;
 }) {
-  const { entered, reducedMotion } = useApp();
+  const { entered, reducedMotion, introDone } = useApp();
   const lenis = useLenis();
   const topbarRef = useRef<HTMLDivElement>(null);
   // Last applied tuck state, held in a ref so the scroll subscription can toggle
@@ -45,7 +45,11 @@ export function Shell({
   // entirely under reduced motion — content is shown instantly by CSS.
   useGSAP(
     () => {
-      if (!entered || reducedMotion) return;
+      // Wait for the intro loader to lift (introDone) so the topbar fade reveals
+      // concurrently with the loader dissolving rather than unseen behind the
+      // opaque loader. On repeat visits / reduced motion introDone is true from
+      // the start, so this runs immediately as before.
+      if (!entered || reducedMotion || !introDone) return;
       registerGsap();
       const root = document.documentElement;
       root.classList.add("entering");
@@ -60,7 +64,7 @@ export function Shell({
         // `entering` never cuts the brightness pulse short.
         .to({}, { duration: 0.6 });
     },
-    { dependencies: [entered, reducedMotion] },
+    { dependencies: [entered, reducedMotion, introDone] },
   );
 
   // Smooth, slow scroll for in-page nav anchors via the shared Lenis instance.

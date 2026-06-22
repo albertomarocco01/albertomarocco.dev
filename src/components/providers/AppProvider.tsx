@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -11,7 +12,7 @@ import {
 // Silence THREE.Clock deprecation warnings coming from React Three Fiber (R3F v9)
 if (typeof window !== "undefined") {
   const originalWarn = console.warn;
-  console.warn = (...args: any[]) => {
+  console.warn = (...args: unknown[]) => {
     if (
       args[0] &&
       typeof args[0] === "string" &&
@@ -26,10 +27,22 @@ if (typeof window !== "undefined") {
 interface AppState {
   /** the entrance has played — auto-triggered on mount (immediate under reduced motion) */
   entered: boolean;
-  /** user prefers reduced motion — no shader loop, no entrance, no cursor */
+  /** user prefers reduced motion — no shader loop, no entrance, no cursor, no intro */
   reducedMotion: boolean;
   /** past first paint + requestIdleCallback — safe to mount the WebGL field */
   fieldReady: boolean;
+  /** First-visit only: the intro loader should play (cookie absent, server-decided). */
+  showIntro: boolean;
+  /**
+   * The intro loader has lifted (or never showed). True immediately on repeat
+   * visits and under reduced motion. On a first visit it flips when the loader's
+   * crossfade begins (Intro calls `markIntroDone`). Gates the Shell entrance so
+   * the topbar fade reveals concurrently with the loader dissolving rather than
+   * unseen behind it.
+   */
+  introDone: boolean;
+  /** Called by the intro loader as its crossfade begins. */
+  markIntroDone: () => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -40,17 +53,30 @@ export function useApp(): AppState {
   return ctx;
 }
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
+export function AppProvider({
+  children,
+  showIntro,
+}: {
+  children: React.ReactNode;
+  showIntro: boolean;
+}) {
   const [entered, setEntered] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [fieldReady, setFieldReady] = useState(false);
+  // Done from the start on repeat visits (no loader to wait for); the loader
+  // flips it via markIntroDone on a first visit, and reduced motion forces it.
+  const [introDone, setIntroDone] = useState(!showIntro);
 
-  // Detect reduced-motion on mount; if set, enter immediately (no entrance).
+  // Detect reduced-motion on mount; if set, enter immediately (no entrance) and
+  // mark the intro done so the home shows instantly (the loader never renders).
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     const apply = () => {
       setReducedMotion(mq.matches);
-      if (mq.matches) setEntered(true);
+      if (mq.matches) {
+        setEntered(true);
+        setIntroDone(true);
+      }
     };
     apply();
     mq.addEventListener("change", apply);
@@ -70,7 +96,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // The hero paints with zero 3D. Only after first paint + an idle slot do we
   // let the WebGL field (and the gen-row aura chunks) mount — keeps 3D off the
   // LCP path. Intentionally NOT gated on `entered`: the ambient white field
-  // readies as soon as the browser is idle.
+  // readies as soon as the browser is idle (well within the intro's short hold,
+  // so the bubbles are live by the time the loader crossfades away).
   useEffect(() => {
     if (fieldReady) return;
     const ric = window.requestIdleCallback as
@@ -84,9 +111,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(id);
   }, [fieldReady]);
 
+  const markIntroDone = useCallback(() => setIntroDone(true), []);
+
   const value = useMemo<AppState>(
-    () => ({ entered, reducedMotion, fieldReady }),
-    [entered, reducedMotion, fieldReady],
+    () => ({
+      entered,
+      reducedMotion,
+      fieldReady,
+      showIntro,
+      introDone,
+      markIntroDone,
+    }),
+    [entered, reducedMotion, fieldReady, showIntro, introDone, markIntroDone],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

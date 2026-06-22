@@ -124,6 +124,32 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
   removed to avoid double-animation (`.gone` is gone; `.in` remains as the
   final/no-motion state). Under reduced motion the timeline is skipped entirely —
   the gate isn't rendered and CSS shows the content instantly.
+- **First-visit loading screen (`Intro.tsx`).** A full-viewport opaque `--void`
+  panel (z 90 — above the topbar, below the cursor at 95) with the mono eyebrow
+  + the Fraunces name (amber period, matching the hero/OG) and a thin amber
+  hairline that fills as a quiet progress cue (no spinner). Auto-plays, no
+  interaction: GSAP holds ~0.9s then crossfades opacity 1→0 on the `field` ease,
+  revealing the home where the retuned bubble field is already alive. On
+  complete it goes inert (`visibility:hidden` + `pointer-events:none`) so it
+  traps no focus. GSAP owns its opacity — `.intro` carries **no** CSS opacity
+  transition (no double-animation). The `Shell` entrance (topbar fade + field
+  bloom) is gated on `introDone`, which the loader flips as its crossfade
+  begins, so the topbar reveals concurrently with the loader dissolving rather
+  than unseen behind it.
+  - **First visit only, via an `intro-seen` cookie** (mirrors the `locale`
+    cookie: read server-side in `layout.tsx`, written client-side by `Intro` on
+    completion — 1-year max-age, `samesite=lax`). Cookie present → the loader
+    isn't rendered at all and the hero paints instantly.
+  - **Reduced motion → renders nothing.** `Intro` early-returns `null` (and a
+    `@media (prefers-reduced-motion)` `display:none` kills any first-frame
+    flash); `AppProvider` marks the intro done immediately, so the home shows
+    at once with no shader/cursor.
+  - **LCP tradeoff (consciously accepted).** On a first visit the opaque loader
+    covers the hero from first paint, so measured LCP slips to the loader's
+    crossfade time. It is bounded by keeping the loader **short** (~0.9s hold +
+    0.7s fade) so first-visit LCP stays well under the 2.5s "good" threshold.
+    Lighthouse/headless is cookieless, so it always sees the first-visit loader.
+    Repeat visits (cookie present) restore the instant-hero LCP (~0.7s).
 
 ## Content / placeholders — NEED REAL VALUES
 
