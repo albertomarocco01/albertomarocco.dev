@@ -37,7 +37,7 @@ import { extend, type ThreeElement } from "@react-three/fiber";
 // Number of soft orbs. Single source of truth: exported for the JS physics sim
 // (Aura.tsx) and interpolated into the fragment shader so the u_blobs[] length
 // and the loop bound always match. Keep small — the loop runs per pixel.
-export const BLOB_COUNT = 9;
+export const BLOB_COUNT = 7;
 
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -66,11 +66,11 @@ const fragmentShader = /* glsl */ `
 
   // ---- white ambient field tunables (soft luminous orbs; motion lives in JS) ----
   #define BLOB_COUNT ${BLOB_COUNT} // orb count — mirrors the exported TS const above (single source of truth)
-  #define BLOB_SIZE 2.34       // visual gaussian radius = core radius (u_blobs.z) × this; >1 so the glow exceeds the collision core and orbs merge softly before they bounce
+  #define BLOB_SIZE 1.5        // visual gaussian radius = core radius (u_blobs.z) × this; >1 so the glow exceeds the collision core and orbs merge softly before they bounce
   #define BLOB_SOFT 1.20       // falloff softness — higher = blurrier / more out-of-focus
   #define DISP_STRENGTH 0.11   // cursor parallax max (fraction of normalized space)
-  #define FIELD_GAIN 0.85      // brightness/presence gain on the summed field
-  #define FIELD_OPACITY 0.72   // overall opacity multiplier for the blob field
+  #define FIELD_GAIN 1.7       // brightness/presence gain on the summed field
+  #define FIELD_OPACITY 1.0    // overall opacity multiplier for the blob field
 
   void main(){
     vec2 uv = vUv;
@@ -98,10 +98,10 @@ const fragmentShader = /* glsl */ `
       // follows presence so the gaps stay true near-black (orbs, not a wash).
       float pres = 1.0 - exp(-field * FIELD_GAIN);
       vec3 dim = vec3(0.30, 0.32, 0.38);
-      vec3 orb = vec3(0.85, 0.87, 0.93);
+      vec3 orb = vec3(0.92, 0.94, 1.0);
       vec3 col = mix(dim, orb, pres);
       float vig = smoothstep(1.25, 0.25, length(uv - 0.5));
-      gl_FragColor = vec4(col, u_fade * pres * mix(0.45, 1.0, vig) * FIELD_OPACITY);
+      gl_FragColor = vec4(col, u_fade * pres * mix(0.8, 1.0, vig) * FIELD_OPACITY);
       return;
     }
 

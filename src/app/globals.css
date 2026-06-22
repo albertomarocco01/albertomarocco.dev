@@ -75,6 +75,31 @@ a {
   pointer-events: none;
 }
 
+/* ---- intro / loading veil ----
+   A dark full-screen plate that covers the hero on load while the WebGL bubbles
+   play above it; fades out (`.lift`) once the intro is done, revealing the hero
+   with the field continuing behind it. */
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: var(--void);
+  opacity: 1;
+  transition: opacity 0.8s var(--ease);
+  pointer-events: none;
+}
+.intro.lift {
+  opacity: 0;
+}
+/* While the intro plays, raise the canvas ABOVE the veil so the bubbles paint on
+   the dark loading screen. Once `intro-playing` is removed the canvas drops back
+   to z-index 1, sitting behind the hero. `!important` is required because Field
+   sets the canvas container's z-index inline (1), and an inline style otherwise
+   wins over this class rule. */
+html.intro-playing .field-canvas {
+  z-index: 91 !important;
+}
+
 /* Entrance bloom: as the page opens on load, the white field carries through
    with a brief one-shot brightness swell, then settles. Added/removed by the
    GSAP entrance timeline (`html.entering`); `both` holds the resting value so
@@ -674,6 +699,9 @@ footer.foot a:focus-visible {
   .field-canvas,
   .ambient-track {
     opacity: 0 !important;
+  }
+  .intro {
+    display: none;
   }
   .cur-dot,
   .cur-ring {

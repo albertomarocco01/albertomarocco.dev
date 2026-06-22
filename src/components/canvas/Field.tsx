@@ -37,7 +37,7 @@ function isSoftwareRenderer(
  * Mounted once, after first paint + idle (see FieldMount), never on first paint.
  */
 export function Field() {
-  const { reducedMotion } = useApp();
+  const { reducedMotion, markFieldReady } = useApp();
 
   // The ambient field runs only while it can actually be seen: the hero is in
   // view (IntersectionObserver) and the tab is visible. Scrolled past the hero
@@ -80,7 +80,13 @@ export function Field() {
 
   return (
     <>
-      {!reducedMotion && <AmbientField active={active} staticOnly={staticOnly} />}
+      {!reducedMotion && (
+        <AmbientField
+          active={active}
+          staticOnly={staticOnly}
+          onReady={markFieldReady}
+        />
+      )}
       <Canvas
         className="field-canvas"
         // R3F sets inline position:relative on its container; override here so

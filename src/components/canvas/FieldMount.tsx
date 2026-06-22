@@ -9,12 +9,16 @@ const Field = dynamic(() => import("./Field").then((m) => m.Field), {
 });
 
 /**
- * Mounts the shared WebGL field once the app is entered and idle. Under reduced
- * motion we skip WebGL entirely (no GPU work, no animation) — gen rows fall back
- * to their designed static amber plate.
+ * Mounts the shared WebGL field on the client as early as possible. The intro
+ * veil covers the (static, server-rendered) hero during load, so mounting the
+ * field immediately doesn't cost the hero's first paint — and the sooner the
+ * canvas is live, the sooner the ambient bubbles play on the dark loading
+ * screen. The field reports back via markFieldReady once it has painted, which
+ * is what gates the gen rows and the intro lift (see AppProvider). Under reduced
+ * motion we skip WebGL entirely — gen rows fall back to their static amber plate.
  */
 export function FieldMount() {
-  const { fieldReady, reducedMotion } = useApp();
-  if (reducedMotion || !fieldReady) return null;
+  const { reducedMotion } = useApp();
+  if (reducedMotion) return null;
   return <Field />;
 }

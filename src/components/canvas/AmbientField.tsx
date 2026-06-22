@@ -22,9 +22,12 @@ import { Aura } from "./Aura";
 export function AmbientField({
   active,
   staticOnly = false,
+  onReady,
 }: {
   active: boolean;
   staticOnly?: boolean;
+  /** called once the field has painted a visible frame (drives the intro lift) */
+  onReady?: () => void;
 }) {
   return (
     <View className="ambient-track">
@@ -32,10 +35,11 @@ export function AmbientField({
         white
         active={active}
         reducedMotion={staticOnly}
-        maxFade={0.6}
-        fadeSpeed={1.4}
+        maxFade={1.0}
+        fadeSpeed={2.5}
         throttleMs={33}
         timeScale={3.1}
+        onReady={onReady}
       />
     </View>
   );

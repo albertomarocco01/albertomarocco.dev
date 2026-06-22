@@ -9,6 +9,7 @@ import { Glow } from "@/components/chrome/Glow";
 import { Grain } from "@/components/chrome/Grain";
 import { Cursor } from "@/components/chrome/Cursor";
 import { Shell } from "@/components/chrome/Shell";
+import { Intro } from "@/components/chrome/Intro";
 import { FieldMount } from "@/components/canvas/FieldMount";
 import { getDictionary, getLocale } from "@/lib/i18n";
 
@@ -80,6 +81,7 @@ export default async function RootLayout({
         <AppProvider>
           <Glow />
           <FieldMount />
+          <Intro />
           <SmoothScroll>
             <Shell dict={dict} locale={locale}>
               {children}

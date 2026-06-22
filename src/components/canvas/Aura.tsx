@@ -18,13 +18,13 @@ const DISP_DECAY = 0.7; // engagement decay per second — low = slower return t
 // handed. Distances are in the shader's aspect-corrected normalized-height space
 // (`p`): y spans ~[-0.5, 0.5] on screen, x is scaled by the aspect ratio.
 const TAU = Math.PI * 2;
-const CORE_RADIUS = 0.145; // base collision-core radius; the visual glow is this × BLOB_SIZE (shader). Small enough that BLOB_COUNT orbs roam and bounce without jamming.
+const CORE_RADIUS = 0.13; // base collision-core radius; the visual glow is this × BLOB_SIZE (shader). Small enough that BLOB_COUNT orbs roam and bounce without jamming.
 const RADIUS_VARY = 0.6; // per-orb size spread: r = CORE_RADIUS × (0.75 + RADIUS_VARY × hash) — mirrors the old radius variation
 const WALL_BOUNDS = 0.58; // half-extent of the orb-centre play area (height units); the x bound is WALL_BOUNDS × aspect each frame. Centres reach the edge; soft glows spill beyond so the field fills the view.
-const BASE_SPEED = 0.24; // entrance speed boost (units/sec) at energy = 1
-const IDLE_DRIFT = 0.035; // calm floor speed (units/sec) once settled — orbs keep gently floating instead of freezing
-const START_ENERGY = 1; // energy on the field's FIRST activation (load); only decays afterwards, never resets, so returning to the tab/hero stays calm
-const ENERGY_DECAY = 0.7; // energy decay per second toward 0 (time-constant ~1.4s → settles in a few seconds)
+const BASE_SPEED = 0.6; // entrance speed boost (units/sec) at energy = 1
+const IDLE_DRIFT = 0.07; // calm floor speed (units/sec) once settled — orbs keep gently floating instead of freezing
+const START_ENERGY = 2.2; // energy on the field's FIRST activation (load); only decays afterwards, never resets, so returning to the tab/hero stays calm
+const ENERGY_DECAY = 0.35; // energy decay per second toward 0 (time-constant ~2.9s → settles over a few seconds)
 const SPEED_TRACK = 1.4; // per-second rate each orb's |velocity| eases toward the envelope (BASE_SPEED×energy + IDLE_DRIFT) — lets the envelope govern liveliness without erasing collision redirects
 const JITTER = 0.6; // tiny brownian heading wobble (rad/sec) so settled orbs wander gently instead of gliding dead straight
 const RESTITUTION = 0.9; // bounciness for collisions and walls: 1 = perfectly elastic, <1 sheds a little speed on contact
@@ -187,6 +187,12 @@ interface AuraProps {
   throttleMs?: number;
   /** multiply the drift rate; >1 makes the noise visibly move while staying slow */
   timeScale?: number;
+  /**
+   * Fired once, when the aura has painted a clearly-visible frame (fade up). The
+   * ambient white field uses this to tell the app the bubbles are live so the
+   * intro veil can lift onto them. Per-row reveals don't pass it.
+   */
+  onReady?: () => void;
 }
 
 /**
@@ -206,10 +212,13 @@ export function Aura({
   maxFade = 1,
   throttleMs = 0,
   timeScale = 1,
+  onReady,
 }: AuraProps) {
   const matRef = useRef<AuraMaterialImpl>(null);
   const invalidate = useThree((s) => s.invalidate);
   const nextTimer = useRef<number | null>(null);
+  // One-shot latch: fire onReady the first frame the field is clearly visible.
+  const reportedReady = useRef(false);
 
   // Pointer state for the white field's gentle cursor parallax. Kept in refs so
   // pointermove never re-renders. UV space (y up). `target` is the latest
@@ -328,12 +337,25 @@ export function Aura({
       // sit at their seeded arrangement — no physics, no per-frame work.
       m.uniforms.u_fade.value = target;
       if (white) writeBlobs(blobVecs, orbs.current);
+      // Software-renderer static plate still counts as "painted" — report it so
+      // the intro veil can lift (software WebGL is not reduced-motion).
+      if (white && !reportedReady.current && target > 0) {
+        reportedReady.current = true;
+        onReady?.();
+      }
       return;
     }
 
     const d = Math.min(1, delta * fadeSpeed);
     m.uniforms.u_fade.value += (target - m.uniforms.u_fade.value) * d;
     if (active) m.uniforms.u_time.value += delta * timeScale;
+
+    // Once the field has faded up enough to be clearly on screen, tell the app
+    // (one-shot): the bubbles are live, so the intro veil may lift onto them.
+    if (white && !reportedReady.current && m.uniforms.u_fade.value > 0.5) {
+      reportedReady.current = true;
+      onReady?.();
+    }
 
     if (white) {
       // Advance the orb sim only while the field is open (mirrors u_time), then
