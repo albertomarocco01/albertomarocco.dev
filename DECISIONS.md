@@ -47,17 +47,17 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
     fbm "smoke", ported verbatim from the prototype. Kept **byte-for-byte** (the
     branch holds the original GLSL; the only edit is aliasing `u_res.x/u_res.y`
     to a local `aspect`, the same value).
-  - **`u_white` 1 — the ambient WHITE field (gate/home):** a small set of soft,
-    slowly-drifting **luminous blobs** — out-of-focus orbs on near-black, not the
-    old desaturated smoke. ~7 gaussian orbs (`BLOB_COUNT`) wander on independent
-    low-frequency sin/cos paths; a soft-saturate (`1 - exp(-field·gain)`) keeps
-    edges blurry and the alpha follows presence so the gaps stay true near-black
-    (orbs, not a wash). All look knobs are named `#define`s in the shader
-    (`BLOB_COUNT/SIZE/SOFT`, `DRIFT_SPEED/AMP`, `DISP_STRENGTH`,
-    `FIELD_GAIN/OPACITY`). The blob field is *cheaper* than the smoke (a handful
-    of gaussians vs a 5-octave domain warp). `maxFade` 0.6 envelope, `timeScale`
-    ~3.1, ~30fps `throttleMs`. Verified real-GPU: a two-timepoint diff
-    (meanAbsDiff ~4) shows the orbs drifting.
+  - **`u_white` 1 — the ambient WHITE field (gate/home):** a small set of soft
+    **luminous orbs** — out-of-focus blobs on near-black, not a desaturated
+    smoke. `BLOB_COUNT` (7) gaussian orbs are positioned each frame by a tiny JS
+    physics sim (elastic collisions + soft walls + an energetic→lively energy
+    envelope — see the retune note below); the shader only sums the gaussians and
+    soft-saturates (`1 - exp(-field·FIELD_GAIN)`). Alpha follows presence, so the
+    gaps between orbs fall to true near-black — distinct orbs, not a wash. All
+    look knobs are named `#define`s (`BLOB_COUNT/SIZE/SOFT`, `DISP_STRENGTH`,
+    `FIELD_GAIN/OPACITY`). Cheaper than the smoke (a handful of gaussians vs a
+    5-octave domain warp). `timeScale` ~3.1, ~30fps `throttleMs`. See **White
+    field — distinct orbs + perpetual motion** below for the tuned constants.
 - **Calm cursor parallax (replaced the old swirl).** The white field gently
   *leans* toward the pointer — no rotation, no velocity-driven stirring. `Aura`
   records the pointer (UV, white field only) and re-engages on movement; the loop
@@ -103,6 +103,53 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
 - **Static fallback.** Generative rows show a faint amber `::before` plate that
   crossfades out once the canvas is live (`.canvas-live`), and stays if WebGL is
   unavailable.
+
+## White ambient field — distinct orbs + perpetual motion
+
+The field must read as **distinct soft white orbs on near-black with real dark
+gaps**, keep the hero eyebrow/name/lede **legible** over it, and hold a
+**constant gentle drift with visible collisions** — an energetic burst on the
+field's first activation (it carries the load beat, and a later intro screen)
+that **settles into the lively floor, never a freeze**. Two root causes were
+retuned; all constants stay named (white branch of `aura-material.ts`, physics
+in `Aura.tsx`, props in `AmbientField.tsx`).
+
+- **Grey wash → distinct orbs (contrast).** The orbs were enormous: visual
+  radius = `BLOB_SIZE`(2.34) × `CORE_RADIUS`(0.145) ≈ 0.34 height-units — at
+  `BLOB_COUNT` 9 that is ~180% viewport coverage, so the summed field saturated
+  everywhere and `pres` stayed high across the whole screen → a flat grey wash
+  over the text. The dark gaps now come from **geometry**, not from crushing
+  opacity: `BLOB_SIZE` **2.34 → 1.35** (≈half-viewport coverage — the main
+  lever), `BLOB_SOFT` **1.20 → 0.9** (sharper falloff), `BLOB_COUNT` **9 → 7**,
+  and the gap/halo `dim` colour **vec3(0.30,0.32,0.38) → vec3(0.10,0.11,0.14)**
+  (just above the void `#0a0a0c`, so low-presence regions read as true dark).
+  `FIELD_GAIN` (0.85) and `FIELD_OPACITY` (0.72) stay at the author's values —
+  the gaps are now geometric, so the field opacity is free to keep the orb cores
+  luminous; only `maxFade` is trimmed **0.6 → 0.45** for a little legibility
+  headroom. Between orbs the alpha falls to ~0, so the hero text stays legible
+  there while the orb cores still read.
+- **Decay-to-freeze → perpetual motion.** The energy envelope decays toward an
+  idle floor, and that floor was a crawl. `IDLE_DRIFT` **0.035 → 0.13** gives a
+  constant lively drift. `START_ENERGY` stays **1** (the first-activation burst),
+  but `BASE_SPEED` **0.24 → 0.5** so the burst reads as clearly energetic against
+  the raised floor before decaying onto it. `CORE_RADIUS` **0.145 → 0.15** widens
+  the contact cross-section so the now-fewer orbs still **collide regularly**;
+  the bumps softly merge-then-separate because `BLOB_SIZE` > 1 keeps each glow
+  larger than its collision core.
+
+**Tradeoff:** smaller + fewer orbs collide less often. 7 orbs (not 6), with the
+bigger core and the 0.13 idle floor, keep collisions frequent and visible while
+still leaving distinct orbs with dark space between.
+
+**Deviations from the first-cut targets:** `FIELD_GAIN` and `FIELD_OPACITY` were
+left at the originals (not lowered to 0.7 / 0.55) and `maxFade` only to 0.45 (not
+0.30) — with the orbs now small and sharp the gaps are already dark from geometry,
+so cutting opacity further only dims the orbs into a faint haze without buying
+legibility. The opacity ceiling (`maxFade` × `FIELD_OPACITY` ≈ 0.32) is the one
+dial to nudge by eye on real hardware: lower it if an orb drifting behind the name
+reads too strong, raise it if the orbs feel too subtle. (Headless/software WebGL
+paints only the field's static frame and can't drive this demand-loop field, so
+the look was reasoned from the shader math, not machine-verified visually.)
 
 ## Motion
 

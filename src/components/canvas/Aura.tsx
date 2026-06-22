@@ -18,11 +18,11 @@ const DISP_DECAY = 0.7; // engagement decay per second — low = slower return t
 // handed. Distances are in the shader's aspect-corrected normalized-height space
 // (`p`): y spans ~[-0.5, 0.5] on screen, x is scaled by the aspect ratio.
 const TAU = Math.PI * 2;
-const CORE_RADIUS = 0.145; // base collision-core radius; the visual glow is this × BLOB_SIZE (shader). Small enough that BLOB_COUNT orbs roam and bounce without jamming.
+const CORE_RADIUS = 0.15; // base collision-core radius; the visual glow is this × BLOB_SIZE (shader). Bumped slightly (was 0.145) so the now-fewer orbs present a larger contact cross-section and collide regularly. Still small enough that BLOB_COUNT orbs roam without jamming.
 const RADIUS_VARY = 0.6; // per-orb size spread: r = CORE_RADIUS × (0.75 + RADIUS_VARY × hash) — mirrors the old radius variation
 const WALL_BOUNDS = 0.58; // half-extent of the orb-centre play area (height units); the x bound is WALL_BOUNDS × aspect each frame. Centres reach the edge; soft glows spill beyond so the field fills the view.
-const BASE_SPEED = 0.24; // entrance speed boost (units/sec) at energy = 1
-const IDLE_DRIFT = 0.035; // calm floor speed (units/sec) once settled — orbs keep gently floating instead of freezing
+const BASE_SPEED = 0.5; // entrance speed boost (units/sec) at energy = 1. Raised (was 0.24) so the FIRST-activation burst (≈0.5 + floor) reads as clearly energetic against the higher idle floor below, then decays onto it.
+const IDLE_DRIFT = 0.13; // calm floor speed (units/sec) once settled. Raised (was 0.035) so the field keeps a constant, lively drift — perpetual gentle motion with regular collisions — instead of decaying to a near-freeze crawl.
 const START_ENERGY = 1; // energy on the field's FIRST activation (load); only decays afterwards, never resets, so returning to the tab/hero stays calm
 const ENERGY_DECAY = 0.7; // energy decay per second toward 0 (time-constant ~1.4s → settles in a few seconds)
 const SPEED_TRACK = 1.4; // per-second rate each orb's |velocity| eases toward the envelope (BASE_SPEED×energy + IDLE_DRIFT) — lets the envelope govern liveliness without erasing collision redirects
