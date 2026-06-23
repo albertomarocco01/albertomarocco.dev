@@ -75,6 +75,13 @@ const fragmentShader = /* glsl */ `
   #define FIELD_GAIN 0.85      // brightness/presence gain on the summed field
   #define FIELD_OPACITY 0.72   // overall opacity multiplier for the blob field
   #define BLOB_DENOM_EPS 1e-4  // floor on the gaussian denominator so a degenerate (zero/NaN) orb radius can't divide-by-zero -> NaN field -> nothing paints. Far below any valid denom (min ~0.021), so it never affects real orbs.
+  #define DEPTH_BASE 0.55      // per-orb parallax depth floor (each orb leans a touch differently for a hint of depth)
+  #define DEPTH_VARY 0.9       // per-orb parallax depth spread added on top of DEPTH_BASE via the per-orb hash
+  #define DIM_COLOR vec3(0.10, 0.11, 0.14) // gap/halo colour — just above the void (#0a0a0c ~ 0.04) so low-presence regions read true-dark, not a milky grey wash
+  #define ORB_COLOR vec3(0.85, 0.87, 0.93) // orb core colour — cold white
+  #define VIG_FAR 1.25         // vignette: centre-distance at which the field is fully faded out
+  #define VIG_NEAR 0.25        // vignette: centre-distance below which the field is at full strength
+  #define VIG_FLOOR 0.45       // vignette: alpha multiplier at the far edge (1.0 at centre)
 
   void main(){
     vec2 uv = vUv;
@@ -91,7 +98,7 @@ const fragmentShader = /* glsl */ `
       float field = 0.0;
       for (int i = 0; i < BLOB_COUNT; i++) {
         vec3 blob = u_blobs[i];
-        float depth = 0.55 + 0.9 * hash(vec2(float(i), 4.3)); // per-orb parallax depth (matches the old per-orb lean)
+        float depth = DEPTH_BASE + DEPTH_VARY * hash(vec2(float(i), 4.3)); // per-orb parallax depth (matches the old per-orb lean)
         vec2 center = blob.xy + disp * depth;
         vec2 d = p - center;
         float radius = blob.z * BLOB_SIZE;             // visual glow radius (see BLOB_SIZE)
@@ -102,15 +109,12 @@ const fragmentShader = /* glsl */ `
       // Soft saturate so dense overlaps glow gently without hard edges; alpha
       // follows presence so the gaps stay true near-black (orbs, not a wash).
       float pres = 1.0 - exp(-field * FIELD_GAIN);
-      // Gap/halo colour sits just above the void (#0a0a0c ≈ 0.04) so low-presence
-      // regions read as true dark, not the old grey wash (was 0.30,0.32,0.38).
-      // Alpha follows presence too, so gaps are near-transparent regardless; this
-      // keeps the partial-presence halos around each orb from milking to grey.
-      vec3 dim = vec3(0.10, 0.11, 0.14);
-      vec3 orb = vec3(0.85, 0.87, 0.93);
-      vec3 col = mix(dim, orb, pres);
-      float vig = smoothstep(1.25, 0.25, length(uv - 0.5));
-      gl_FragColor = vec4(col, u_fade * pres * mix(0.45, 1.0, vig) * FIELD_OPACITY);
+      // DIM_COLOR (gap/halo) sits just above the void so low-presence regions read
+      // true-dark, not the old grey wash; ORB_COLOR is the cold-white core. Alpha
+      // follows presence too, so the partial-presence halos never milk to grey.
+      vec3 col = mix(DIM_COLOR, ORB_COLOR, pres);
+      float vig = smoothstep(VIG_FAR, VIG_NEAR, length(uv - 0.5));
+      gl_FragColor = vec4(col, u_fade * pres * mix(VIG_FLOOR, 1.0, vig) * FIELD_OPACITY);
       return;
     }
 

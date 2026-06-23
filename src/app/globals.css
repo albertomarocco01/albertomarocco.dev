@@ -117,9 +117,12 @@ html.entering .field-canvas {
 }
 .loader-name {
   margin: 0;
+  max-width: 92vw;
   font-family: var(--serif);
   font-weight: 300;
-  font-size: clamp(1.9rem, 6vw, 3.6rem);
+  /* The wordmark is now the domain — one long, unbreakable token, so the upper
+     bound is sized to fit narrow viewports without clipping under the veil. */
+  font-size: clamp(1.5rem, 5vw, 3.1rem);
   line-height: 1;
   letter-spacing: -0.02em;
   color: var(--ink);

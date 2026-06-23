@@ -55,7 +55,8 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
     soft-saturates (`1 - exp(-field·FIELD_GAIN)`). Alpha follows presence, so the
     gaps between orbs fall to true near-black — distinct orbs, not a wash. All
     look knobs are named `#define`s (`BLOB_COUNT/SIZE/SOFT`, `DISP_STRENGTH`,
-    `FIELD_GAIN/OPACITY`). Cheaper than the smoke (a handful of gaussians vs a
+    `FIELD_GAIN/OPACITY`, the `DIM_COLOR`/`ORB_COLOR` palette, the `VIG_*`
+    vignette, and the `DEPTH_*` parallax spread). Cheaper than the smoke (a handful of gaussians vs a
     5-octave domain warp). `timeScale` ~3.1, ~30fps `throttleMs`. See **White
     field — distinct orbs + perpetual motion** below for the tuned constants.
 - **Calm cursor parallax (replaced the old swirl).** The white field gently

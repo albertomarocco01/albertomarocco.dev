@@ -19,8 +19,10 @@ const DISP_DECAY = 0.7; // engagement decay per second — low = slower return t
 // (`p`): y spans ~[-0.5, 0.5] on screen, x is scaled by the aspect ratio.
 const TAU = Math.PI * 2;
 const CORE_RADIUS = 0.15; // base collision-core radius; the visual glow is this × BLOB_SIZE (shader). Bumped slightly (was 0.145) so the now-fewer orbs present a larger contact cross-section and collide regularly. Still small enough that BLOB_COUNT orbs roam without jamming.
-const RADIUS_VARY = 0.6; // per-orb size spread: r = CORE_RADIUS × (0.75 + RADIUS_VARY × hash) — mirrors the old radius variation
+const RADIUS_BASE = 0.75; // floor of the per-orb radius fraction: r = CORE_RADIUS × (RADIUS_BASE + RADIUS_VARY × hash)
+const RADIUS_VARY = 0.6; // per-orb size spread added on top of RADIUS_BASE — mirrors the old radius variation
 const WALL_BOUNDS = 0.58; // half-extent of the orb-centre play area (height units); the x bound is WALL_BOUNDS × aspect each frame. Centres reach the edge; soft glows spill beyond so the field fills the view.
+const SEED_INSET = 0.9; // initial spread as a fraction of WALL_BOUNDS — seed centres just inside the walls so they have room to move before the first bounce
 const BASE_SPEED = 0.5; // entrance speed boost (units/sec) at energy = 1. Raised (was 0.24) so the FIRST-activation burst (≈0.5 + floor) reads as clearly energetic against the higher idle floor below, then decays onto it.
 const IDLE_DRIFT = 0.13; // calm floor speed (units/sec) once settled. Raised (was 0.035) so the field keeps a constant, lively drift — perpetual gentle motion with regular collisions — instead of decaying to a near-freeze crawl.
 const START_ENERGY = 1; // energy on the field's FIRST activation (load); only decays afterwards, never resets, so returning to the tab/hero stays calm
@@ -28,6 +30,9 @@ const ENERGY_DECAY = 0.7; // energy decay per second toward 0 (time-constant ~1.
 const SPEED_TRACK = 1.4; // per-second rate each orb's |velocity| eases toward the envelope (BASE_SPEED×energy + IDLE_DRIFT) — lets the envelope govern liveliness without erasing collision redirects
 const JITTER = 0.6; // tiny brownian heading wobble (rad/sec) so settled orbs wander gently instead of gliding dead straight
 const RESTITUTION = 0.9; // bounciness for collisions and walls: 1 = perfectly elastic, <1 sheds a little speed on contact
+const ENERGY_DT_MAX = 0.1; // clamp on the energy-decay timestep (s) — a long stall (tab refocus) lands already-calm, not mid-burst
+const STEP_DT_MAX = 0.05; // clamp on the integration timestep (s) — bounds per-frame motion so a long stall can't explode the sim
+const FADE_EPS = 0.003; // demand-loop keep-alive cutoff: stop re-arming once the fade-out has settled below this
 
 type Orb = { x: number; y: number; vx: number; vy: number; r: number };
 
@@ -53,9 +58,9 @@ function seedOrbs(orbs: Orb[], aspect: number) {
     const b = hash2(i, 9.1);
     const c = hash2(i, 4.3);
     const o = orbs[i];
-    o.x = (a * 2 - 1) * WALL_BOUNDS * aspect * 0.9; // spread just inside the walls
-    o.y = (b * 2 - 1) * WALL_BOUNDS * 0.9;
-    o.r = CORE_RADIUS * (0.75 + RADIUS_VARY * a);
+    o.x = (a * 2 - 1) * WALL_BOUNDS * aspect * SEED_INSET; // spread just inside the walls
+    o.y = (b * 2 - 1) * WALL_BOUNDS * SEED_INSET;
+    o.r = CORE_RADIUS * (RADIUS_BASE + RADIUS_VARY * a);
     const ang = c * TAU;
     o.vx = Math.cos(ang) * launch;
     o.vy = Math.sin(ang) * launch;
@@ -73,10 +78,10 @@ function stepPhysics(
   // Energy eases toward 0 (the speed floor is IDLE_DRIFT, applied below). The dt
   // is clamped so a long stall (tab refocus) lands already-calm rather than
   // exploding the integration.
-  const eDt = Math.min(delta, 0.1);
+  const eDt = Math.min(delta, ENERGY_DT_MAX);
   energy.current *= Math.exp(-ENERGY_DECAY * eDt);
 
-  const dt = Math.min(delta, 0.05);
+  const dt = Math.min(delta, STEP_DT_MAX);
   const boundX = WALL_BOUNDS * aspect;
   const boundY = WALL_BOUNDS;
   const targetSpeed = BASE_SPEED * energy.current + IDLE_DRIFT; // base × energy + floor
@@ -366,7 +371,7 @@ export function Aura({
     }
 
     // Keep the loop alive while open or while the fade-out completes.
-    if (active || m.uniforms.u_fade.value > 0.003) {
+    if (active || m.uniforms.u_fade.value > FADE_EPS) {
       requestNext();
     }
   });

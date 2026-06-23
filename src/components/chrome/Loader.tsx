@@ -114,7 +114,7 @@ export function Loader({ tag }: { tag: string }) {
   return (
     <div className="loader" ref={rootRef} aria-hidden="true">
       <p className="loader-name">
-        Alberto Marocco<span className="loader-dot">.</span>
+        albertomaroccodev<span className="loader-dot">.</span>xyz
       </p>
       <span className="loader-bar">
         <span className="loader-fill" ref={fillRef} />
