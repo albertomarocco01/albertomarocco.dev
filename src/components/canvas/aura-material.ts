@@ -74,6 +74,7 @@ const fragmentShader = /* glsl */ `
   #define DISP_STRENGTH 0.11   // cursor parallax max (fraction of normalized space)
   #define FIELD_GAIN 0.85      // brightness/presence gain on the summed field
   #define FIELD_OPACITY 0.72   // overall opacity multiplier for the blob field
+  #define BLOB_DENOM_EPS 1e-4  // floor on the gaussian denominator so a degenerate (zero/NaN) orb radius can't divide-by-zero -> NaN field -> nothing paints. Far below any valid denom (min ~0.021), so it never affects real orbs.
 
   void main(){
     vec2 uv = vUv;
@@ -94,7 +95,8 @@ const fragmentShader = /* glsl */ `
         vec2 center = blob.xy + disp * depth;
         vec2 d = p - center;
         float radius = blob.z * BLOB_SIZE;             // visual glow radius (see BLOB_SIZE)
-        field += exp(-dot(d, d) / (radius * radius * BLOB_SOFT)); // soft gaussian
+        float denom = max(radius * radius * BLOB_SOFT, BLOB_DENOM_EPS); // guard divide-by-zero on a degenerate radius
+        field += exp(-dot(d, d) / denom);              // soft gaussian
       }
 
       // Soft saturate so dense overlaps glow gently without hard edges; alpha

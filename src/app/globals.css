@@ -94,6 +94,80 @@ html.entering .field-canvas {
   }
 }
 
+/* ---- loading veil (every load / refresh) ----
+   A full-viewport opaque void panel shown while the page wakes: the wordmark, a
+   thin amber progress bar, and a mono counter. Server-rendered, so it paints
+   before React loads and genuinely covers the network/hydration wait. Sits above
+   content + topbar (70) and below the custom cursor (95) so the cursor still
+   reads over it. GSAP owns the fill, the counter, and the crossfade-out (see
+   Loader.tsx); CSS sets no opacity transition here so the two never fight.
+   Hidden entirely under reduced motion / no-JS (the home shows instantly). */
+.loader {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: var(--void);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.8rem;
+  text-align: center;
+  pointer-events: none; /* the cursor layer sits above; nothing here is clickable */
+}
+.loader-name {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(1.9rem, 6vw, 3.6rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.loader-dot {
+  color: #b07846; /* amber period — matches the hero/OG */
+}
+/* the bar: a faint hairline track with an amber fill that scales in from the
+   left. No overflow:hidden so the fill's soft leading glow can bloom past it. */
+.loader-bar {
+  position: relative;
+  width: clamp(200px, 56vw, 340px);
+  height: 2px;
+  background: var(--hairline);
+  border-radius: 1px;
+}
+.loader-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 1px;
+  transform: scaleX(0); /* GSAP drives this 0 → 1; SSR shows an empty bar */
+  transform-origin: left center;
+  background: linear-gradient(90deg, rgba(176, 120, 70, 0.28), #b07846);
+  box-shadow: 0 0 9px rgba(176, 120, 70, 0.5);
+}
+/* mono meta row under the bar: lowercase tag left, zero-padded counter right */
+.loader-meta {
+  display: flex;
+  justify-content: space-between;
+  width: clamp(200px, 56vw, 340px);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.24em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+}
+.loader-count {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums; /* counter doesn't jitter as digits change */
+}
+
+/* Lock scroll while the veil is up (shift-free thanks to scrollbar-gutter).
+   Toggled by Loader.tsx; released as the veil dissolves. */
+html.loading,
+html.loading body {
+  overflow: hidden;
+}
+
 .glow {
   position: fixed;
   inset: 0;
@@ -674,6 +748,9 @@ footer.foot a:focus-visible {
   .field-canvas,
   .ambient-track {
     opacity: 0 !important;
+  }
+  .loader {
+    display: none !important;
   }
   .cur-dot,
   .cur-ring {

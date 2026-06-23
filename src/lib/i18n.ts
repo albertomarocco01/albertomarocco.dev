@@ -34,6 +34,10 @@ export interface Dictionary {
     eyebrow: string;
     lede: string;
   };
+  loader: {
+    /** lowercase tag shown beside the progress counter on the loading veil */
+    tag: string;
+  };
   ticker: string[];
   work: {
     /** section landmark label (mirrors the visible label) */
@@ -67,6 +71,9 @@ const en: Dictionary = {
   hero: {
     eyebrow: "full-stack developer & creative technologist based in Turin",
     lede: "I build high-performance web interfaces and generative visuals — where robust code meets real-time graphics, for screens and LED walls alike.",
+  },
+  loader: {
+    tag: "loading",
   },
   ticker: [
     "generative visuals",
@@ -129,6 +136,9 @@ const it: Dictionary = {
   hero: {
     eyebrow: "full-stack developer & creative technologist, torino",
     lede: "Costruisco interfacce web ad alte prestazioni e visual generative — dove il codice solido incontra la grafica in tempo reale, per schermi e led wall.",
+  },
+  loader: {
+    tag: "caricamento",
   },
   ticker: [
     "visual generative",

@@ -9,6 +9,7 @@ import { Glow } from "@/components/chrome/Glow";
 import { Grain } from "@/components/chrome/Grain";
 import { Cursor } from "@/components/chrome/Cursor";
 import { Shell } from "@/components/chrome/Shell";
+import { Loader } from "@/components/chrome/Loader";
 import { FieldMount } from "@/components/canvas/FieldMount";
 import { getDictionary, getLocale } from "@/lib/i18n";
 
@@ -77,9 +78,15 @@ export default async function RootLayout({
   return (
     <html lang={locale} className={fraunces.variable}>
       <body>
+        {/* No-JS fallback: without hydration the veil would never dissolve, so
+            hide it and show the static home directly. */}
+        <noscript>
+          <style>{`.loader{display:none!important}`}</style>
+        </noscript>
         <AppProvider>
           <Glow />
           <FieldMount />
+          <Loader tag={dict.loader.tag} />
           <SmoothScroll>
             <Shell dict={dict} locale={locale}>
               {children}

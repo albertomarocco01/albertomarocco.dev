@@ -274,10 +274,17 @@ export function Aura({
     requestNext();
   }, [active, requestNext]);
 
-  // Drop any pending throttle timer on unmount.
+  // Drop any pending throttle timer on unmount. Reset the ref to null too: under
+  // React StrictMode (dev) effects mount→cleanup→remount, and if the ref kept a
+  // stale (already-cleared) timer id, requestNext()'s `nextTimer.current != null`
+  // guard would no-op forever on the remount — the kick never fires, invalidate()
+  // never runs, and the demand loop never starts (the field paints nothing).
   useEffect(
     () => () => {
-      if (nextTimer.current != null) window.clearTimeout(nextTimer.current);
+      if (nextTimer.current != null) {
+        window.clearTimeout(nextTimer.current);
+        nextTimer.current = null;
+      }
     },
     [],
   );
@@ -309,13 +316,19 @@ export function Aura({
     m.uniforms.u_res.value.set(w, h); // only the ratio is used by the shader
     m.uniforms.u_cool.value = variant === "ember" ? 1 : 0;
     m.uniforms.u_white.value = white ? 1 : 0;
-    const aspect = w / h;
+    // Clamp the aspect to a finite, positive value for the white-field sim. A
+    // transient zero/NaN box (u_res 0 -> aspect 0/NaN) would otherwise seed orbs
+    // at NaN centres / zero radii and blow up the gaussian field to NaN, painting
+    // nothing. White-field use only (seeding + physics); the shader reads u_res.
+    const rawAspect = w / h;
+    const aspect = Number.isFinite(rawAspect) && rawAspect > 0 ? rawAspect : 1;
+    const resOk = Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0;
 
-    // White field: own the u_blobs array, and seed the orbs once now that the
-    // aspect is known (also the fixed arrangement for the static frame).
+    // White field: own the u_blobs array, and seed the orbs once a finite,
+    // non-zero box is known (also the fixed arrangement for the static frame).
     if (white) {
       m.uniforms.u_blobs.value = blobVecs;
-      if (!orbsReady.current) {
+      if (!orbsReady.current && resOk) {
         seedOrbs(orbs.current, aspect);
         orbsReady.current = true;
       }

@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -11,7 +12,7 @@ import {
 // Silence THREE.Clock deprecation warnings coming from React Three Fiber (R3F v9)
 if (typeof window !== "undefined") {
   const originalWarn = console.warn;
-  console.warn = (...args: any[]) => {
+  console.warn = (...args: unknown[]) => {
     if (
       args[0] &&
       typeof args[0] === "string" &&
@@ -24,8 +25,11 @@ if (typeof window !== "undefined") {
 }
 
 interface AppState {
-  /** the entrance has played — auto-triggered on mount (immediate under reduced motion) */
+  /** the entrance has played — fired by the loading veil as it dissolves
+   * (immediate under reduced motion, which skips the veil) */
   entered: boolean;
+  /** play the entrance — called once by the loader when its fake fill completes */
+  enter: () => void;
   /** user prefers reduced motion — no shader loop, no entrance, no cursor */
   reducedMotion: boolean;
   /** past first paint + requestIdleCallback — safe to mount the WebGL field */
@@ -57,14 +61,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  // Auto-play the entrance on load — there's no gate to click anymore. Flip on
-  // the next animation frame so the hero has painted as static HTML first; the
-  // opening (topbar fade + field bloom, see Shell) then plays over it without
-  // ever hiding the hero, so LCP is unaffected. Under reduced motion the effect
-  // above already set `entered`, making this a harmless idempotent no-op.
+  // The entrance is driven by the loading veil (Loader): as its fake fill
+  // completes it calls `enter()`, so the opening (topbar fade + field bloom, see
+  // Shell) plays exactly as the veil dissolves. Under reduced motion the effect
+  // above already set `entered` (the veil is skipped), making `enter` a no-op.
+  const enter = useCallback(() => setEntered(true), []);
+
+  // Pure insurance: if the loader never reports back (it threw before its own
+  // safety timeout could run, say), still reveal the site so it's never stuck
+  // behind the veil. Fires well after the loader's own fill + safety window;
+  // `setEntered(true)` is idempotent, so the normal path no-ops this.
   useEffect(() => {
-    const raf = requestAnimationFrame(() => setEntered(true));
-    return () => cancelAnimationFrame(raf);
+    const id = window.setTimeout(() => setEntered(true), 6000);
+    return () => window.clearTimeout(id);
   }, []);
 
   // The hero paints with zero 3D. Only after first paint + an idle slot do we
@@ -85,8 +94,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [fieldReady]);
 
   const value = useMemo<AppState>(
-    () => ({ entered, reducedMotion, fieldReady }),
-    [entered, reducedMotion, fieldReady],
+    () => ({ entered, enter, reducedMotion, fieldReady }),
+    [entered, enter, reducedMotion, fieldReady],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
