@@ -327,6 +327,43 @@ html.loading body {
   }
 }
 
+/* Topbar on phones: the wordmark is redundant with the hero name just below and
+   is what overflows the single flex row — it wrapped to two lines and shoved the
+   EN/IT switch into the nav. Drop it on narrow screens, tighten the mono register,
+   and keep the switch + nav as one nowrap line. Tablet/desktop are untouched. */
+@media (max-width: 560px) {
+  .topbar {
+    padding: 1.1rem clamp(1.1rem, 5vw, 1.6rem);
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+  }
+  .topbar-left a:first-child {
+    display: none;
+  }
+  .topbar-left {
+    gap: 0;
+  }
+  .topbar nav {
+    gap: 1.1rem;
+  }
+  .topbar-left,
+  .topbar nav a {
+    white-space: nowrap;
+  }
+}
+@media (max-width: 380px) {
+  .topbar {
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+  }
+  .topbar nav {
+    gap: 0.85rem;
+  }
+  .locale-toggle {
+    gap: 0.4rem;
+  }
+}
+
 /* ---- hero ---- */
 .hero {
   min-height: 92vh;

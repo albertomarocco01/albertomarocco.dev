@@ -91,13 +91,16 @@ const fragmentShader = /* glsl */ `
   #define BLOB_SIZE 1.30       // visual glow radius = core radius (u_blobs.z) * this
   #define BLOB_SOFT 0.85       // softness
   #define DISP_STRENGTH 0.11   // cursor parallax max (fraction of normalized space)
-  #define FIELD_GAIN 1.10      // brightness/presence gain on the summed field
+  #define FIELD_GAIN 1.55      // brightness/presence gain on the summed field — higher = orb cores saturate to a distinct cold-white solid while the low-field gaps stay true-dark (raises orb visibility without milking the gaps)
   #define FIELD_OPACITY 0.76   // overall opacity multiplier for the blob field
   #define BLOB_DENOM_EPS 1e-4  // floor on the gaussian denominator so a degenerate (zero/NaN) orb radius can't divide-by-zero -> NaN field -> nothing paints. Far below any valid denom (min ~0.021), so it never affects real orbs.
   #define DEPTH_BASE 0.55      // per-orb parallax depth floor (each orb leans a touch differently for a hint of depth)
   #define DEPTH_VARY 0.9       // per-orb parallax depth spread added on top of DEPTH_BASE via the per-orb hash
   #define DIM_COLOR vec3(0.10, 0.11, 0.14) // gap/halo colour — just above the void (#0a0a0c ~ 0.04) so low-presence regions read true-dark, not a milky grey wash
   #define ORB_COLOR vec3(0.85, 0.87, 0.93) // orb core colour — cold white
+  #define VIG_XSQUASH 0.45 // horizontal squash of the vignette ellipse. Small enough that wide-screen (16:9+) side orbs survive the falloff instead of being clipped to black, while portrait p.x is tiny either way → the mobile look is untouched. (was 0.8 — which killed every landscape side orb.)
+  #define VIG_OUT 0.55     // vignette outer radius: vig = 0 beyond this (soft screen corners stay dark)
+  #define VIG_IN  0.35     // vignette inner radius: vig = 1 within this (full-presence core over the hero)
 
   void main(){
     vec2 uv = vUv;
@@ -130,8 +133,13 @@ const fragmentShader = /* glsl */ `
       // true-dark, not the old grey wash; ORB_COLOR is the cold-white core. Alpha
       // follows presence too, so the partial-presence halos never milk to grey.
       vec3 col = mix(DIM_COLOR, ORB_COLOR, pres);
-      float dist_centro = length(p * vec2(0.8, 1.0)); // schiaccia asse X per widescreen
-      float vig = smoothstep(0.55, 0.35, dist_centro); // vignette matching reference
+      // Vignette as a fixed-screen-space ellipse: squash x by VIG_XSQUASH so the
+      // horizontal falloff is wide enough for every aspect (a 16:9 side orb at
+      // p.x~0.76 squashes to ~0.34 → still lit, instead of the old 0.8 squash →
+      // 0.61 → clipped to black). Portrait p.x is tiny, so its look is unchanged;
+      // the vertical falloff (p.y) and corner darkening are identical to before.
+      float dist_centro = length(vec2(p.x * VIG_XSQUASH, p.y));
+      float vig = smoothstep(VIG_OUT, VIG_IN, dist_centro);
       gl_FragColor = vec4(col, u_fade * pres * vig * FIELD_OPACITY);
       return;
     }

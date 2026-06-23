@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, type MouseEvent } from "react";
+import { useEffect, useRef, type MouseEvent } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import { useLenis } from "lenis/react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import type { Work } from "@/lib/work";
@@ -48,6 +49,25 @@ export function Row({
   const revealRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
 
+  // Opening/closing a row runs a GSAP height tween that changes document height.
+  // Lenis caches its max-scroll limit behind a 250ms-debounced ResizeObserver, so
+  // for ~1s after a row opens it clamps every scroll to the stale (shorter) height
+  // — felt as broken, rubber-banding scrolling "while a work is kept open." We
+  // refresh the limit explicitly when the tween settles (held in a ref so the
+  // GSAP closures always see the live instance without re-running the effect).
+  const lenis = useLenis();
+  const lenisRef = useRef(lenis);
+  useEffect(() => {
+    lenisRef.current = lenis;
+  }, [lenis]);
+  const syncScrollLimit = () => {
+    const l = lenisRef.current;
+    // Skip mid-scroll: resize() snaps animated/target to the current position,
+    // which would abort an in-flight smooth scroll; the debounced observer still
+    // catches that rare overlap.
+    if (l && !l.isScrolling) l.resize();
+  };
+
   // GSAP owns the layout-affecting reveal (height) and the directional wipe
   // (clip-path via a CSS var) + opacity, synced to open state. CSS handles the
   // cheap micro-transitions (title shift, amber line, sibling dim).
@@ -66,6 +86,7 @@ export function Row({
           duration: reducedMotion ? 0 : TIMING.reveal,
           ease: FIELD_EASE,
           overwrite: "auto",
+          onComplete: syncScrollLimit,
         });
         gsap.to(inner, {
           opacity: 1,
@@ -80,6 +101,7 @@ export function Row({
           duration: reducedMotion ? 0 : 0.6,
           ease: FIELD_EASE,
           overwrite: "auto",
+          onComplete: syncScrollLimit,
         });
         gsap.to(inner, {
           opacity: 0,

@@ -32,6 +32,23 @@ const WALL_BOUNDS = 0.475; // half-extent of play area (scaled)
 const SEED_INSET = 0.9; // initial spread as a fraction of WALL_BOUNDS
 const BASE_SPEED = 0.25; // entrance speed boost (scaled)
 const IDLE_DRIFT = 0.065; // calm drift floor speed (scaled)
+// Aspect-aware orb-size scale. The orb play area grows ~linearly with the aspect
+// ratio (x-extent ∝ aspect, y fixed), so the same fixed-size orbs that look lush
+// and touching in portrait scatter sparse on a wide screen — one faint blob on
+// 16:9. We scale each orb's radius (its visual glow AND its physics collision
+// core, since o.r feeds both) by sqrt(aspect / ref): area ∝ aspect, so r ∝
+// √aspect holds the fill-fraction — the lush, merging, frequently-colliding look
+// — constant across aspects. Clamped so portrait never shrinks below the design
+// (the loved mobile look is preserved at scale 1.0) and ultrawide can't balloon.
+// All sight-tunable.
+const RADIUS_REF_ASPECT = 0.5; // design aspect (≈ a phone portrait) where scale = 1
+const RADIUS_ASPECT_POW = 0.5; // r ∝ aspect^this — 0.5 holds fill-fraction constant
+const RADIUS_SCALE_MIN = 1.0; // floor: portrait keeps the exact loved orb size
+const RADIUS_SCALE_MAX = 1.9; // ceiling: stops ultrawide orbs from ballooning
+function radiusScale(aspect: number): number {
+  const s = Math.pow(aspect / RADIUS_REF_ASPECT, RADIUS_ASPECT_POW);
+  return Math.min(RADIUS_SCALE_MAX, Math.max(RADIUS_SCALE_MIN, s));
+}
 const START_ENERGY = 1;
 const ENERGY_DECAY = 0.7;
 const SPEED_TRACK = 1.4;
@@ -67,7 +84,7 @@ function seedOrbs(orbs: Orb[], aspect: number) {
     const o = orbs[i];
     o.x = (a * 2 - 1) * WALL_BOUNDS * aspect * SEED_INSET; // spread just inside the walls
     o.y = (b * 2 - 1) * WALL_BOUNDS * SEED_INSET;
-    o.r = CORE_RADIUS * (RADIUS_BASE + RADIUS_VARY * a);
+    o.r = CORE_RADIUS * (RADIUS_BASE + RADIUS_VARY * a) * radiusScale(aspect);
     const ang = c * TAU;
     o.vx = Math.cos(ang) * launch;
     o.vy = Math.sin(ang) * launch;
