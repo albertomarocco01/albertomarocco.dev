@@ -124,7 +124,7 @@ export function Row({
       )}
       <div
         className={`reveal-inner${isGen ? " gen" : ""}${
-          work.variant === "ember" ? " ember" : ""
+          isGen && work.variant ? ` ${work.variant}` : ""
         }`}
         ref={innerRef}
       >

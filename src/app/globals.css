@@ -543,6 +543,14 @@ html.loading body {
   background: radial-gradient(135% 130% at 50% 116%, rgba(140, 72, 46, 0.32), rgba(72, 42, 30, 0.06) 46%, transparent 66%),
     linear-gradient(165deg, #170f0c, #0b0908 55%, #1a0d08);
 }
+.reveal-inner.gen.teal::before {
+  background: radial-gradient(135% 130% at 50% 116%, rgba(46, 140, 122, 0.3), rgba(26, 66, 58, 0.06) 46%, transparent 66%),
+    linear-gradient(165deg, #0c1614, #08100e 55%, #0a1a16);
+}
+.reveal-inner.gen.violet::before {
+  background: radial-gradient(135% 130% at 50% 116%, rgba(110, 79, 160, 0.3), rgba(56, 42, 82, 0.06) 46%, transparent 66%),
+    linear-gradient(165deg, #130f1c, #0b0910 55%, #160f22);
+}
 .canvas-live .reveal-inner.gen::before {
   opacity: 0;
 }

@@ -42,6 +42,24 @@ import { extend, type ThreeElement } from "@react-three/fiber";
 // visible collisions. The distinct-orbs-vs-collision-frequency balance.
 export const BLOB_COUNT = 7;
 
+/**
+ * Work-reveal colour families. Each `gen` row picks one by name (see
+ * src/lib/work.ts `WorkVariant`, which mirrors these keys). `hot` is the bright
+ * accent the smoke flares to; `mid` is the dark body fog. `base` (near-black) is
+ * shared and hardcoded in the shader. amber/ember keep the prototype's exact
+ * values — the verbatim work aura, identical to the old u_cool 0/1 endpoints —
+ * so only teal/violet are new. mid is tinted toward each hue so the cooler
+ * fields read teal/violet rather than muddy-warm.
+ */
+export const VARIANT_PALETTE = {
+  amber: { hot: [0.64, 0.43, 0.22], mid: [0.105, 0.092, 0.082] },
+  ember: { hot: [0.5, 0.27, 0.16], mid: [0.105, 0.092, 0.082] },
+  teal: { hot: [0.18, 0.55, 0.48], mid: [0.055, 0.095, 0.088] },
+  violet: { hot: [0.43, 0.31, 0.63], mid: [0.085, 0.072, 0.105] },
+} as const;
+
+export type AuraVariant = keyof typeof VARIANT_PALETTE;
+
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
   void main() {
@@ -55,7 +73,8 @@ const fragmentShader = /* glsl */ `
   varying vec2 vUv;
   uniform float u_time;
   uniform vec2  u_res;
-  uniform float u_cool;  // variant 0..1: clean amber -> dusty ember
+  uniform vec3  u_hot;   // variant accent the smoke flares to (see VARIANT_PALETTE)
+  uniform vec3  u_mid;   // variant dark body fog (the smoke bulk, tinted per hue)
   uniform float u_white; // 0 = warm work smoke, 1 = ambient white blob field
   uniform float u_fade;  // master opacity (in/out envelope)
   uniform vec2  u_disp;  // cursor parallax offset in view-local UV (rest = 0)
@@ -124,11 +143,9 @@ const fragmentShader = /* glsl */ `
     vec2 q = vec2(fbm(p+t), fbm(p+vec2(5.2,1.3)-t));
     vec2 r = vec2(fbm(p+3.6*q+vec2(1.7,9.2)+t*0.6), fbm(p+3.6*q+vec2(8.3,2.8)-t*0.5));
     float f = fbm(p+3.6*r);
-    vec3 base = vec3(0.033,0.029,0.030), mid = vec3(0.105,0.092,0.082);
-    vec3 amber = vec3(0.64,0.43,0.22), ember = vec3(0.50,0.27,0.16);
-    vec3 hot = mix(amber, ember, u_cool);
-    vec3 col = mix(base, mid, clamp(f*1.5,0.,1.));
-    col = mix(col, hot, pow(clamp(r.x*r.y*1.7,0.,1.),2.0)*0.55);
+    vec3 base = vec3(0.033,0.029,0.030);
+    vec3 col = mix(base, u_mid, clamp(f*1.5,0.,1.));
+    col = mix(col, u_hot, pow(clamp(r.x*r.y*1.7,0.,1.),2.0)*0.55);
     float vig = smoothstep(1.25,0.25,length(uv-0.5));
     col *= mix(0.55,1.0,vig);
     gl_FragColor = vec4(col, u_fade);
@@ -139,7 +156,8 @@ export const AuraMaterial = shaderMaterial(
   {
     u_time: 0,
     u_res: new THREE.Vector2(1, 1),
-    u_cool: 0,
+    u_hot: new THREE.Vector3(...VARIANT_PALETTE.amber.hot),
+    u_mid: new THREE.Vector3(...VARIANT_PALETTE.amber.mid),
     u_white: 0,
     u_fade: 0,
     u_disp: new THREE.Vector2(0, 0),
@@ -157,7 +175,8 @@ export type AuraMaterialImpl = THREE.ShaderMaterial & {
   uniforms: {
     u_time: { value: number };
     u_res: { value: THREE.Vector2 };
-    u_cool: { value: number };
+    u_hot: { value: THREE.Vector3 };
+    u_mid: { value: THREE.Vector3 };
     u_white: { value: number };
     u_fade: { value: number };
     u_disp: { value: THREE.Vector2 };

@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campo di Bolle Soffuse - Creative Tech</title>
+  <style>
+    /* Absolute reset and basic styling */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0a0a0c;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background-color: #0a0a0c;
+    }
+    
+    /* Control Panel Glassmorphism Overlay */
+    .panel {
+      position: absolute;
+      top: 1.5rem;
+      right: 1.5rem;
+      background: rgba(10, 10, 12, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 1.5rem;
+      color: rgba(255, 255, 255, 0.95);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 0.85rem;
+      width: 320px;
+      max-width: 90vw;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      z-index: 10;
+      user-select: none;
+      transition: opacity 0.3s ease;
+    }
+    
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 0.6rem;
+    }
+    
+    .panel-title {
+      font-weight: 600;
+      font-size: 0.9rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.9);
+    }
+    
+    .panel-subtitle {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    .slider-group {
+      margin-bottom: 1rem;
+    }
+    
+    .slider-info {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.25rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+    
+    .slider-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .slider-value {
+      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.15);
+      outline: none;
+      transition: background 0.2s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      border: 1px solid rgba(0, 0, 0, 0.3);
+      box-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+      transition: transform 0.1s, background-color 0.2s;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      background-color: #edf2f7;
+    }
+
+    .status-panel {
+      margin-top: 1rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      font-size: 0.7rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .status-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .status-val {
+      font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas, monospace;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 0.75rem;
+      margin-top: 0.1rem;
+    }
+
+    /* Action Buttons */
+    .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    .action-btn {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      color: #fff;
+      padding: 0.45rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s, border-color 0.2s;
+    }
+    
+    .action-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Simple subtle indicator */
+    .energy-glow {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: #63b3ed;
+      box-shadow: 0 0 8px #63b3ed;
+      margin-right: 6px;
+      vertical-align: middle;
+      transition: background-color 0.5s, box-shadow 0.5s;
+    }
+    
+    /* Reduced motion notice */
+    .reduced-motion-badge {
+      display: none;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: #f59e0b;
+      padding: 0.4rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      margin-top: 0.5rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gl-canvas"></canvas>
+
+  <div class="panel" id="ui-panel">
+    <div class="panel-header">
+      <div>
+        <span class="panel-title">Campo di Bolle</span>
+        <div class="panel-subtitle">Soffuso WebGL2 Simulator</div>
+      </div>
+    </div>
+
+    <!-- Sliders -->
+    <div class="slider-group">
+      <div class="slider-info">
+        <span class="slider-label">Quantità Bolle</span>
+        <span class="slider-value" id="val-blob-count">14</span>
+      </div>
+      <input type="range" id="slide-blob-count" min="2" max="32" step="1" value="14">
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-info">
+        <span class="slider-label">Raggio Glow (Glow Size)</span>
+        <span class="slider-value" id="val-blob-size">1.30</span>
+      </div>
+      <input type="range" id="slide-blob-size" min="1.0" max="3.0" step="0.05" value="1.30">
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-info">
+        <span class="slider-label">Morbidezza (Softness)</span>
+        <span class="slider-value" id="val-blob-soft">0.85</span>
+      </div>
+      <input type="range" id="slide-blob-soft" min="0.1" max="2.0" step="0.05" value="0.85">
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-info">
+        <span class="slider-label">Velocità Deriva (Drift)</span>
+        <span class="slider-value" id="val-idle-drift">0.13</span>
+      </div>
+      <input type="range" id="slide-idle-drift" min="0.0" max="1.0" step="0.01" value="0.13">
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-info">
+        <span class="slider-label">Velocità Iniziale (Push)</span>
+        <span class="slider-value" id="val-base-speed">0.50</span>
+      </div>
+      <input type="range" id="slide-base-speed" min="0.0" max="2.0" step="0.05" value="0.50">
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-info">
+        <span class="slider-label">Field Gain (Campo)</span>
+        <span class="slider-value" id="val-field-gain">1.10</span>
+      </div>
+      <input type="range" id="slide-field-gain" min="0.1" max="3.0" step="0.05" value="1.10">
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-info">
+        <span class="slider-label">Field Opacity (Opacità)</span>
+        <span class="slider-value" id="val-field-opacity">0.76</span>
+      </div>
+      <input type="range" id="slide-field-opacity" min="0.0" max="1.0" step="0.02" value="0.76">
+    </div>
+
+    <div class="slider-group">
+      <div class="slider-info">
+        <span class="slider-label">Area Rimbalzo (Bounds)</span>
+        <span class="slider-value" id="val-wall-bounds">0.95</span>
+      </div>
+      <input type="range" id="slide-wall-bounds" min="0.30" max="1.10" step="0.02" value="0.95">
+    </div>
+
+    <!-- Statuses -->
+    <div class="status-panel">
+      <div class="status-item">
+        <span>Stato Cinetico</span>
+        <span class="status-val" id="status-kinetic">
+          <span class="energy-glow" id="kinetic-dot"></span><span id="kinetic-text">Attivo</span>
+        </span>
+      </div>
+      <div class="status-item">
+        <span>Inviluppo Energia</span>
+        <span class="status-val" id="status-energy">1.000</span>
+      </div>
+    </div>
+    
+    <div id="reduced-motion-badge" class="reduced-motion-badge">
+      Ridotta mobilità attiva (Frame statico)
+    </div>
+
+    <div class="btn-row">
+      <button class="action-btn" id="btn-relaunch">RILANCIA SPINTA</button>
+    </div>
+  </div>
+
+  <script>
+    // ====== PARAMETRI FISICI ED ESTETICI (Inizializzati secondo le specifiche) ======
+    let BLOB_COUNT = 14;
+    let CORE_RADIUS = 0.11;
+    let RADIUS_VARY = 0.4;
+    let BLOB_SIZE = 1.30;
+    let BLOB_SOFT = 0.85;
+    let WALL_BOUNDS = 0.95;
+    let RESTITUTION = 0.9;
+    let START_ENERGY = 1.0;
+    let ENERGY_DECAY = 0.7;
+    let BASE_SPEED = 0.50;
+    let IDLE_DRIFT = 0.13;
+    let SPEED_TRACK = 1.40;
+    let JITTER = 0.60;
+    let FIELD_GAIN = 1.10;
+    let FIELD_OPACITY = 0.76;
+
+    // Colori originali
+    const COLOR_DIM = [0.10, 0.11, 0.14]; // Sfondo / gap soffusi
+    const COLOR_ORB = [0.85, 0.87, 0.93]; // Colore orbi bianco freddo
+
+    // Parametri Vignette
+    const VIGNETTE_RADIUS = 1.10;
+    const VIGNETTE_SOFTNESS = 0.40;
+
+    // ====== STATO APPLICAZIONE ======
+    let blobs = [];
+    let accumulatedTime = 0;
+    let lastTime = 0;
+    let aspectX = 1.0;
+    let aspectY = 1.0;
+    
+    // Rileva impostazioni di accessibilità del sistema per ridotta mobilità
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Buffer per passare dati uniformi nello shader (Max 32 blobs supportati)
+    const blobsData = new Float32Array(32 * 3);
+
+    // ====== SHADERS (WebGL2 GLSL ES 3.00) ======
+    const vsSource = `#version 300 es
+      in vec2 position;
+      out vec2 v_uv;
+      uniform float u_aspect_x;
+      uniform float u_aspect_y;
+
+      void main() {
+        // Genera coordinate UV allineate con l'aspect ratio di JS
+        v_uv = position * vec2(u_aspect_x, u_aspect_y);
+        gl_Position = vec4(position, 0.0, 1.0);
+      }
+    `;
+
+    const fsSource = `#version 300 es
+      precision highp float;
+      
+      out vec4 fragColor;
+      in vec2 v_uv;
+
+      uniform vec3 u_blobs[32];   // xy = centro, z = raggio collisione
+      uniform int u_blob_count;   // numero effettivo di orbi attivi
+      uniform float u_blob_size;  // moltiplicatore per raggio glow
+      uniform float u_blob_soft;  // morbidezza campo gaussiano
+      uniform float u_field_gain; // guadagno finale del campo
+      uniform float u_field_opacity; // opacità massima
+      uniform vec3 u_color_dim;   // colore dei gap limitrofi
+      uniform vec3 u_color_orb;   // colore puro delle bolle
+
+      uniform float u_v_radius;
+      uniform float u_v_softness;
+
+      void main() {
+        float campo = 0.0;
+
+        for (int i = 0; i < u_blob_count; i++) {
+          vec2 center = u_blobs[i].xy;
+          float r_coll = u_blobs[i].z;
+          float r_glow = r_coll * u_blob_size;
+
+          // Calcola distanza tra pixel e centro orbo
+          float d = distance(v_uv, center);
+
+          // Inviluppo Gaussiano soffice: exp(-d^2 / (2 * sigma^2))
+          float sigma = r_glow * u_blob_soft;
+          float dist_term = (d * d) / (2.0 * sigma * sigma + 1e-6);
+          campo += exp(-dist_term);
+        }
+
+        // presenza = 1 - exp(-campo * FIELD_GAIN)
+        float presenza = 1.0 - exp(-campo * u_field_gain);
+
+        // Vignette per ammorbidire ed eliminare "wash" sui bordi esterni
+        float dist_centro = length(v_uv * vec2(0.8, 1.0)); // schiaccia asse X per widescreen
+        float vignette = smoothstep(u_v_radius, u_v_radius - u_v_softness, dist_centro);
+
+        // Colore interpolato: mix(dim, orb, presenza)
+        vec3 colore = mix(u_color_dim, u_color_orb, presenza);
+
+        // Alpha calcolato per mantenere sfondi scuri assoluti (#0a0a0c) sui gap veri
+        float alpha = presenza * u_field_opacity * vignette;
+
+        fragColor = vec4(colore, alpha);
+      }
+    `;
+
+    // ====== INITIALIZATION WEBGL2 & FALLBACK ======
+    const canvas = document.getElementById('gl-canvas');
+    let gl = null;
+    let fallbackMode = false;
+    let ctx2d = null;
+
+    try {
+      gl = canvas.getContext('webgl2', { alpha: true, antialias: true, premultipliedAlpha: false });
+      if (!gl) {
+        console.warn("WebGL2 not supported, falling back to Canvas 2D mode.");
+        fallbackMode = true;
+        ctx2d = canvas.getContext('2d');
+      }
+    } catch (e) {
+      console.warn("Error checking WebGL2 support, falling back to Canvas 2D mode:", e);
+      fallbackMode = true;
+      ctx2d = canvas.getContext('2d');
+    }
+
+    // Helper compilazione shaders
+    function compileShader(ctx, type, source) {
+      if (!ctx) return null;
+      const shader = ctx.createShader(type);
+      ctx.shaderSource(shader, source);
+      ctx.compileShader(shader);
+      if (!ctx.getShaderParameter(shader, ctx.COMPILE_STATUS)) {
+        console.error("Shader Compile Error: " + ctx.getShaderInfoLog(shader));
+        ctx.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+
+    let program = null;
+    let positionBuffer = null;
+    let vao = null;
+
+    let uBlobsLoc = null;
+    let uBlobCountLoc = null;
+    let uBlobSizeLoc = null;
+    let uBlobSoftLoc = null;
+    let uFieldGainLoc = null;
+    let uFieldOpacityLoc = null;
+    let uColorDimLoc = null;
+    let uColorOrbLoc = null;
+    let uAspectXLoc = null;
+    let uAspectYLoc = null;
+    let uVRadiusLoc = null;
+    let uVSoftnessLoc = null;
+
+    if (!fallbackMode && gl) {
+      try {
+        const vs = compileShader(gl, gl.VERTEX_SHADER, vsSource);
+        const fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+        if (!vs || !fs) {
+          throw new Error("Unable to compile Vertex or Fragment shaders.");
+        }
+
+        program = gl.createProgram();
+        gl.attachShader(program, vs);
+        gl.attachShader(program, fs);
+        gl.linkProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+          throw new Error("Shader Linker Error: " + gl.getProgramInfoLog(program));
+        }
+
+        gl.useProgram(program);
+
+        // Quad Vertex Data
+        const vertices = [
+          -1,-1,  1,-1, -1,1,
+          -1,1,   1,-1,  1,1
+        ];
+        positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+        vao = gl.createVertexArray();
+        gl.bindVertexArray(vao);
+        const posAttrib = gl.getAttribLocation(program, "position");
+        gl.enableVertexAttribArray(posAttrib);
+        gl.vertexAttribPointer(posAttrib, 2, gl.FLOAT, false, 0, 0);
+
+        // Recupero locazioni uniformi
+        uBlobsLoc = gl.getUniformLocation(program, "u_blobs");
+        uBlobCountLoc = gl.getUniformLocation(program, "u_blob_count");
+        uBlobSizeLoc = gl.getUniformLocation(program, "u_blob_size");
+        uBlobSoftLoc = gl.getUniformLocation(program, "u_blob_soft");
+        uFieldGainLoc = gl.getUniformLocation(program, "u_field_gain");
+        uFieldOpacityLoc = gl.getUniformLocation(program, "u_field_opacity");
+        uColorDimLoc = gl.getUniformLocation(program, "u_color_dim");
+        uColorOrbLoc = gl.getUniformLocation(program, "u_color_orb");
+        uAspectXLoc = gl.getUniformLocation(program, "u_aspect_x");
+        uAspectYLoc = gl.getUniformLocation(program, "u_aspect_y");
+        uVRadiusLoc = gl.getUniformLocation(program, "u_v_radius");
+        uVSoftnessLoc = gl.getUniformLocation(program, "u_v_softness");
+      } catch (err) {
+        console.error("WebGL shader configuration crashed, applying 2D Canvas fallback:", err);
+        fallbackMode = true;
+        ctx2d = canvas.getContext('2d');
+      }
+    }
+
+    // ====== FISICA ED ENGINE IN JS ======
+    function initBlobs() {
+      blobs = [];
+      const count = Math.floor(BLOB_COUNT);
+      for (let i = 0; i < count; i++) {
+        const r = CORE_RADIUS * (1.0 + (Math.random() - 0.5) * RADIUS_VARY);
+        
+        // Spargi i centri all'interno delle coordinate fisiche bounds-aspect corrette
+        const rx = (Math.random() - 0.5) * 2 * WALL_BOUNDS * aspectX;
+        const ry = (Math.random() - 0.5) * 2 * WALL_BOUNDS * aspectY;
+        
+        // Direzione casuale ad alta velocità (spinta energica)
+        const angle = Math.random() * Math.PI * 2;
+        const speed = BASE_SPEED * START_ENERGY * 2.5 + IDLE_DRIFT;
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed;
+
+        blobs.push({ x: rx, y: ry, vx: vx, vy: vy, r: r });
+      }
+    }
+
+    // Regola dinamicamente la lunghezza dei blobs preservando i vecchi stati!
+    function adjustBlobsCount() {
+      const targetCount = Math.floor(BLOB_COUNT);
+      if (blobs.length < targetCount) {
+        const diff = targetCount - blobs.length;
+        for (let i = 0; i < diff; i++) {
+          const r = CORE_RADIUS * (1.0 + (Math.random() - 0.5) * RADIUS_VARY);
+          const rx = (Math.random() - 0.5) * 2 * WALL_BOUNDS * aspectX;
+          const ry = (Math.random() - 0.5) * 2 * WALL_BOUNDS * aspectY;
+          
+          // Imposta velocità in linea con l'attuale energia corrente dell'inviluppo
+          const currentEnergy = START_ENERGY * Math.exp(-accumulatedTime * ENERGY_DECAY);
+          const currentTargetSpeed = BASE_SPEED * currentEnergy + IDLE_DRIFT;
+          
+          const angle = Math.random() * Math.PI * 2;
+          const vx = Math.cos(angle) * currentTargetSpeed;
+          const vy = Math.sin(angle) * currentTargetSpeed;
+
+          blobs.push({ x: rx, y: ry, vx: vx, vy: vy, r: r });
+        }
+      } else if (blobs.length > targetCount) {
+        blobs.splice(targetCount);
+      }
+    }
+
+    function updatePhysics(dt) {
+      if (dt <= 0) return;
+      accumulatedTime += dt;
+
+      // Inviluppo di energia logaritmico/esponenziale
+      const energy = START_ENERGY * Math.exp(-accumulatedTime * ENERGY_DECAY);
+      const targetSpeed = BASE_SPEED * energy + IDLE_DRIFT;
+
+      // Aggiorna indicatori statistici nel pannello
+      document.getElementById('status-energy').textContent = energy.toFixed(4);
+      if (energy > 0.05) {
+        document.getElementById('kinetic-text').textContent = "Inviluppo Decrescente";
+        document.getElementById('kinetic-dot').style.backgroundColor = "#63b3ed";
+        document.getElementById('kinetic-dot').style.boxShadow = "0 0 8px #63b3ed";
+      } else {
+        document.getElementById('kinetic-text').textContent = "Deriva Calma Attiva";
+        document.getElementById('kinetic-dot').style.backgroundColor = "#48bb78";
+        document.getElementById('kinetic-dot').style.boxShadow = "0 0 8px #48bb78";
+      }
+
+      // 1. Integrazione posizionale e micro-jitter browniano
+      for (let i = 0; i < blobs.length; i++) {
+        const b = blobs[i];
+
+        // Micro-jitter browniano sulla rotta
+        b.vx += (Math.random() - 0.5) * JITTER * dt;
+        b.vy += (Math.random() - 0.5) * JITTER * dt;
+
+        // Inseguimento della velocità target dell'inviluppo corrente (SPEED_TRACK)
+        const currentSpeed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+        if (currentSpeed > 0) {
+          const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * (1.0 - Math.exp(-SPEED_TRACK * dt));
+          b.vx = (b.vx / currentSpeed) * newSpeed;
+          b.vy = (b.vy / currentSpeed) * newSpeed;
+        } else {
+          // Fallback di movimento se immobile
+          const angle = Math.random() * Math.PI * 2;
+          b.vx = Math.cos(angle) * targetSpeed;
+          b.vy = Math.sin(angle) * targetSpeed;
+        }
+
+        // Integrazione Eulero
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+
+        // Pareti morbide: forza elastica per un rimbalzo ultra-smooth ai bordi del viewport
+        const limitX = WALL_BOUNDS * aspectX;
+        const limitY = WALL_BOUNDS * aspectY;
+
+        // Limiti estremi per clamp di sicurezza assoluta per evitare fughe dallo schermo
+        const maxLimitX = aspectX * 1.05;
+        const maxLimitY = aspectY * 1.05;
+
+        // Direzione X
+        const dX = Math.abs(b.x) - limitX;
+        if (dX > 0) {
+          const stiffness = 8.0; 
+          const direction = Math.sign(b.x);
+          b.vx -= direction * dX * stiffness * dt;
+          
+          // Se la bolla si sta ancora muovendo verso l'esterno, applica un forte smorzamento (damping)
+          if (b.vx * direction > 0) {
+            b.vx *= Math.exp(-3.5 * dt);
+          }
+        }
+
+        // Direzione Y
+        const dY = Math.abs(b.y) - limitY;
+        if (dY > 0) {
+          const stiffness = 8.0;
+          const direction = Math.sign(b.y);
+          b.vy -= direction * dY * stiffness * dt;
+          
+          if (b.vy * direction > 0) {
+            b.vy *= Math.exp(-3.5 * dt);
+          }
+        }
+
+        // Clip di sicurezza assoluta estremo per prevenire accumulo infinito fuori schermo
+        if (b.x > maxLimitX) { b.x = maxLimitX; b.vx = -Math.abs(b.vx) * 0.5; }
+        if (b.x < -maxLimitX) { b.x = -maxLimitX; b.vx = Math.abs(b.vx) * 0.5; }
+        if (b.y > maxLimitY) { b.y = maxLimitY; b.vy = -Math.abs(b.vy) * 0.5; }
+        if (b.y < -maxLimitY) { b.y = -maxLimitY; b.vy = Math.abs(b.vy) * 0.5; }
+      }
+
+      // 2. Collisioni elastiche a coppie con separazione anti-overlap proporzionale a inverse-mass (r^2)
+      for (let i = 0; i < blobs.length; i++) {
+        for (let j = i + 1; j < blobs.length; j++) {
+          const b1 = blobs[i];
+          const b2 = blobs[j];
+
+          const dx = b2.x - b1.x;
+          const dy = b2.y - b1.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const minDist = b1.r + b2.r;
+
+          if (dist < minDist && dist > 1e-5) {
+            const nx = dx / dist;
+            const ny = dy / dist;
+
+            // Masse proporzionali alla superficie degli orbi r^2
+            const m1 = b1.r * b1.r;
+            const m2 = b2.r * b2.r;
+            const invM1 = 1.0 / m1;
+            const invM2 = 1.0 / m2;
+            const totalInvMass = invM1 + invM2;
+
+            // Separazione immediata anti-overlap
+            const overlap = minDist - dist;
+            const separationX = (overlap / totalInvMass) * nx;
+            const separationY = (overlap / totalInvMass) * ny;
+
+            b1.x -= separationX * invM1;
+            b1.y -= separationY * invM1;
+            b2.x += separationX * invM2;
+            b2.y += separationY * invM2;
+
+            // Collisione elastica conservativa lungo la normale
+            const rvx = b2.vx - b1.vx;
+            const rvy = b2.vy - b1.vy;
+            const speedAlongNormal = rvx * nx + rvy * ny;
+
+            // Processa impulso solo se si stanno avvicinando
+            if (speedAlongNormal < 0) {
+              const e = 1.0; // Elasticità totale tra orbi
+              const impulseScalar = -(1.0 + e) * speedAlongNormal / totalInvMass;
+
+              b1.vx -= impulseScalar * invM1 * nx;
+              b1.vy -= impulseScalar * invM1 * ny;
+              b2.vx += impulseScalar * invM2 * nx;
+              b2.vy += impulseScalar * invM2 * ny;
+            }
+          }
+        }
+      }
+    }
+
+    // ====== RENDER WEBGL2 & 2D FALLBACK ======
+    function drawFallback() {
+      if (!ctx2d) return;
+
+      // Sfondo nero freddo #0a0a0c
+      ctx2d.fillStyle = '#0a0a0c';
+      ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Compositing per fusione soffusa additiva (sum of exposure)
+      ctx2d.globalCompositeOperation = 'screen';
+
+      const widthHalf = canvas.width / 2;
+      const heightHalf = canvas.height / 2;
+
+      for (let i = 0; i < blobs.length; i++) {
+        const b = blobs[i];
+        
+        // Mappatura coordinate fisiche aspect-corrette [-aspect, aspect] in pixel
+        const cx = widthHalf + (b.x / aspectX) * widthHalf;
+        const cy = heightHalf - (b.y / aspectY) * heightHalf;
+        
+        const rGlow = b.r * BLOB_SIZE;
+        // Calcola raggio in pixel basato su asse Y
+        const rGlowPixels = (rGlow / aspectY) * heightHalf;
+        
+        if (rGlowPixels <= 0) continue;
+
+        // Crea sfumatura radiale per simulare il campo gaussiano soffuso
+        const grad = ctx2d.createRadialGradient(cx, cy, 0, cx, cy, rGlowPixels);
+        
+        const opacity = FIELD_OPACITY * FIELD_GAIN;
+        const colorOrbStr = `rgba(${Math.floor(COLOR_ORB[0]*255)}, ${Math.floor(COLOR_ORB[1]*255)}, ${Math.floor(COLOR_ORB[2]*255)}, ${opacity})`;
+        const colorDimStr = `rgba(${Math.floor(COLOR_DIM[0]*255)}, ${Math.floor(COLOR_DIM[1]*255)}, ${Math.floor(COLOR_DIM[2]*255)}, ${opacity * 0.15})`;
+        
+        grad.addColorStop(0, colorOrbStr);
+        grad.addColorStop(0.3, colorDimStr);
+        grad.addColorStop(1, 'rgba(10, 10, 12, 0)');
+
+        ctx2d.fillStyle = grad;
+        ctx2d.beginPath();
+        ctx2d.arc(cx, cy, rGlowPixels, 0, Math.PI * 2);
+        ctx2d.fill();
+      }
+
+      // Disegna un vighettage scuro addizionale in modalità source-over
+      ctx2d.globalCompositeOperation = 'source-over';
+      const vGrad = ctx2d.createRadialGradient(
+        widthHalf, heightHalf, 0,
+        widthHalf, heightHalf, Math.max(canvas.width, canvas.height) * 0.75
+      );
+      vGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vGrad.addColorStop(0.5, 'rgba(10, 10, 12, 0.4)');
+      vGrad.addColorStop(1, 'rgba(10, 10, 12, 0.96)');
+
+      ctx2d.fillStyle = vGrad;
+      ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function render() {
+      if (fallbackMode) {
+        drawFallback();
+        return;
+      }
+
+      if (!gl) return;
+
+      // Pulisce buffer con nero assoluto freddo #0a0a0c
+      gl.clearColor(0.0392, 0.0392, 0.0471, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+
+      // Abilita blending cumulativo additivo per metaballs soffusi
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+      // Prepara i dati degli orbi attivi nel Float32Array
+      // Azzeramento residui
+      blobsData.fill(99.0); // Sposta i non attivi fuori schermo
+
+      for (let i = 0; i < blobs.length; i++) {
+        blobsData[i * 3 + 0] = blobs[i].x;
+        blobsData[i * 3 + 1] = blobs[i].y;
+        blobsData[i * 3 + 2] = blobs[i].r;
+      }
+
+      // Upload Uniforms correlati
+      gl.uniform3fv(uBlobsLoc, blobsData);
+      gl.uniform1i(uBlobCountLoc, blobs.length);
+      gl.uniform1f(uBlobSizeLoc, BLOB_SIZE);
+      gl.uniform1f(uBlobSoftLoc, BLOB_SOFT);
+      gl.uniform1f(uFieldGainLoc, FIELD_GAIN);
+      gl.uniform1f(uFieldOpacityLoc, FIELD_OPACITY);
+      
+      gl.uniform3fv(uColorDimLoc, new Float32Array(COLOR_DIM));
+      gl.uniform3fv(uColorOrbLoc, new Float32Array(COLOR_ORB));
+      
+      gl.uniform1f(uAspectXLoc, aspectX);
+      gl.uniform1f(uAspectYLoc, aspectY);
+      
+      gl.uniform1f(uVRadiusLoc, VIGNETTE_RADIUS);
+      gl.uniform1f(uVSoftnessLoc, VIGNETTE_SOFTNESS);
+
+      // Disegna il quad di superficie
+      gl.bindVertexArray(vao);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+
+    // ====== LOOP ANIMAZIONE CAPPATO A ~30 FPS ======
+    const FPS_INTERVAL = 1000 / 30; // 33.33ms
+
+    function tick(currentTime) {
+      if (!lastTime) lastTime = currentTime;
+      const elapsed = currentTime - lastTime;
+
+      if (elapsed >= FPS_INTERVAL) {
+        // Allinea prossimo frame
+        lastTime = currentTime - (elapsed % FPS_INTERVAL);
+
+        // Clamp delta time per prevenire salti folli in backgrounding
+        const dt = Math.min(elapsed / 1000, 0.1);
+
+        updatePhysics(dt);
+        render();
+      }
+
+      if (!prefersReducedMotion) {
+        requestAnimationFrame(tick);
+      }
+    }
+
+    // Gestione ridimensionamento dinamico (resize)
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+      
+      if (!fallbackMode && gl) {
+        gl.viewport(0, 0, width, height);
+      }
+
+      // Risoluzione asimmetria aspect ratio
+      if (width > height) {
+        aspectX = width / height;
+        aspectY = 1.0;
+      } else {
+        aspectX = 1.0;
+        aspectY = height / width;
+      }
+
+      // Rerenderizza subito se in modalità statica ridotta
+      if (prefersReducedMotion) {
+        render();
+      }
+    }
+
+    window.addEventListener('resize', resize);
+
+    // ====== CONFIGURAZIONE EVENTI SLIDERS ======
+    document.getElementById('slide-blob-count').addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      BLOB_COUNT = val;
+      document.getElementById('val-blob-count').textContent = val;
+      adjustBlobsCount();
+      if (prefersReducedMotion) render();
+    });
+
+    document.getElementById('slide-blob-size').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      BLOB_SIZE = val;
+      document.getElementById('val-blob-size').textContent = val.toFixed(2);
+      if (prefersReducedMotion) render();
+    });
+
+    document.getElementById('slide-blob-soft').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      BLOB_SOFT = val;
+      document.getElementById('val-blob-soft').textContent = val.toFixed(2);
+      if (prefersReducedMotion) render();
+    });
+
+    document.getElementById('slide-idle-drift').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      IDLE_DRIFT = val;
+      document.getElementById('val-idle-drift').textContent = val.toFixed(2);
+      if (prefersReducedMotion) render();
+    });
+
+    document.getElementById('slide-base-speed').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      BASE_SPEED = val;
+      document.getElementById('val-base-speed').textContent = val.toFixed(2);
+      if (prefersReducedMotion) render();
+    });
+
+    document.getElementById('slide-field-gain').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      FIELD_GAIN = val;
+      document.getElementById('val-field-gain').textContent = val.toFixed(2);
+      if (prefersReducedMotion) render();
+    });
+
+    document.getElementById('slide-field-opacity').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      FIELD_OPACITY = val;
+      document.getElementById('val-field-opacity').textContent = val.toFixed(2);
+      if (prefersReducedMotion) render();
+    });
+
+    document.getElementById('slide-wall-bounds').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      WALL_BOUNDS = val;
+      document.getElementById('val-wall-bounds').textContent = val.toFixed(2);
+      if (prefersReducedMotion) render();
+    });
+
+    // Reset spinta energica
+    document.getElementById('btn-relaunch').addEventListener('click', () => {
+      accumulatedTime = 0;
+      const targetCount = Math.floor(BLOB_COUNT);
+      
+      // Rigenera o re-inietta velocità massicce conservando le dimensioni attuali
+      for (let i = 0; i < blobs.length; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = BASE_SPEED * START_ENERGY * 2.5 + IDLE_DRIFT;
+        blobs[i].vx = Math.cos(angle) * speed;
+        blobs[i].vy = Math.sin(angle) * speed;
+      }
+      
+      // Se era statico, fai muovere un micro istante ed esegui render unico
+      if (prefersReducedMotion) {
+        updatePhysics(0.01e-3);
+        render();
+      }
+    });
+
+    // Avvio globale dopo il caricamento della finestra
+    window.addEventListener('load', () => {
+      resize();
+      initBlobs();
+
+      if (prefersReducedMotion) {
+        document.getElementById('reduced-motion-badge').style.display = 'block';
+        document.getElementById('kinetic-text').textContent = 'Disattivata';
+        document.getElementById('kinetic-dot').style.backgroundColor = '#f59e0b';
+        document.getElementById('kinetic-dot').style.boxShadow = '0 0 8px #f59e0b';
+        render();
+      } else {
+        requestAnimationFrame((time) => {
+          lastTime = time;
+          requestAnimationFrame(tick);
+        });
+      }
+    });
+
+  </script>
+</body>
+</html>

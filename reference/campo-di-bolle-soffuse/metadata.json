@@ -1,0 +1,6 @@
+{
+  "name": "Campo di Bolle Soffuse",
+  "description": "Un campo generativo di bolle soffuse metaball in WebGL2 con simulazione fisica ed estetica minimale.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

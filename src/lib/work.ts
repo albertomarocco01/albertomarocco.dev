@@ -1,13 +1,16 @@
 // Selected work — the full-width rows. Order is the display order.
-// `gen` rows host the live WebGL aura (variant: clean amber vs dusty ember).
-// `web` rows show a still media plate (or a real site preview) and link out /
-// route internally. No stock imagery anywhere — gen rows render Alberto's own
-// shader live, and the one preview is a capture of his actual shipped site.
+// `gen` rows host the live WebGL aura, each in its own colour family (amber /
+// teal / violet — the same domain-warped smoke, different tints). `web` rows
+// show a still media plate (or a real site preview) and link out / route
+// internally. No stock imagery anywhere — gen rows render Alberto's own shader
+// live, and the one preview is a capture of his actual shipped site.
 
 import type { StaticImageData } from "next/image";
 import viniMontarello from "@/assets/work/vini-montarello.webp";
 
-export type WorkVariant = "amber" | "ember";
+// Mirrors the keys of VARIANT_PALETTE in src/components/canvas/aura-material.ts
+// (kept as a plain union here so this data module never imports three).
+export type WorkVariant = "amber" | "ember" | "teal" | "violet";
 
 // Translatable copy (description, cue) lives in the dictionary, keyed by `id`
 // (see src/lib/i18n.ts). This file stays structural and language-neutral.
@@ -59,16 +62,14 @@ export const WORK: Work[] = [
     title: "Aura Loops",
     meta: "generative · touchdesigner · 2024",
     type: "gen",
-    variant: "ember",
+    variant: "teal",
   },
   {
     id: "studio-next",
     index: "04",
     title: "Studio — next",
     meta: "web · soon",
-    type: "web",
-    href: "#work",
-    external: false,
-    mediaGradient: "linear-gradient(135deg,#101520,#0a0c10 55%,#141b22)",
+    type: "gen",
+    variant: "violet",
   },
 ];

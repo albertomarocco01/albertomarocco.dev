@@ -3,6 +3,7 @@
 import type { RefObject } from "react";
 import { View } from "@react-three/drei";
 import { Aura } from "./Aura";
+import type { AuraVariant } from "./aura-material";
 
 /**
  * A generative row's aura. Outside the canvas, drei's <View> renders and tracks
@@ -18,7 +19,7 @@ export function GenAura({
   reducedMotion,
 }: {
   sizeRef: RefObject<HTMLElement | null>;
-  variant?: "amber" | "ember";
+  variant?: AuraVariant;
   active: boolean;
   reducedMotion: boolean;
 }) {

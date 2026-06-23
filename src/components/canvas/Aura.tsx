@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
-import { AuraMaterial, BLOB_COUNT, type AuraMaterialImpl } from "./aura-material";
+import {
+  AuraMaterial,
+  BLOB_COUNT,
+  VARIANT_PALETTE,
+  type AuraMaterialImpl,
+  type AuraVariant,
+} from "./aura-material";
 
 // AuraMaterial must be extended once; importing for its side effect.
 void AuraMaterial;
@@ -168,7 +174,7 @@ function writeBlobs(out: THREE.Vector3[], orbs: Orb[]) {
 }
 
 interface AuraProps {
-  variant?: "amber" | "ember";
+  variant?: AuraVariant;
   /** the owning row (or the wash) is open — drive the loop */
   active: boolean;
   reducedMotion: boolean;
@@ -319,7 +325,11 @@ export function Aura({
     const w = Math.max(el ? el.clientWidth : window.innerWidth, 1);
     const h = Math.max(el ? el.clientHeight : window.innerHeight, 1);
     m.uniforms.u_res.value.set(w, h); // only the ratio is used by the shader
-    m.uniforms.u_cool.value = variant === "ember" ? 1 : 0;
+    // Colour family for the warm work smoke. Ignored in white mode (the white
+    // branch never reads u_hot/u_mid), so the gate/home field leaves it at amber.
+    const pal = VARIANT_PALETTE[variant] ?? VARIANT_PALETTE.amber;
+    m.uniforms.u_hot.value.set(pal.hot[0], pal.hot[1], pal.hot[2]);
+    m.uniforms.u_mid.value.set(pal.mid[0], pal.mid[1], pal.mid[2]);
     m.uniforms.u_white.value = white ? 1 : 0;
     // Clamp the aspect to a finite, positive value for the white-field sim. A
     // transient zero/NaN box (u_res 0 -> aspect 0/NaN) would otherwise seed orbs
