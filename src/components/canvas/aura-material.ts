@@ -40,7 +40,7 @@ import { extend, type ThreeElement } from "@react-three/fiber";
 // 7 (was 9): fewer orbs open real dark gaps between them, while staying dense
 // enough — with the bigger collision core + lively idle floor — for regular,
 // visible collisions. The distinct-orbs-vs-collision-frequency balance.
-export const BLOB_COUNT = 7;
+export const BLOB_COUNT = 14;
 
 /**
  * Work-reveal colour families. Each `gen` row picks one by name (see
@@ -88,19 +88,16 @@ const fragmentShader = /* glsl */ `
 
   // ---- white ambient field tunables (soft luminous orbs; motion lives in JS) ----
   #define BLOB_COUNT ${BLOB_COUNT} // orb count — mirrors the exported TS const above (single source of truth)
-  #define BLOB_SIZE 1.35       // visual gaussian radius = core radius (u_blobs.z) × this; >1 so the glow exceeds the collision core and orbs merge softly before they bounce. SMALL is the main contrast lever: at 1.35 the orbs cover ~half the view (was 2.34 → ~180%, total overlap → grey wash), leaving real dark gaps between them
-  #define BLOB_SOFT 0.9        // falloff softness — higher = blurrier; lower = sharper edges + darker gaps (0.9, was 1.20, so the void shows between orbs instead of fat overlapping tails)
+  #define BLOB_SIZE 1.30       // visual glow radius = core radius (u_blobs.z) * this
+  #define BLOB_SOFT 0.85       // softness
   #define DISP_STRENGTH 0.11   // cursor parallax max (fraction of normalized space)
-  #define FIELD_GAIN 0.85      // brightness/presence gain on the summed field
-  #define FIELD_OPACITY 0.72   // overall opacity multiplier for the blob field
+  #define FIELD_GAIN 1.10      // brightness/presence gain on the summed field
+  #define FIELD_OPACITY 0.76   // overall opacity multiplier for the blob field
   #define BLOB_DENOM_EPS 1e-4  // floor on the gaussian denominator so a degenerate (zero/NaN) orb radius can't divide-by-zero -> NaN field -> nothing paints. Far below any valid denom (min ~0.021), so it never affects real orbs.
   #define DEPTH_BASE 0.55      // per-orb parallax depth floor (each orb leans a touch differently for a hint of depth)
   #define DEPTH_VARY 0.9       // per-orb parallax depth spread added on top of DEPTH_BASE via the per-orb hash
   #define DIM_COLOR vec3(0.10, 0.11, 0.14) // gap/halo colour — just above the void (#0a0a0c ~ 0.04) so low-presence regions read true-dark, not a milky grey wash
   #define ORB_COLOR vec3(0.85, 0.87, 0.93) // orb core colour — cold white
-  #define VIG_FAR 1.25         // vignette: centre-distance at which the field is fully faded out
-  #define VIG_NEAR 0.25        // vignette: centre-distance below which the field is at full strength
-  #define VIG_FLOOR 0.45       // vignette: alpha multiplier at the far edge (1.0 at centre)
 
   void main(){
     vec2 uv = vUv;
@@ -121,7 +118,8 @@ const fragmentShader = /* glsl */ `
         vec2 center = blob.xy + disp * depth;
         vec2 d = p - center;
         float radius = blob.z * BLOB_SIZE;             // visual glow radius (see BLOB_SIZE)
-        float denom = max(radius * radius * BLOB_SOFT, BLOB_DENOM_EPS); // guard divide-by-zero on a degenerate radius
+        float sigma = radius * BLOB_SOFT;
+        float denom = max(2.0 * sigma * sigma, BLOB_DENOM_EPS); // soft gaussian denominator matching reference
         field += exp(-dot(d, d) / denom);              // soft gaussian
       }
 
@@ -132,8 +130,9 @@ const fragmentShader = /* glsl */ `
       // true-dark, not the old grey wash; ORB_COLOR is the cold-white core. Alpha
       // follows presence too, so the partial-presence halos never milk to grey.
       vec3 col = mix(DIM_COLOR, ORB_COLOR, pres);
-      float vig = smoothstep(VIG_FAR, VIG_NEAR, length(uv - 0.5));
-      gl_FragColor = vec4(col, u_fade * pres * mix(VIG_FLOOR, 1.0, vig) * FIELD_OPACITY);
+      float dist_centro = length(p * vec2(0.8, 1.0)); // schiaccia asse X per widescreen
+      float vig = smoothstep(0.55, 0.35, dist_centro); // vignette matching reference
+      gl_FragColor = vec4(col, u_fade * pres * vig * FIELD_OPACITY);
       return;
     }
 

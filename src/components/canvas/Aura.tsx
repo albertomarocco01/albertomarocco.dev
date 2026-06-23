@@ -10,6 +10,7 @@ import {
   type AuraMaterialImpl,
   type AuraVariant,
 } from "./aura-material";
+import { useApp } from "@/components/providers/AppProvider";
 
 // AuraMaterial must be extended once; importing for its side effect.
 void AuraMaterial;
@@ -24,18 +25,18 @@ const DISP_DECAY = 0.7; // engagement decay per second — low = slower return t
 // handed. Distances are in the shader's aspect-corrected normalized-height space
 // (`p`): y spans ~[-0.5, 0.5] on screen, x is scaled by the aspect ratio.
 const TAU = Math.PI * 2;
-const CORE_RADIUS = 0.15; // base collision-core radius; the visual glow is this × BLOB_SIZE (shader). Bumped slightly (was 0.145) so the now-fewer orbs present a larger contact cross-section and collide regularly. Still small enough that BLOB_COUNT orbs roam without jamming.
-const RADIUS_BASE = 0.75; // floor of the per-orb radius fraction: r = CORE_RADIUS × (RADIUS_BASE + RADIUS_VARY × hash)
-const RADIUS_VARY = 0.6; // per-orb size spread added on top of RADIUS_BASE — mirrors the old radius variation
-const WALL_BOUNDS = 0.58; // half-extent of the orb-centre play area (height units); the x bound is WALL_BOUNDS × aspect each frame. Centres reach the edge; soft glows spill beyond so the field fills the view.
-const SEED_INSET = 0.9; // initial spread as a fraction of WALL_BOUNDS — seed centres just inside the walls so they have room to move before the first bounce
-const BASE_SPEED = 0.5; // entrance speed boost (units/sec) at energy = 1. Raised (was 0.24) so the FIRST-activation burst (≈0.5 + floor) reads as clearly energetic against the higher idle floor below, then decays onto it.
-const IDLE_DRIFT = 0.13; // calm floor speed (units/sec) once settled. Raised (was 0.035) so the field keeps a constant, lively drift — perpetual gentle motion with regular collisions — instead of decaying to a near-freeze crawl.
-const START_ENERGY = 1; // energy on the field's FIRST activation (load); only decays afterwards, never resets, so returning to the tab/hero stays calm
-const ENERGY_DECAY = 0.7; // energy decay per second toward 0 (time-constant ~1.4s → settles in a few seconds)
-const SPEED_TRACK = 1.4; // per-second rate each orb's |velocity| eases toward the envelope (BASE_SPEED×energy + IDLE_DRIFT) — lets the envelope govern liveliness without erasing collision redirects
-const JITTER = 0.6; // tiny brownian heading wobble (rad/sec) so settled orbs wander gently instead of gliding dead straight
-const RESTITUTION = 0.9; // bounciness for collisions and walls: 1 = perfectly elastic, <1 sheds a little speed on contact
+const CORE_RADIUS = 0.055; // base collision-core radius (scaled for aspect-correct coordinates)
+const RADIUS_BASE = 0.8; // floor of the per-orb radius fraction
+const RADIUS_VARY = 0.4; // size variance multiplier
+const WALL_BOUNDS = 0.475; // half-extent of play area (scaled)
+const SEED_INSET = 0.9; // initial spread as a fraction of WALL_BOUNDS
+const BASE_SPEED = 0.25; // entrance speed boost (scaled)
+const IDLE_DRIFT = 0.065; // calm drift floor speed (scaled)
+const START_ENERGY = 1;
+const ENERGY_DECAY = 0.7;
+const SPEED_TRACK = 1.4;
+const JITTER = 0.6; // heading wobble (rad/sec)
+const RESTITUTION = 1.0; // fully elastic collisions, matching reference
 const ENERGY_DT_MAX = 0.1; // clamp on the energy-decay timestep (s) — a long stall (tab refocus) lands already-calm, not mid-burst
 const STEP_DT_MAX = 0.05; // clamp on the integration timestep (s) — bounds per-frame motion so a long stall can't explode the sim
 const FADE_EPS = 0.003; // demand-loop keep-alive cutoff: stop re-arming once the fade-out has settled below this
@@ -114,23 +115,39 @@ function stepPhysics(
     o.y += o.vy * dt;
   }
 
-  // soft walls: reflect the centre back inside, shedding a little speed
+  // soft walls: force field for smooth bounce matching reference spring physics
   for (let i = 0; i < orbs.length; i++) {
     const o = orbs[i];
-    if (o.x > boundX) {
-      o.x = boundX;
-      o.vx = -Math.abs(o.vx) * RESTITUTION;
-    } else if (o.x < -boundX) {
-      o.x = -boundX;
-      o.vx = Math.abs(o.vx) * RESTITUTION;
+    
+    // X direction spring force and damping
+    const dX = Math.abs(o.x) - boundX;
+    if (dX > 0) {
+      const stiffness = 8.0;
+      const direction = Math.sign(o.x);
+      o.vx -= direction * dX * stiffness * dt;
+      if (o.vx * direction > 0) {
+        o.vx *= Math.exp(-3.5 * dt);
+      }
     }
-    if (o.y > boundY) {
-      o.y = boundY;
-      o.vy = -Math.abs(o.vy) * RESTITUTION;
-    } else if (o.y < -boundY) {
-      o.y = -boundY;
-      o.vy = Math.abs(o.vy) * RESTITUTION;
+
+    // Y direction spring force and damping
+    const dY = Math.abs(o.y) - boundY;
+    if (dY > 0) {
+      const stiffness = 8.0;
+      const direction = Math.sign(o.y);
+      o.vy -= direction * dY * stiffness * dt;
+      if (o.vy * direction > 0) {
+        o.vy *= Math.exp(-3.5 * dt);
+      }
     }
+
+    // Safety hard clamp bounds to prevent escaping
+    const maxLimitX = aspect * 0.525;
+    const maxLimitY = 0.525;
+    if (o.x > maxLimitX) { o.x = maxLimitX; o.vx = -Math.abs(o.vx) * 0.5; }
+    if (o.x < -maxLimitX) { o.x = -maxLimitX; o.vx = Math.abs(o.vx) * 0.5; }
+    if (o.y > maxLimitY) { o.y = maxLimitY; o.vy = -Math.abs(o.vy) * 0.5; }
+    if (o.y < -maxLimitY) { o.y = -maxLimitY; o.vy = Math.abs(o.vy) * 0.5; }
   }
 
   // pairwise elastic collisions. Mass ∝ r²; push apart by inverse-mass share,
@@ -221,6 +238,24 @@ export function Aura({
   const matRef = useRef<AuraMaterialImpl>(null);
   const invalidate = useThree((s) => s.invalidate);
   const nextTimer = useRef<number | null>(null);
+
+  const { entered } = useApp();
+  const prevEntered = useRef(entered);
+
+  useEffect(() => {
+    if (entered && !prevEntered.current && !reducedMotion && white) {
+      // Trigger energetic bubble speed explosion upon loading completion
+      energy.current = START_ENERGY;
+      const speed = BASE_SPEED * START_ENERGY * 2.5 + IDLE_DRIFT;
+      for (let i = 0; i < orbs.current.length; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        orbs.current[i].vx = Math.cos(ang) * speed;
+        orbs.current[i].vy = Math.sin(ang) * speed;
+      }
+      invalidate();
+    }
+    prevEntered.current = entered;
+  }, [entered, reducedMotion, white, invalidate]);
 
   // Pointer state for the white field's gentle cursor parallax. Kept in refs so
   // pointermove never re-renders. UV space (y up). `target` is the latest
