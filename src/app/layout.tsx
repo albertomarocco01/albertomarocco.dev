@@ -11,6 +11,7 @@ import { Cursor } from "@/components/chrome/Cursor";
 import { Shell } from "@/components/chrome/Shell";
 import { Loader } from "@/components/chrome/Loader";
 import { FieldMount } from "@/components/canvas/FieldMount";
+import { BubbleControls } from "@/components/canvas/BubbleControls";
 import { getDictionary, getLocale } from "@/lib/i18n";
 
 // Distinctive display serif — variable, with italic + optical size. Not Inter.
@@ -86,6 +87,7 @@ export default async function RootLayout({
         <AppProvider>
           <Glow />
           <FieldMount />
+          <BubbleControls />
           <Loader tag={dict.loader.tag} />
           <SmoothScroll>
             <Shell dict={dict} locale={locale}>

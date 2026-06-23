@@ -783,6 +783,120 @@ footer.foot a:focus-visible {
   border: 0;
 }
 
+/* ---- bubble field tuner (dev / ?tune only — see BubbleControls.tsx) ----
+   A small mono panel, bottom-right, for live-tuning the white bubble field. It
+   only mounts in dev or with ?tune in the URL, so visitors never see it. Sits
+   above content (70) but below the loader (90), and re-enables the real cursor
+   inside itself so the sliders are draggable over the site's `cursor: none`. */
+.bubble-ctl {
+  position: fixed;
+  right: clamp(0.8rem, 2vw, 1.4rem);
+  bottom: clamp(0.8rem, 2vw, 1.4rem);
+  z-index: 80;
+  width: 224px;
+  max-width: calc(100vw - 1.6rem);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+  background: rgba(10, 10, 12, 0.82);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  backdrop-filter: blur(8px);
+  cursor: auto;
+}
+.bubble-ctl-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0.6rem 0.7rem;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  font: inherit;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+}
+.bubble-ctl.open .bubble-ctl-head {
+  border-bottom: 1px solid var(--hairline);
+}
+.bubble-ctl-toggle {
+  color: var(--ink-dim);
+}
+.bubble-ctl-body {
+  padding: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.bubble-ctl-row {
+  display: grid;
+  grid-template-columns: 4.2rem 1fr 2.2rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+.bubble-ctl-label {
+  color: var(--ink-dim);
+}
+.bubble-ctl-val {
+  text-align: right;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.bubble-ctl input[type="range"] {
+  width: 100%;
+  height: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--hairline-hot);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.bubble-ctl input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: 0;
+  cursor: pointer;
+}
+.bubble-ctl input[type="range"]::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: 0;
+  cursor: pointer;
+}
+.bubble-ctl-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
+.bubble-ctl-actions button {
+  flex: 1;
+  padding: 0.4rem;
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  color: var(--ink-dim);
+  font: inherit;
+  letter-spacing: 0.16em;
+  text-transform: lowercase;
+  cursor: pointer;
+  transition: color 0.4s var(--ease), border-color 0.4s var(--ease);
+}
+.bubble-ctl-actions button:hover,
+.bubble-ctl-actions button:focus-visible {
+  color: var(--ink);
+  border-color: var(--hairline-hot);
+  outline: none;
+}
+
 /* ---- reduced motion: no shader, instant transitions, no entrance, no custom cursor ---- */
 @media (prefers-reduced-motion: reduce) {
   * {
@@ -797,7 +911,8 @@ footer.foot a:focus-visible {
   .ambient-track {
     opacity: 0 !important;
   }
-  .loader {
+  .loader,
+  .bubble-ctl {
     display: none !important;
   }
   .cur-dot,

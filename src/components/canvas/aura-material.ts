@@ -78,6 +78,13 @@ const fragmentShader = /* glsl */ `
   uniform float u_white; // 0 = warm work smoke, 1 = ambient white blob field
   uniform float u_fade;  // master opacity (in/out envelope)
   uniform vec2  u_disp;  // cursor parallax offset in view-local UV (rest = 0)
+  // White-field live tunables (driven by bubble-params.ts via Aura.tsx; the
+  // amber/ember work branch never reads these). Were #defines — lifted to
+  // uniforms so the controller can tweak the look at runtime.
+  uniform float u_gain;     // FIELD_GAIN: orb-core presence/brightness gain
+  uniform float u_opacity;  // FIELD_OPACITY: overall opacity multiplier
+  uniform float u_blobSize; // BLOB_SIZE: visual glow radius = core radius * this
+  uniform float u_soft;     // BLOB_SOFT: gaussian softness
   uniform vec3  u_blobs[${BLOB_COUNT}]; // white field only: xy = orb centre (aspect-corrected, centred at 0), z = collision-core radius
 
   float hash(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
@@ -87,12 +94,11 @@ const fragmentShader = /* glsl */ `
   float fbm(vec2 p){ float v=0.,a=.5; for(int i=0;i<5;i++){ v+=a*noise(p); p*=2.0; a*=.5; } return v; }
 
   // ---- white ambient field tunables (soft luminous orbs; motion lives in JS) ----
+  // BLOB_SIZE / BLOB_SOFT / FIELD_GAIN / FIELD_OPACITY are now the u_blobSize /
+  // u_soft / u_gain / u_opacity uniforms above (live-tunable). The rest stay
+  // compile-time #defines — structural, not aesthetic knobs.
   #define BLOB_COUNT ${BLOB_COUNT} // orb count — mirrors the exported TS const above (single source of truth)
-  #define BLOB_SIZE 1.30       // visual glow radius = core radius (u_blobs.z) * this
-  #define BLOB_SOFT 0.85       // softness
   #define DISP_STRENGTH 0.11   // cursor parallax max (fraction of normalized space)
-  #define FIELD_GAIN 1.55      // brightness/presence gain on the summed field — higher = orb cores saturate to a distinct cold-white solid while the low-field gaps stay true-dark (raises orb visibility without milking the gaps)
-  #define FIELD_OPACITY 0.76   // overall opacity multiplier for the blob field
   #define BLOB_DENOM_EPS 1e-4  // floor on the gaussian denominator so a degenerate (zero/NaN) orb radius can't divide-by-zero -> NaN field -> nothing paints. Far below any valid denom (min ~0.021), so it never affects real orbs.
   #define DEPTH_BASE 0.55      // per-orb parallax depth floor (each orb leans a touch differently for a hint of depth)
   #define DEPTH_VARY 0.9       // per-orb parallax depth spread added on top of DEPTH_BASE via the per-orb hash
@@ -120,15 +126,15 @@ const fragmentShader = /* glsl */ `
         float depth = DEPTH_BASE + DEPTH_VARY * hash(vec2(float(i), 4.3)); // per-orb parallax depth (matches the old per-orb lean)
         vec2 center = blob.xy + disp * depth;
         vec2 d = p - center;
-        float radius = blob.z * BLOB_SIZE;             // visual glow radius (see BLOB_SIZE)
-        float sigma = radius * BLOB_SOFT;
+        float radius = blob.z * u_blobSize;            // visual glow radius (see u_blobSize)
+        float sigma = radius * u_soft;
         float denom = max(2.0 * sigma * sigma, BLOB_DENOM_EPS); // soft gaussian denominator matching reference
         field += exp(-dot(d, d) / denom);              // soft gaussian
       }
 
       // Soft saturate so dense overlaps glow gently without hard edges; alpha
       // follows presence so the gaps stay true near-black (orbs, not a wash).
-      float pres = 1.0 - exp(-field * FIELD_GAIN);
+      float pres = 1.0 - exp(-field * u_gain);
       // DIM_COLOR (gap/halo) sits just above the void so low-presence regions read
       // true-dark, not the old grey wash; ORB_COLOR is the cold-white core. Alpha
       // follows presence too, so the partial-presence halos never milk to grey.
@@ -140,7 +146,7 @@ const fragmentShader = /* glsl */ `
       // the vertical falloff (p.y) and corner darkening are identical to before.
       float dist_centro = length(vec2(p.x * VIG_XSQUASH, p.y));
       float vig = smoothstep(VIG_OUT, VIG_IN, dist_centro);
-      gl_FragColor = vec4(col, u_fade * pres * vig * FIELD_OPACITY);
+      gl_FragColor = vec4(col, u_fade * pres * vig * u_opacity);
       return;
     }
 
@@ -168,6 +174,13 @@ export const AuraMaterial = shaderMaterial(
     u_white: 0,
     u_fade: 0,
     u_disp: new THREE.Vector2(0, 0),
+    // White-field live tunables. Defaults mirror the original #define values;
+    // Aura.tsx overwrites them each frame from bubble-params.ts when `white`.
+    // The amber/ember work branch never reads them, so the defaults are inert there.
+    u_gain: 1.55,
+    u_opacity: 0.76,
+    u_blobSize: 1.3,
+    u_soft: 0.85,
     // One vec3 per orb (xy = centre, z = core radius); Aura.tsx mutates these
     // each frame from the physics sim. Default-zeroed; sized by BLOB_COUNT.
     u_blobs: Array.from({ length: BLOB_COUNT }, () => new THREE.Vector3()),
@@ -187,6 +200,10 @@ export type AuraMaterialImpl = THREE.ShaderMaterial & {
     u_white: { value: number };
     u_fade: { value: number };
     u_disp: { value: THREE.Vector2 };
+    u_gain: { value: number };
+    u_opacity: { value: number };
+    u_blobSize: { value: number };
+    u_soft: { value: number };
     u_blobs: { value: THREE.Vector3[] };
   };
 };

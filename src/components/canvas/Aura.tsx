@@ -11,6 +11,7 @@ import {
   type AuraVariant,
 } from "./aura-material";
 import { useApp } from "@/components/providers/AppProvider";
+import { getBubbleParams } from "./bubble-params";
 
 // AuraMaterial must be extended once; importing for its side effect.
 void AuraMaterial;
@@ -75,8 +76,10 @@ function hash2(x: number, y: number): number {
 
 // Seed orbs into a pleasing spread (run once, when the aspect is known). Doubles
 // as the fixed arrangement painted for the static (software-renderer) frame.
-function seedOrbs(orbs: Orb[], aspect: number) {
-  const launch = BASE_SPEED * START_ENERGY + IDLE_DRIFT; // hot entrance speed
+// `speedScale` (the live `speed` param) scales the launch so a faster setting
+// also makes the entrance livelier, not just the steady-state drift.
+function seedOrbs(orbs: Orb[], aspect: number, speedScale: number) {
+  const launch = (BASE_SPEED * START_ENERGY + IDLE_DRIFT) * speedScale; // hot entrance speed
   for (let i = 0; i < orbs.length; i++) {
     const a = hash2(i, 1.7);
     const b = hash2(i, 9.1);
@@ -98,6 +101,7 @@ function stepPhysics(
   energy: { current: number },
   delta: number,
   aspect: number,
+  speedScale: number,
 ) {
   // Energy eases toward 0 (the speed floor is IDLE_DRIFT, applied below). The dt
   // is clamped so a long stall (tab refocus) lands already-calm rather than
@@ -108,7 +112,8 @@ function stepPhysics(
   const dt = Math.min(delta, STEP_DT_MAX);
   const boundX = WALL_BOUNDS * aspect;
   const boundY = WALL_BOUNDS;
-  const targetSpeed = BASE_SPEED * energy.current + IDLE_DRIFT; // base × energy + floor
+  // base × energy + floor, then scaled by the live `speed` param (movement pace)
+  const targetSpeed = (BASE_SPEED * energy.current + IDLE_DRIFT) * speedScale;
 
   // integrate: heading wobble → ease speed toward the envelope → advance
   for (let i = 0; i < orbs.length; i++) {
@@ -261,9 +266,12 @@ export function Aura({
 
   useEffect(() => {
     if (entered && !prevEntered.current && !reducedMotion && white) {
-      // Trigger energetic bubble speed explosion upon loading completion
+      // Trigger energetic bubble speed explosion upon loading completion,
+      // scaled by the live `speed` param so a faster setting bursts harder.
       energy.current = START_ENERGY;
-      const speed = BASE_SPEED * START_ENERGY * 2.5 + IDLE_DRIFT;
+      const speed =
+        (BASE_SPEED * START_ENERGY * 2.5 + IDLE_DRIFT) *
+        getBubbleParams().speed;
       for (let i = 0; i < orbs.current.length; i++) {
         const ang = Math.random() * Math.PI * 2;
         orbs.current[i].vx = Math.cos(ang) * speed;
@@ -391,12 +399,19 @@ export function Aura({
     const aspect = Number.isFinite(rawAspect) && rawAspect > 0 ? rawAspect : 1;
     const resOk = Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0;
 
-    // White field: own the u_blobs array, and seed the orbs once a finite,
+    // White field: own the u_blobs array, push the live tunables into their
+    // uniforms (brightness/glow/size/softness), and seed the orbs once a finite,
     // non-zero box is known (also the fixed arrangement for the static frame).
-    if (white) {
+    // Read once here and reuse `bp.speed` below for the physics pace.
+    const bp = white ? getBubbleParams() : null;
+    if (white && bp) {
+      m.uniforms.u_gain.value = bp.brightness;
+      m.uniforms.u_opacity.value = bp.glow;
+      m.uniforms.u_blobSize.value = bp.size;
+      m.uniforms.u_soft.value = bp.softness;
       m.uniforms.u_blobs.value = blobVecs;
       if (!orbsReady.current && resOk) {
-        seedOrbs(orbs.current, aspect);
+        seedOrbs(orbs.current, aspect, bp.speed);
         orbsReady.current = true;
       }
     }
@@ -415,10 +430,10 @@ export function Aura({
     m.uniforms.u_fade.value += (target - m.uniforms.u_fade.value) * d;
     if (active) m.uniforms.u_time.value += delta * timeScale;
 
-    if (white) {
+    if (white && bp) {
       // Advance the orb sim only while the field is open (mirrors u_time), then
-      // publish the live centres/radii to the shader.
-      if (active) stepPhysics(orbs.current, energy, delta, aspect);
+      // publish the live centres/radii to the shader. `bp.speed` paces it.
+      if (active) stepPhysics(orbs.current, energy, delta, aspect, bp.speed);
       writeBlobs(blobVecs, orbs.current);
 
       // Cursor parallax: heavily smooth the pointer toward its target and decay

@@ -39,38 +39,22 @@ function isSoftwareRenderer(
 export function Field() {
   const { reducedMotion } = useApp();
 
-  // The ambient field runs only while it can actually be seen: the hero is in
-  // view (IntersectionObserver) and the tab is visible. Scrolled past the hero
-  // or backgrounded → it fades out and the demand loop goes idle (no GPU, no
-  // main-thread work); it resumes on return. Starts true so it's already alive
-  // behind the gate (the hero sits at the top of the page).
+  // The ambient field is now a full-site background: it runs the whole time the
+  // tab is visible, behind every section, so the bubbles stay present while you
+  // scroll (not just behind the hero). The only gate left is tab-visibility —
+  // backgrounded → it fades out and the demand loop goes idle (no GPU, no
+  // main-thread work); it resumes on return. (The `.field-canvas`/`.ambient-track`
+  // are fixed full-viewport, so "active" is all that governs whether it paints.)
   const [active, setActive] = useState(true);
   // Set once the renderer is known; until then assume hardware (animate).
   const [staticOnly, setStaticOnly] = useState(false);
 
   useEffect(() => {
     if (reducedMotion) return;
-    const hero = document.querySelector(".hero");
-    let inView = true;
-    const update = () => setActive(inView && !document.hidden);
-
-    const io = hero
-      ? new IntersectionObserver(
-          ([entry]) => {
-            inView = entry.isIntersecting;
-            update();
-          },
-          { threshold: 0 },
-        )
-      : null;
-    io?.observe(hero as Element);
-
+    const update = () => setActive(!document.hidden);
     document.addEventListener("visibilitychange", update);
     update();
-    return () => {
-      io?.disconnect();
-      document.removeEventListener("visibilitychange", update);
-    };
+    return () => document.removeEventListener("visibilitychange", update);
   }, [reducedMotion]);
 
   // Mark the document so gen-row fallback plates crossfade to the live canvas.

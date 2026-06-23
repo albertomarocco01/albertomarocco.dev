@@ -32,7 +32,11 @@ export function AmbientField({
         white
         active={active}
         reducedMotion={staticOnly}
-        maxFade={0.5}
+        // Master fade ceiling. Raised (0.5 → 0.7) so the field reads as a clear
+        // full-site presence and the controller's `glow` knob has real range up
+        // to it. Final alpha = u_fade(≤maxFade) · presence · vignette · glow, so
+        // the live `glow` param still dials the actual on-screen opacity down.
+        maxFade={0.7}
         fadeSpeed={1.4}
         throttleMs={33}
         timeScale={3.1}

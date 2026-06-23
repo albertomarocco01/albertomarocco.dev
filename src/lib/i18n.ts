@@ -125,7 +125,7 @@ const it: Dictionary = {
   nav: {
     skip: "salta ai lavori",
     work: "lavori",
-    about: "info",
+    about: "about",
     contact: "contatti",
   },
   locale: {
@@ -177,7 +177,7 @@ const it: Dictionary = {
     },
   },
   about: {
-    label: "info",
+    label: "about",
     body: "Laureato in Informatica (Università di Torino, 2025), lavoro nel punto d'incontro tra ingegneria web e visual immersive. Realizzo siti che performano e installazioni che respirano — e questo fa girare dal vivo il mio lavoro generativo, come prova.",
   },
   footer: {
