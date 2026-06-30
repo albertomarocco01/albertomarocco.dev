@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
-import { WORK, type Work } from "@/lib/work";
+import { WORK_SECTIONS, type Work } from "@/lib/work";
 import type { WorkText } from "@/lib/i18n";
 import { TIMING } from "@/lib/motion";
 import { useApp } from "@/components/providers/AppProvider";
@@ -15,7 +15,14 @@ import { Row } from "./Row";
  * `items` is the active dictionary's per-work copy, keyed by `work.id`; each
  * Row reads its own description/cue from it.
  */
-export function WorkRows({ items }: { items: Record<string, WorkText> }) {
+export function WorkRows({
+  items,
+  sections,
+}: {
+  items: Record<string, WorkText>;
+  /** section id → visible label */
+  sections: Record<string, string>;
+}) {
   const { reducedMotion, fieldReady } = useApp();
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -82,26 +89,35 @@ export function WorkRows({ items }: { items: Record<string, WorkText> }) {
   }, []);
 
   return (
-    <div className={`rows${openId ? " has-open" : ""}`}>
-      {WORK.map((work) => (
-        <Row
-          key={work.id}
-          work={work}
-          text={items[work.id]}
-          isOpen={openId === work.id}
-          reducedMotion={reducedMotion}
-          fieldReady={fieldReady}
-          onEnter={() => {
-            if (!touch.current) intentOpen(work.id);
-          }}
-          onLeave={() => {
-            if (!touch.current) intentClose(work.id);
-          }}
-          onFocus={() => openNow(work.id)}
-          onBlur={() => intentClose(work.id)}
-          onClick={(e) => handleClick(work, e)}
-        />
+    <>
+      {WORK_SECTIONS.map((section) => (
+        <div className="work-section" key={section.id}>
+          <div className="sect-label">
+            <span>{sections[section.id]}</span>
+          </div>
+          <div className={`rows${openId ? " has-open" : ""}`}>
+            {section.items.map((work) => (
+              <Row
+                key={work.id}
+                work={work}
+                text={items[work.id]}
+                isOpen={openId === work.id}
+                reducedMotion={reducedMotion}
+                fieldReady={fieldReady}
+                onEnter={() => {
+                  if (!touch.current) intentOpen(work.id);
+                }}
+                onLeave={() => {
+                  if (!touch.current) intentClose(work.id);
+                }}
+                onFocus={() => openNow(work.id)}
+                onBlur={() => intentClose(work.id)}
+                onClick={(e) => handleClick(work, e)}
+              />
+            ))}
+          </div>
+        </div>
       ))}
-    </div>
+    </>
   );
 }

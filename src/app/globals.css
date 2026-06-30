@@ -432,6 +432,9 @@ html.loading body {
 }
 
 /* ---- work rows ---- */
+.work-section + .work-section {
+  margin-top: 4.5rem;
+}
 .sect-label {
   font-family: var(--mono);
   font-size: 0.68rem;
@@ -718,6 +721,68 @@ html.loading body {
 .row:focus-visible .row-title,
 .row:focus-visible .row-idx {
   color: var(--ink-dim);
+}
+
+/* ---- graphic designs (mock gallery route) ---- */
+.gd {
+  padding: 7rem 0 4rem;
+}
+.gd-back {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+  transition: color 0.5s var(--ease);
+}
+.gd-back:hover,
+.gd-back:focus-visible {
+  color: var(--ink);
+  outline: none;
+}
+.gd-head {
+  margin: 2.4rem 0 3rem;
+}
+.gd-head .sect-label {
+  border-bottom: 0;
+  padding: 0 0 1rem;
+}
+.gd-title {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(2rem, 6vw, 4rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--ink);
+}
+.gd-lede {
+  max-width: 40ch;
+  margin: 1.6rem 0 0;
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  line-height: 1.6;
+  color: var(--ink-dim);
+}
+.gd-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 1.2rem;
+}
+.gd-plate {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  background: linear-gradient(135deg, #161020, #0b0a10 55%, #1d1424);
+}
+.gd-plate-idx {
+  position: absolute;
+  left: 1rem;
+  bottom: 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  color: var(--ink-ghost);
 }
 
 /* ---- about (small, deep) ---- */

@@ -40,10 +40,10 @@ export interface Dictionary {
   };
   ticker: string[];
   work: {
-    /** section landmark label (mirrors the visible label) */
+    /** section landmark label */
     aria: string;
-    label: string;
-    years: string;
+    /** visible label per section, keyed by section id (see WORK_SECTIONS) */
+    sections: Record<string, string>;
     items: Record<string, WorkText>;
   };
   about: {
@@ -85,14 +85,22 @@ const en: Dictionary = {
     "available 2026",
   ],
   work: {
-    aria: "Selected work",
-    label: "selected work",
-    years: "2024 — 2025",
+    aria: "Work",
+    sections: {
+      websites: "websites",
+      graphic: "graphic design",
+      experiments: "xperiments",
+    },
     items: {
       "vini-montarello": {
         description:
           "Winery brand & e-commerce. Full-stack build, slow scroll, product as ritual.",
         cue: "visit site",
+      },
+      "merge-graphic-designs": {
+        description:
+          "Selected graphic design — identities, posters, type. A merged set, viewable in one place.",
+        cue: "open gallery",
       },
       "liminal-field": {
         description:
@@ -150,14 +158,22 @@ const it: Dictionary = {
     "disponibile 2026",
   ],
   work: {
-    aria: "Lavori selezionati",
-    label: "lavori selezionati",
-    years: "2024 — 2025",
+    aria: "Lavori",
+    sections: {
+      websites: "websites",
+      graphic: "graphic design",
+      experiments: "xperiments",
+    },
     items: {
       "vini-montarello": {
         description:
           "Brand vinicolo & e-commerce. Sviluppo full-stack, scroll lento, il prodotto come rito.",
         cue: "visita il sito",
+      },
+      "merge-graphic-designs": {
+        description:
+          "Grafica selezionata — identità, manifesti, type. Una raccolta unita, in un solo posto.",
+        cue: "apri la gallery",
       },
       "liminal-field": {
         description:

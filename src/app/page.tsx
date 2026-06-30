@@ -13,11 +13,7 @@ export default async function Home() {
       <Hero hero={dict.hero} />
       <Ticker items={dict.ticker} />
       <section id="work" aria-label={dict.work.aria}>
-        <div className="sect-label">
-          <span>{dict.work.label}</span>
-          <span>{dict.work.years}</span>
-        </div>
-        <WorkRows items={dict.work.items} />
+        <WorkRows items={dict.work.items} sections={dict.work.sections} />
       </section>
       <About about={dict.about} />
       <Footer footer={dict.footer} />
