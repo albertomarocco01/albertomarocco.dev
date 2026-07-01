@@ -26,8 +26,8 @@ export function WestScene({ registerNode, clearNodes, windowWidth, onRevealCompl
         <span className="tara-hint">← blow on the left</span>
       </div>
       
-      <div className="max-w-2xl w-full pl-32 md:pl-48">
-        <PretextLayout 
+      <div className="max-w-2xl w-full">
+        <PretextLayout
           text={text}
           windowWidth={windowWidth}
           registerNode={registerNode}

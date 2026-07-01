@@ -24,8 +24,9 @@ export function DandelionScene({ windowWidth, registerNode, clearNodes }: Dandel
       <div className="relative w-full">
         
         {/* The Locked, Luminous Dandelion (Top Right) */}
-        <div className="absolute top-0 right-0 z-20 pointer-events-none -mt-24 -mr-12">
+        <div className="absolute top-0 right-0 z-20 pointer-events-none -mt-24 -mr-12 flex flex-col items-center gap-4">
           <GlowingDandelion registerNode={registerNode} />
+          <span className="tara-hint">blow</span>
         </div>
 
         {/* The Custom Pretext Engine */}
