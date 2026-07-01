@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { useLenis } from "lenis/react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
@@ -31,6 +32,7 @@ export function Shell({
 }) {
   const { entered, reducedMotion } = useApp();
   const lenis = useLenis();
+  const pathname = usePathname();
   const topbarRef = useRef<HTMLDivElement>(null);
   // Last applied tuck state, held in a ref so the scroll subscription can toggle
   // the class without ever calling setState in the hot loop (same hot-path
@@ -83,6 +85,19 @@ export function Shell({
     [lenis, reducedMotion],
   );
 
+  // Wordmark: real link to "/" so it navigates home from any route. Only when
+  // already on the home page do we intercept it for the smooth Lenis
+  // scroll-to-top instead of a same-page reload.
+  const onWordmarkClick = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      if (pathname !== "/" || reducedMotion || !lenis) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      lenis.scrollTo(0, { duration: NAV_SCROLL_DURATION, easing: fieldEasing });
+    },
+    [pathname, reducedMotion, lenis],
+  );
+
   // Auto-hide the (transparent, scrim-free) topbar so it never collides with
   // the "selected work" label and the ghosted row titles below: tuck it away on
   // scroll down, reveal it on scroll up, always show it near the very top.
@@ -129,7 +144,7 @@ export function Shell({
       </a>
       <div ref={topbarRef} className={`topbar${entered ? " in" : ""}`}>
         <div className="topbar-left">
-          <a href="#top" onClick={onNavClick}>
+          <a href="/" onClick={onWordmarkClick}>
             alberto marocco
           </a>
           <LocaleToggle locale={locale} labels={dict.locale} />

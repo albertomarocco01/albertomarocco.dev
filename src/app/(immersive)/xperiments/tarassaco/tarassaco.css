@@ -1,0 +1,242 @@
+/*
+  Tarassaco — Dandelion Wind: scoped stylesheet.
+
+  The original app was a Vite project styled with Tailwind v4. The host site is a
+  single hand-authored stylesheet on purpose (no Tailwind), so rather than pull in
+  Tailwind + its global Preflight reset — which would fight the site's design
+  system — the ~70 utility classes the app actually used are reproduced here by
+  hand and scoped under `.tarassaco`. The component JSX keeps its original class
+  names (e.g. `flex`, `bg-black`), they just resolve to these rules instead of
+  Tailwind's. Nothing here leaks outside the experience.
+
+  Kept GLOBAL-by-contract (referenced as string literals in JS, not via CSS
+  Modules): `physics-recover` (toggled by the wind hook), `glow-text`, `glow-svg`.
+  `physics-node` is a JS query hook only and needs no style. They stay scoped to
+  `.tarassaco` but keep their exact names so classList/querySelector still match.
+*/
+
+/* ---- scope base (was the Vite app's body) ---- */
+.tarassaco {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: #000;
+  color: #fff;
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  overflow-x: hidden;
+  cursor: auto; /* restore the pointer over the site-wide `body { cursor: none }` */
+  isolation: isolate;
+}
+.tarassaco ::selection {
+  background: #fff;
+  color: #000;
+}
+.tarassaco button {
+  font-family: inherit;
+  background: none;
+  border: 0;
+}
+
+/* ---- glow effects + physics recovery (global-by-JS-reference) ---- */
+.tarassaco .glow-text {
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 16px rgba(255, 255, 255, 0.4);
+}
+.tarassaco .glow-svg {
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9))
+    drop-shadow(0 0 12px rgba(255, 255, 255, 0.5));
+}
+.tarassaco .physics-recover {
+  transition: transform 3s cubic-bezier(0.25, 1, 0.5, 1), opacity 3s ease !important;
+}
+
+/* ---- display / position ---- */
+.tarassaco .relative { position: relative; }
+.tarassaco .absolute { position: absolute; }
+.tarassaco .inset-0 { inset: 0; }
+.tarassaco .top-0 { top: 0; }
+.tarassaco .right-0 { right: 0; }
+.tarassaco .top-1\/2 { top: 50%; }
+.tarassaco .left-8 { left: 2rem; }
+.tarassaco .right-8 { right: 2rem; }
+
+.tarassaco .flex { display: flex; }
+.tarassaco .flex-col { flex-direction: column; }
+.tarassaco .inline-block { display: inline-block; }
+.tarassaco .items-center { align-items: center; }
+.tarassaco .justify-center { justify-content: center; }
+.tarassaco .gap-2 { gap: 0.5rem; }
+.tarassaco .gap-4 { gap: 1rem; }
+
+/* ---- sizing ---- */
+.tarassaco .w-full { width: 100%; }
+.tarassaco .h-full { height: 100%; }
+.tarassaco .w-12 { width: 3rem; }
+.tarassaco .h-12 { height: 3rem; }
+.tarassaco .w-24 { width: 6rem; }
+.tarassaco .w-\[450px\] { width: 450px; }
+.tarassaco .h-\[450px\] { height: 450px; }
+.tarassaco .h-\[1px\] { height: 1px; }
+.tarassaco .max-w-2xl { max-width: 42rem; }
+.tarassaco .max-w-6xl { max-width: 72rem; }
+.tarassaco .min-h-screen { min-height: 100vh; min-height: 100dvh; }
+
+/* ---- spacing ---- */
+.tarassaco .mt-4 { margin-top: 1rem; }
+.tarassaco .mt-12 { margin-top: 3rem; }
+.tarassaco .mb-16 { margin-bottom: 4rem; }
+.tarassaco .-mt-24 { margin-top: -6rem; }
+.tarassaco .-mr-12 { margin-right: -3rem; }
+.tarassaco .px-8 { padding-left: 2rem; padding-right: 2rem; }
+.tarassaco .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+.tarassaco .pl-32 { padding-left: 8rem; }
+.tarassaco .pr-32 { padding-right: 8rem; }
+
+/* ---- transforms ---- */
+.tarassaco .-translate-y-1\/2 { transform: translateY(-50%); }
+
+/* ---- colours / borders ---- */
+.tarassaco .bg-black { background-color: #000; }
+.tarassaco .bg-white { background-color: #fff; }
+.tarassaco .text-white { color: #fff; }
+.tarassaco .text-black { color: #000; }
+.tarassaco .text-gray-400 { color: #9ca3af; }
+.tarassaco .bg-white\/30 { background-color: rgba(255, 255, 255, 0.3); }
+.tarassaco .border { border-width: 1px; border-style: solid; border-color: currentColor; }
+.tarassaco .border-white\/30 { border-color: rgba(255, 255, 255, 0.3); }
+
+/* ---- typography ---- */
+.tarassaco .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+.tarassaco .text-base { font-size: 1rem; line-height: 1.5rem; }
+.tarassaco .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+.tarassaco .font-mono {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+.tarassaco .uppercase { text-transform: uppercase; }
+.tarassaco .tracking-wide { letter-spacing: 0.025em; }
+.tarassaco .tracking-widest { letter-spacing: 0.1em; }
+.tarassaco .tracking-\[0\.5em\] { letter-spacing: 0.5em; }
+.tarassaco .leading-loose { line-height: 2; }
+.tarassaco .whitespace-pre { white-space: pre; }
+
+/* ---- z-index / effects ---- */
+.tarassaco .z-10 { z-index: 10; }
+.tarassaco .z-20 { z-index: 20; }
+.tarassaco .z-40 { z-index: 40; }
+.tarassaco .z-50 { z-index: 50; }
+.tarassaco .opacity-0 { opacity: 0; }
+.tarassaco .opacity-70 { opacity: 0.7; }
+.tarassaco .opacity-100 { opacity: 1; }
+.tarassaco .pointer-events-none { pointer-events: none; }
+.tarassaco .select-none { user-select: none; }
+.tarassaco .will-change-transform { will-change: transform; }
+.tarassaco .overflow-hidden { overflow: hidden; }
+.tarassaco .overflow-visible { overflow: visible; }
+
+/* ---- transitions / animations ---- */
+.tarassaco .transition-all {
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tarassaco .transition-opacity {
+  transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tarassaco .duration-1000 { transition-duration: 1000ms; }
+.tarassaco .animate-spin { animation: tarassaco-spin 1s linear infinite; }
+.tarassaco .animate-pulse {
+  animation: tarassaco-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes tarassaco-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes tarassaco-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ---- interactive states ---- */
+.tarassaco .hover\:bg-white:hover { background-color: #fff; }
+.tarassaco .hover\:text-black:hover { color: #000; }
+.tarassaco .disabled\:opacity-50:disabled { opacity: 0.5; }
+.tarassaco .disabled\:cursor-wait:disabled { cursor: wait; }
+
+/* ---- responsive (md: 768px) ---- */
+@media (min-width: 768px) {
+  .tarassaco .md\:text-2xl { font-size: 1.5rem; line-height: 2rem; }
+  .tarassaco .md\:px-16 { padding-left: 4rem; padding-right: 4rem; }
+  .tarassaco .md\:left-16 { left: 4rem; }
+  .tarassaco .md\:right-16 { right: 4rem; }
+  .tarassaco .md\:pl-48 { padding-left: 12rem; }
+  .tarassaco .md\:pr-48 { padding-right: 12rem; }
+}
+
+/* ---- persistent demo chrome: title + exit + directional blow hints ---- */
+/* Fixed to the viewport (no transformed ancestor between here and .tarassaco).
+   Title is a bottom cover-label — bigger + glowing, seated above the gate's
+   footer notice, not at the top like the sibling Vortex demo. */
+.tarassaco .tara-title {
+  position: fixed;
+  left: 50%;
+  bottom: 4.5rem;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+}
+.tarassaco .tara-title-main {
+  font-size: clamp(1.7rem, 4.5vw, 3rem);
+  font-weight: 300;
+  letter-spacing: 0.4em;
+  text-indent: 0.4em; /* offset the trailing tracking so it stays optically centered */
+  text-transform: uppercase;
+  line-height: 1;
+  color: #fff;
+  text-shadow:
+    0 0 10px rgba(255, 255, 255, 0.85),
+    0 0 28px rgba(255, 255, 255, 0.45),
+    0 0 60px rgba(255, 255, 255, 0.2);
+}
+.tarassaco .tara-title-sub {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: clamp(0.6rem, 1.4vw, 0.78rem);
+  letter-spacing: 0.6em;
+  text-indent: 0.6em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.tarassaco .tara-exit {
+  position: fixed;
+  top: 2rem;
+  left: 2rem;
+  z-index: 60;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  transition: color 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+}
+.tarassaco .tara-exit:hover {
+  color: #000;
+  background: #fff;
+  border-color: #fff;
+}
+
+/* Directional prompt under each mini-dandelion (west: left, east: right). */
+.tarassaco .tara-hint {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 0 14px rgba(255, 255, 255, 0.45);
+  animation: tarassaco-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

@@ -45,3 +45,7 @@ next-env.d.ts
 
 # local dev server log
 .serve.log
+
+# Local staging archive for the Tarassaco port (~64MB source images already
+# ported into src/app/(immersive)/xperiments/tarassaco). Never deployed.
+/src/Merge Designs/

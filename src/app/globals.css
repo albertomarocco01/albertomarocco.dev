@@ -989,3 +989,160 @@ footer.foot a:focus-visible {
     opacity: 1;
   }
 }
+
+/* ── Vortex — immersive demo (/xperiments/vortex, no site chrome) ───────────── */
+.vortex-immersive {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  cursor: auto; /* restore over site-wide `body { cursor: none }` (no Cursor here) */
+}
+.vortex-stage {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+/* Keep the kiosk's exact framing (1536×960) on every screen: the stage letterboxes
+   a fixed-aspect frame, so camera.aspect never changes — faithful, crisp, fluid. */
+.vortex-frame {
+  position: relative;
+  aspect-ratio: 1536 / 960;
+  width: min(100vw, calc(100vh * 1536 / 960));
+  height: min(100vh, calc(100vw * 960 / 1536));
+}
+.vortex-title {
+  position: fixed;
+  top: 1.55rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+.vortex-exit,
+.vortex-back {
+  position: fixed;
+  top: 1.4rem;
+  z-index: 2;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  transition:
+    color 0.4s var(--ease),
+    border-color 0.4s var(--ease);
+}
+.vortex-exit {
+  left: 1.4rem;
+}
+.vortex-back {
+  right: 1.4rem;
+}
+.vortex-exit:hover,
+.vortex-exit:focus-visible,
+.vortex-back:hover,
+.vortex-back:focus-visible {
+  color: var(--ink);
+  border-color: var(--ink-dim);
+  outline: none;
+}
+
+/* ── Merge — Graphic Designs index (list of demos, in the site chrome) ──────── */
+.gd-demos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+.gd-demo {
+  display: grid;
+  grid-template-columns: clamp(120px, 28vw, 220px) 1fr;
+  gap: clamp(1rem, 3vw, 2rem);
+  align-items: stretch;
+  padding: 1rem;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.012);
+  transition:
+    border-color 0.5s var(--ease),
+    background 0.5s var(--ease);
+}
+.gd-demo:hover,
+.gd-demo:focus-visible {
+  border-color: var(--hairline-hot);
+  background: rgba(255, 255, 255, 0.03);
+  outline: none;
+}
+.gd-demo-cover {
+  aspect-ratio: 4 / 5;
+  border-radius: 2px;
+  background-color: #0e0c0a;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--hairline);
+}
+.gd-demo-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.4rem 0.2rem;
+}
+.gd-demo-title {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(1.4rem, 3.5vw, 2.2rem);
+  line-height: 1.05;
+  color: var(--ink);
+}
+.gd-demo-meta {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+}
+.gd-demo-desc {
+  max-width: 48ch;
+  margin-top: 0.2rem;
+  font-size: clamp(0.9rem, 1.6vw, 1rem);
+  line-height: 1.55;
+  color: var(--ink-dim);
+}
+.gd-demo-cta {
+  margin-top: auto;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+  color: var(--ink);
+}
+.gd-demo-cta .arrow {
+  display: inline-block;
+  margin-left: 0.5rem;
+  transition: transform 0.4s var(--ease);
+}
+.gd-demo:hover .gd-demo-cta .arrow,
+.gd-demo:focus-visible .gd-demo-cta .arrow {
+  transform: translateX(0.3rem);
+}
+@media (max-width: 560px) {
+  .gd-demo {
+    grid-template-columns: 1fr;
+  }
+}

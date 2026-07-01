@@ -3,16 +3,7 @@ import { Fraunces } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
-import { AppProvider } from "@/components/providers/AppProvider";
-import { SmoothScroll } from "@/components/providers/SmoothScroll";
-import { Glow } from "@/components/chrome/Glow";
-import { Grain } from "@/components/chrome/Grain";
-import { Cursor } from "@/components/chrome/Cursor";
-import { Shell } from "@/components/chrome/Shell";
-import { Loader } from "@/components/chrome/Loader";
-import { FieldMount } from "@/components/canvas/FieldMount";
-import { BubbleControls } from "@/components/canvas/BubbleControls";
-import { getDictionary, getLocale } from "@/lib/i18n";
+import { getLocale } from "@/lib/i18n";
 
 // Distinctive display serif — variable, with italic + optical size. Not Inter.
 const fraunces = Fraunces({
@@ -71,32 +62,17 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
+// Root layout holds only the document shell (html/body), fonts, metadata and
+// analytics. The site chrome (cursor, loader, Lenis, WebGL field, topbar) lives
+// in (site)/layout.tsx so immersive route groups can opt out of it entirely.
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const locale = await getLocale();
-  const dict = getDictionary(locale);
   return (
     <html lang={locale} className={fraunces.variable}>
       <body>
-        {/* No-JS fallback: without hydration the veil would never dissolve, so
-            hide it and show the static home directly. */}
-        <noscript>
-          <style>{`.loader{display:none!important}`}</style>
-        </noscript>
-        <AppProvider>
-          <Glow />
-          <FieldMount />
-          <BubbleControls />
-          <Loader tag={dict.loader.tag} />
-          <SmoothScroll>
-            <Shell dict={dict} locale={locale}>
-              {children}
-            </Shell>
-          </SmoothScroll>
-          <Grain />
-          <Cursor />
-        </AppProvider>
+        {children}
         <Analytics />
       </body>
     </html>

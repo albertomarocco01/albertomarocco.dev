@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Delivery vehicle for the Tarassaco experiment — already ported into
+    // src/app/(immersive)/xperiments/tarassaco. Kept as an archive, not built.
+    "src/Merge Designs/**",
   ]),
 ]);
 
