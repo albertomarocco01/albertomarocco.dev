@@ -97,14 +97,17 @@ export default function App() {
         />
       )}
 
-      {/* Persistent demo chrome — painted above every scene (z-60). The title is
-          a bottom cover-label; the exit mirrors the sibling Vortex demo (nothing
-          else here lets you leave the experience). */}
+      {/* Persistent demo chrome — painted above every scene (z-60). The exit
+          mirrors the sibling Vortex demo (nothing else here lets you leave
+          the experience). The title is a gate-only cover-label — it must not
+          survive into the running demo, so it's gated to scene '0-gate'. */}
       <a href="/graphic-designs" className="tara-exit">← esci dalla demo</a>
-      <div className="tara-title" aria-hidden="true">
-        <span className="tara-title-main">Tarassaco</span>
-        <span className="tara-title-sub">dandelion wind</span>
-      </div>
+      {scene === '0-gate' && (
+        <div className="tara-title" aria-hidden="true">
+          <span className="tara-title-main">Tarassaco</span>
+          <span className="tara-title-sub">dandelion wind</span>
+        </div>
+      )}
     </div>
   );
 }
