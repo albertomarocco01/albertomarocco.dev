@@ -7,6 +7,19 @@ import { SCENE_CONFIG } from '../config/scene.config.js';
 import { VortexCard } from './VortexCard.jsx';
 import { getClampedSize } from '../utils/cardUtils.js';
 
+// ── Deterministic seeded PRNG (Mulberry32) ──
+// Keeps the gallery layout pure across renders (no StrictMode double-render
+// drift) and stable across canvas resizes (same count → same slots, so cards
+// don't get yanked underground to replay the whole fly-in on every resize).
+function mulberry32(a) {
+  return function () {
+    let t = (a += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 // ── Single floating card with bob and label ──────────────────────
 function FloatingCard({ imageData, finalPosition, rotation, index, isSelected }) {
   const groupRef   = useRef();
@@ -73,36 +86,38 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected })
               hudAnchor.current.startQuat.copy(groupRef.current.quaternion);
               hudAnchor.current.active = true;
 
-              gsap.to(hudAnchor.current, {
+              // Track these late-created tweens too, so unmount mid-resolve
+              // kills them instead of leaving them animating a detached object.
+              tweens.push(gsap.to(hudAnchor.current, {
                 progress: 1,
                 duration: 0.8,
                 ease: 'power3.inOut'
-              });
-              gsap.to(groupRef.current.scale, {
+              }));
+              tweens.push(gsap.to(groupRef.current.scale, {
                 x: 1.3, y: 1.3, z: 1.3, // Make HUD card a nice size
                 duration: 0.8,
                 ease: 'power3.inOut'
-              });
+              }));
             } else {
               // Unselected cards fly left and disappear
-              gsap.to(groupRef.current.position, {
+              tweens.push(gsap.to(groupRef.current.position, {
                 x: groupRef.current.position.x - 20,
                 duration: 0.7,
                 ease: 'power3.in'
-              });
-              gsap.to(groupRef.current.rotation, {
+              }));
+              tweens.push(gsap.to(groupRef.current.rotation, {
                 z: groupRef.current.rotation.z - 0.5,
                 y: groupRef.current.rotation.y + 1,
                 duration: 0.7,
                 ease: 'power3.in'
-              });
+              }));
               if (matRef.current) {
-                gsap.to(matRef.current, {
+                tweens.push(gsap.to(matRef.current, {
                   opacity: 0,
                   duration: 0.5,
                   delay: 0.2,
                   ease: 'power2.in'
-                });
+                }));
               }
             }
           });
@@ -241,8 +256,8 @@ function gridSlots(count, safeHW, safeHH) {
   return slots;
 }
 
-// ── Slot Generator: random with deterministic grid fallback ────────
-function generateSlots(count, aspect) {
+// ── Slot Generator: seeded-random with deterministic grid fallback ────────
+function generateSlots(count, aspect, rng) {
   const { camera, gallery, cards } = SCENE_CONFIG;
 
   // Compute visible world-space area at Z=0 for the gallery camera
@@ -277,9 +292,9 @@ function generateSlots(count, aspect) {
     let found = false;
 
     for (let a = 0; a < MAX_ATTEMPTS; a++) {
-      const x  = (Math.random() - 0.5) * 2 * safeHW;
-      const y  = (Math.random() - 0.5) * 2 * safeHH;
-      const z  = (Math.random() - 0.5) * 1.5;
+      const x  = (rng() - 0.5) * 2 * safeHW;
+      const y  = (rng() - 0.5) * 2 * safeHH;
+      const z  = (rng() - 0.5) * 1.5;
       const ok = placed.every(s => {
         const dx = x - s[0], dy = y - s[1];
         return dx * dx + dy * dy >= minDistSq;
@@ -301,6 +316,24 @@ function generateSlots(count, aspect) {
   return placed;
 }
 
+// ── Backdrop: the clicked image, dimmed, filling the scene behind the cards ──
+function GalleryBackdrop({ image }) {
+  const texture = useLoader(THREE.TextureLoader, image.url);
+  useMemo(() => { texture.colorSpace = THREE.SRGBColorSpace; }, [texture]);
+  return (
+    <mesh position={[0, 0, -6]} renderOrder={-1}>
+      <planeGeometry args={[60, 40]} />
+      <meshBasicMaterial
+        map={texture}
+        transparent
+        opacity={SCENE_CONFIG.gallery.backgroundOpacity}
+        depthWrite={false}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
 // ── GalleryScene ─────────────────────────────────────────────────
 export function GalleryScene({ phase, backgroundImage, floatingImages }) {
   const { gallery } = SCENE_CONFIG;
@@ -308,26 +341,33 @@ export function GalleryScene({ phase, backgroundImage, floatingImages }) {
   const safeImages  = floatingImages ?? [];
   const cardCount   = safeImages.length || 8;
 
-  // Recompute layout when card count or canvas aspect ratio changes
+  // Layout is fit to the viewport when the gallery opens, then frozen: a resize
+  // must NOT recompute it, or every card would snap underground and replay the
+  // whole fly-in mid-view. Seeded PRNG → pure across renders (no StrictMode
+  // drift, no impure Math.random). `size` is read once at build time and
+  // deliberately excluded from the deps.
   const layouts = useMemo(() => {
     const aspect = size.width / Math.max(size.height, 1);
-    const slots  = generateSlots(cardCount, aspect);
+    const rng    = mulberry32(SCENE_CONFIG.cards.randomOffsets.seed + cardCount);
+    const slots  = generateSlots(cardCount, aspect, rng);
 
     return slots.map((pos) => ({
       position: pos,
       rotation: [
-        (Math.random() - 0.5) * 0.35,  // tilt X
-        (Math.random() - 0.5) * 0.50,  // tilt Y
-        (Math.random() - 0.5) * 0.25,  // tilt Z
+        (rng() - 0.5) * 0.35,  // tilt X
+        (rng() - 0.5) * 0.50,  // tilt Y
+        (rng() - 0.5) * 0.25,  // tilt Z
       ],
     }));
-  }, [cardCount, size.width, size.height]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardCount]);
 
-  const isVisible = phase === 'gallery' || phase === 'enteringGallery';
+  const isVisible = phase === 'gallery';
   if (!isVisible || safeImages.length === 0) return null;
 
   return (
     <group name="GalleryScene">
+      {backgroundImage && <GalleryBackdrop image={backgroundImage} />}
       {phase === 'gallery' && safeImages.map((img, i) => (
         <FloatingCard
           key={img.id || `gfloat-${i}`}

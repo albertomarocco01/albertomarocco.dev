@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 import { SCENE_CONFIG } from '../config/scene.config.js';
 import { buildCurvedCardGeometry, calculateBendStrength } from '../utils/curvedCardGeometry.js';
+import { useReducedMotion } from '../utils/reducedMotion.js';
 
 /**
  * VortexCard — renders one image card.
@@ -81,9 +82,10 @@ export function VortexCard({
 
   const localTimeRef = useRef(0);
   const hoverGroupRef = useRef();
+  const reduceMotion = useReducedMotion();
 
   useFrame((_, delta) => {
-    if (!animGroupRefUsed.current || !floating.enabled) return;
+    if (!animGroupRefUsed.current || !floating.enabled || reduceMotion) return;
     // Solo floating attivo durante idle
     if (phase !== 'idle') return;
 
@@ -102,13 +104,18 @@ export function VortexCard({
   // ── Cursor Cleanup ───────────────────────────────────────────
   useEffect(() => {
     return () => {
-      document.body.style.cursor = 'auto';
+      document.body.style.cursor = ''; // clear inline override → site's cursor:none returns
     };
   }, []);
 
   const handlePointerOver = useCallback((e) => {
-    if (phase !== 'idle' && phase !== 'gallery') return;
-    
+    // Touch fires pointerover with no matching pointerout → cards would stick at
+    // hover scale. Skip hover entirely for touch; the click still fires.
+    if (e.pointerType === 'touch') return;
+    // Hover feedback only on clickable cards (idle vortex + carousel), matching
+    // handleClick. Gallery cards aren't clickable, so no pointer affordance.
+    if (phase !== 'idle' && phase !== 'carousel') return;
+
     e.stopPropagation();
     document.body.style.cursor = 'pointer';
     if (!hoverGroupRef.current) return;
@@ -132,7 +139,7 @@ export function VortexCard({
 
   const handlePointerOut = useCallback((e) => {
     // We don't check phase here to ensure we ALWAYS clean up if we leave
-    document.body.style.cursor = 'auto';
+    document.body.style.cursor = ''; // clear inline override → site's cursor:none returns
     if (!hoverGroupRef.current) return;
     
     gsap.killTweensOf(hoverGroupRef.current.scale);
@@ -181,7 +188,7 @@ export function VortexCard({
               metalness={SCENE_CONFIG.cards.material.metalness}
               envMapIntensity={SCENE_CONFIG.cards.material.envMapIntensity}
               emissiveIntensity={SCENE_CONFIG.cards.material.emissiveIntensity}
-              emissive={new THREE.Color('#ffffff')}
+              emissive="#ffffff"
               side={THREE.DoubleSide}
               transparent={true}
               opacity={1}

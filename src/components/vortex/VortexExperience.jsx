@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Loader } from "@react-three/drei";
 import { VortexScene } from "./components/VortexScene.jsx";
 
 /**
@@ -17,6 +19,7 @@ import { VortexScene } from "./components/VortexScene.jsx";
  * (back to the merge-designs list — `exitHref`).
  */
 export function VortexExperience({ exitHref = "/graphic-designs" }) {
+  const router = useRouter();
   const [phase, setPhase] = useState("idle");
   const [selectedCardId, setSelectedCardId] = useState(null);
   const [galleryBackground, setGalleryBackground] = useState(null);
@@ -53,8 +56,6 @@ export function VortexExperience({ exitHref = "/graphic-designs" }) {
     [],
   );
 
-  const handleEnteringGalleryComplete = useCallback(() => setPhase("gallery"), []);
-
   // ── Back navigation (replaces the tablet's force_return) ───────────────────
   const handleReturnComplete = useCallback(() => {
     setSelectedCardId(null);
@@ -74,19 +75,38 @@ export function VortexExperience({ exitHref = "/graphic-designs" }) {
 
   useEffect(() => {
     const onKey = (e) => {
+      // Enter/Space from idle opens the carousel (keyboard path into the flow).
+      // Carousel/gallery keys are handled inside CarouselRing (it owns activeIndex).
+      // Don't hijack the keys when the exit/back chrome is focused.
+      if (e.key === "Enter" || e.key === " ") {
+        if (phaseRef.current === "idle" && !e.target.closest?.("a, button")) {
+          e.preventDefault();
+          // First vortex card is always id "0-0" (layer 0, card 0 always exists).
+          handleCardSelect("0-0");
+        }
+        return;
+      }
+      if (e.key === "Escape" && phaseRef.current === "idle") {
+        router.push(exitHref); // keyboard exit from the top of the flow
+        return;
+      }
       if (e.key === "Escape" || e.key === "ArrowLeft" || e.key === "Backspace") {
         back();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [back]);
+  }, [back, handleCardSelect, router, exitHref]);
 
   const canGoBack = phase === "carousel" || phase === "gallery";
 
   return (
     <div className="vortex-stage">
-      <div className="vortex-frame">
+      <div
+        className="vortex-frame"
+        role="application"
+        aria-label="Image Vortex — interactive 3D gallery. Enter opens the carousel, arrow keys browse it, Escape exits."
+      >
         <VortexScene
           phase={phase}
           selectedCardId={selectedCardId}
@@ -94,12 +114,10 @@ export function VortexExperience({ exitHref = "/graphic-designs" }) {
           onCarouselImageClick={handleCarouselImageClick}
           onSelectionComplete={handleSelectionComplete}
           onReturnComplete={handleReturnComplete}
-          onEnteringGalleryComplete={handleEnteringGalleryComplete}
           galleryBackground={galleryBackground}
           galleryImages={galleryImages}
           carouselImages={carouselImages}
           setCarouselImages={setCarouselImages}
-          autoSelectImageId={null}
         />
       </div>
 
@@ -116,6 +134,12 @@ export function VortexExperience({ exitHref = "/graphic-designs" }) {
           ← {phase === "gallery" ? "carousel" : "vortex"}
         </button>
       )}
+
+      {/* Progress overlay while the 54 textures load (replaces the black screen). */}
+      <Loader
+        containerStyles={{ background: "#000" }}
+        dataInterpolation={(p) => `Loading ${p.toFixed(0)}%`}
+      />
     </div>
   );
 }

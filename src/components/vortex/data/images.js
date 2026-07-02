@@ -1,21 +1,8 @@
 /**
- * DATASET IMMAGINI
- *
- * 54 immagini distribuite in 3 categorie (18 per categoria).
- * L'assegnazione è round-robin: indice 0→cat_1, 1→cat_2, 2→cat_3, 3→cat_1, …
+ * DATASET IMMAGINI — 54 immagini del vortice.
  */
 
-// ── Definizione categorie ─────────────────────────────────────────
-const CATEGORY_IDS = ['cat_1', 'cat_2', 'cat_3'];
-
-export const CATEGORIES = [
-  { id: 'cat_1', label: 'Categoria 1', coverId: 'img_001', color: '#6366f1' },
-  { id: 'cat_2', label: 'Categoria 2', coverId: 'img_029', color: '#ec4899' },
-  { id: 'cat_3', label: 'Categoria 3', coverId: 'img_054', color: '#14b8a6' },
-];
-
-// ── Dati grezzi (senza categoria — assegnata automaticamente sotto) ──
-const _RAW = [
+export const IMAGES = [
   { id: 'img_001', url: '/vortex/images/img_001.webp', w: 950,  h: 904,  title: 'Immagine 1',  subtitle: '', description: '' },
   { id: 'img_002', url: '/vortex/images/img_002.webp', w: 550,  h: 550,  title: 'Immagine 2',  subtitle: '', description: '' },
   { id: 'img_003', url: '/vortex/images/img_003.webp', w: 584,  h: 843,  title: 'Immagine 3',  subtitle: '', description: '' },
@@ -71,9 +58,3 @@ const _RAW = [
   { id: 'img_053', url: '/vortex/images/img_053.webp', w: 716,  h: 476,  title: 'Immagine 53', subtitle: '', description: '' },
   { id: 'img_054', url: '/vortex/images/img_054.webp', w: 736,  h: 411,  title: 'Immagine 54', subtitle: '', description: '' },
 ];
-
-// ── Assegnazione categorie (round-robin) ────────────────────────────
-export const IMAGES = _RAW.map((img, i) => ({
-  ...img,
-  category: CATEGORY_IDS[i % 3],
-}));

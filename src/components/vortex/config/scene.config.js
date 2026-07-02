@@ -144,22 +144,12 @@ export const SCENE_CONFIG = {
 
   // ── SCENA GALLERY (SCENA 3) ───────────────────────────────────
   gallery: {
-    backgroundOpacity: 0.20,
-    expansionDuration: 1.5,
-    cardCount:         6,
+    backgroundOpacity: 0.20,  // Opacità del backdrop (l'immagine cliccata, dietro le card)
     elevationStart:   -12,    // Le card partono da sotto lo schermo
     elevationDuration: 1.4,
     staggerDelay:      0.15,
     cameraPosition:    [0, 0, 12],
     cameraTarget:      [0, 0, 0],
-
-    detailView: {
-      duration:       0.8,
-      ease:           'power3.inOut',
-      targetZ:        4.0,     // Card moves forward to this Z
-      targetScale:    1.8,     // Card scales up to this factor
-      offFocusOpacity: 0.15,   // Opacity of non-selected cards
-    },
   },
 
   lighting: {

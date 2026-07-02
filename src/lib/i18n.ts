@@ -83,6 +83,7 @@ const en: Dictionary = {
     "touchdesigner",
     "based in turin",
     "available 2026",
+    "open to collaborations",
   ],
   work: {
     aria: "Work",
@@ -156,6 +157,7 @@ const it: Dictionary = {
     "touchdesigner",
     "con base a torino",
     "disponibile 2026",
+    "aperto a collaborazioni",
   ],
   work: {
     aria: "Lavori",

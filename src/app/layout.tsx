@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces } from "next/font/google";
+import { Fraunces, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
@@ -12,6 +12,15 @@ const fraunces = Fraunces({
   variable: "--font-fraunces",
   style: ["normal", "italic"],
   axes: ["opsz"],
+});
+
+// A real mono, self-hosted, so the site's whole meta/nav/ticker/loader register
+// looks identical on every OS instead of degrading to Consolas/SF Mono/Android
+// mono. Variable weight axis — no `weight` needed.
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-mono",
 });
 
 const SITE = "https://albertomarocco.dev";
@@ -62,6 +71,23 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
+// Person structured data — lets search/AI surface who this is, role, place and
+// socials as an entity, not just page text. Rendered once in the document body.
+const personLd = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: "Alberto Marocco",
+  url: SITE,
+  jobTitle: "Creative Technologist",
+  email: "mailto:albertomarocco.dev@gmail.com",
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: "Turin",
+    addressCountry: "IT",
+  },
+  sameAs: ["https://www.instagram.com/alberto.marocco/"],
+};
+
 // Root layout holds only the document shell (html/body), fonts, metadata and
 // analytics. The site chrome (cursor, loader, Lenis, WebGL field, topbar) lives
 // in (site)/layout.tsx so immersive route groups can opt out of it entirely.
@@ -70,8 +96,12 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const locale = await getLocale();
   return (
-    <html lang={locale} className={fraunces.variable}>
+    <html lang={locale} className={`${fraunces.variable} ${jetbrainsMono.variable}`}>
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(personLd) }}
+        />
         {children}
         <Analytics />
       </body>

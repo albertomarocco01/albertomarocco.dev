@@ -6,6 +6,7 @@ import { SCENE_CONFIG } from '../config/scene.config.js';
 import { IMAGES } from '../data/images.js';
 import { VortexCard } from './VortexCard.jsx';
 import { getClampedSize } from '../utils/cardUtils.js';
+import { useReducedMotion } from '../utils/reducedMotion.js';
 
 // ── Deterministic seeded PRNG (Mulberry32) ──
 function mulberry32(a) {
@@ -29,9 +30,13 @@ function CylinderLayer({ layer, cards, phase, onCardClick }) {
   const groupRef = useRef();
   const speed = SCENE_CONFIG.rings.idle.speeds[layer.index] || 0.04;
   const currentSpeed = useRef(speed);
+  const reduceMotion = useReducedMotion();
 
   useFrame((_, delta) => {
     if (!groupRef.current) return;
+
+    // Honour "reduce motion": keep the rings static.
+    if (reduceMotion) { currentSpeed.current = 0; return; }
 
     if (phase !== 'idle') {
       // Instant freeze — rotation.y stays fixed so worldToLocal stays valid
@@ -79,8 +84,16 @@ function CylinderLayer({ layer, cards, phase, onCardClick }) {
 function CarouselRing({ images, phase, onCarouselImageClick }) {
   const groupRef = useRef();
   const [activeIndex, setActiveIndex] = React.useState(0);
+  // Once the user drives the carousel (tap/keyboard), stop auto-rotating so a
+  // rotation can't fire between aiming and tapping and turn an "open" into a
+  // "select". Reset whenever we leave the carousel.
+  const [autoPaused, setAutoPaused] = React.useState(false);
   const rotationTweenRef = useRef(null);
   const carouselConfig = SCENE_CONFIG.carousel;
+
+  useEffect(() => {
+    if (phase !== 'carousel') setAutoPaused(false);
+  }, [phase]);
 
   const selectedCards = useMemo(() => {
     return images.map((img, i) => {
@@ -162,18 +175,19 @@ function CarouselRing({ images, phase, onCarouselImageClick }) {
     });
   }, [activeIndex, phase, selectedCards, carouselConfig, cardRefs]);
 
-  // ── Auto-Play: Passa alla card successiva ogni 2 secondi ──
+  // ── Auto-Play: Passa alla card successiva (autoPlayDelay secondi) ──
   useEffect(() => {
-    if (phase !== 'carousel' || !carouselConfig.autoPlayDelay) return;
+    if (phase !== 'carousel' || autoPaused || !carouselConfig.autoPlayDelay) return;
 
     const timer = setTimeout(() => {
       setActiveIndex((prev) => (prev + 1) % selectedCards.length);
     }, carouselConfig.autoPlayDelay * 1000);
 
     return () => clearTimeout(timer);
-  }, [activeIndex, phase, selectedCards.length, carouselConfig.autoPlayDelay]);
+  }, [activeIndex, phase, autoPaused, selectedCards.length, carouselConfig.autoPlayDelay]);
 
   const handleCardClick = (i, cardData) => {
+    setAutoPaused(true); // user is driving now — stop auto-rotation
     if (i === activeIndex) {
       // Se è già attiva, apri la gallery
       if (onCarouselImageClick) onCarouselImageClick(cardData.imageData, i, selectedCards);
@@ -182,6 +196,35 @@ function CarouselRing({ images, phase, onCarouselImageClick }) {
       setActiveIndex(i);
     }
   };
+
+  // ── Keyboard path through the carousel (WCAG 2.1.1) ──
+  // Arrow up/right = next, arrow down = previous, Enter/Space = open active.
+  // (Arrow left / Escape stay wired to "back" in VortexExperience.)
+  useEffect(() => {
+    if (phase !== 'carousel') return;
+    const count = selectedCards.length;
+    if (count === 0) return;
+
+    const onKey = (e) => {
+      if (e.target.closest?.('a, button')) return; // let the chrome handle its own keys
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+        setAutoPaused(true);
+        setActiveIndex((prev) => (prev + 1) % count);
+      } else if (e.key === 'ArrowDown') {
+        setAutoPaused(true);
+        setActiveIndex((prev) => (prev - 1 + count) % count);
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setAutoPaused(true);
+        const card = selectedCards[activeIndex];
+        if (card && onCarouselImageClick) {
+          onCarouselImageClick(card.imageData, activeIndex, selectedCards);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phase, activeIndex, selectedCards, onCarouselImageClick]);
 
   // Imposta opacità a 1 all'inizio del carousel
   useLayoutEffect(() => {
@@ -227,9 +270,7 @@ export function VortexLayout({
   onCarouselImageClick,
   onSelectionComplete,
   onReturnComplete,
-  autoSelectImageId,
 }) {
-  const vortexGroupRef = useRef();
   const timelineRef = useRef(null);
 
   // ── Build layout data with refs for each card ──
@@ -289,17 +330,6 @@ export function VortexLayout({
   }, []);
 
   const allCards = useMemo(() => layoutData.flatMap(entry => entry.cards), [layoutData]);
-
-  // ── AUTO-SELECT: triggered by tablet category selection ──────────
-  useEffect(() => {
-    if (!autoSelectImageId || phase !== 'idle') return;
-
-    // Find the vortex card whose imageData.id matches
-    const targetCard = allCards.find(c => c.imageData.id === autoSelectImageId);
-    if (targetCard && onCardSelect) {
-      onCardSelect(targetCard.id);
-    }
-  }, [autoSelectImageId, phase, allCards, onCardSelect]);
 
   // ── SELECTION ANIMATION ──────────────────────────────────────────
   useEffect(() => {
@@ -389,7 +419,7 @@ export function VortexLayout({
     tl.call(() => { if (onSelectionComplete) onSelectionComplete(); }, [], selected.flyDuration);
 
     return () => tl.kill();
-  }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, selectedCardId, allCards, setCarouselImages, onSelectionComplete]);
 
   // ── RETURN TO VORTEX ANIMATION ──────────────────────────────────
   useEffect(() => {
@@ -430,7 +460,7 @@ export function VortexLayout({
 
   return (
     <group name="VortexLayout">
-      <group ref={vortexGroupRef} visible={phase !== 'carousel' && phase !== 'gallery' && phase !== 'enteringGallery'}>
+      <group visible={phase !== 'carousel' && phase !== 'gallery'}>
         {layoutData.map((entry) => (
           <CylinderLayer
             key={entry.layer.index}

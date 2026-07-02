@@ -53,6 +53,31 @@ export function Loader({ tag }: { tag: string }) {
       const count = countRef.current;
       if (!root || !fill || !count) return;
 
+      // First mount of the session pays the full deliberate veil once; any later
+      // mount (returning from an immersive route remounts this layout, and plain
+      // refreshes) skips straight to a fast dissolve so the beat isn't re-paid on
+      // every navigation. sessionStorage clears with the tab, so a fresh session
+      // gets the full opening again.
+      let seen = false;
+      try {
+        seen = sessionStorage.getItem("veil-seen") === "1";
+        sessionStorage.setItem("veil-seen", "1");
+      } catch {
+        // private mode / storage blocked — treat as first visit, play in full.
+      }
+      if (seen) {
+        reveal();
+        gsap.to(root, {
+          autoAlpha: 0,
+          duration: 0.3,
+          ease: FIELD_EASE,
+          onComplete: () => {
+            root.style.pointerEvents = "none";
+          },
+        });
+        return;
+      }
+
       // Drive a single 0→100 proxy; both the bar (scaleX) and the counter read
       // from it each tick, so the number and the fill never drift apart.
       const prog = { v: 0 };
@@ -114,7 +139,7 @@ export function Loader({ tag }: { tag: string }) {
   return (
     <div className="loader" ref={rootRef} aria-hidden="true">
       <p className="loader-name">
-        albertomaroccodev<span className="loader-dot">.</span>xyz
+        albertomarocco<span className="loader-dot">.</span>dev
       </p>
       <span className="loader-bar">
         <span className="loader-fill" ref={fillRef} />

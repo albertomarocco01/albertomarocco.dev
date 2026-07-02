@@ -16,7 +16,7 @@
   --accent: rgba(176, 120, 70, 0.55); /* amber — the single accent, used with restraint */
 
   --serif: var(--font-fraunces), Georgia, "Times New Roman", serif;
-  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --mono: var(--font-mono), ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 
   --row-h: 5.4rem;
@@ -183,9 +183,7 @@ html.loading body {
 
 .grain {
   position: fixed;
-  inset: -50%;
-  width: 200%;
-  height: 200%;
+  inset: 0; /* never animated — 100% viewport is identical to the old 200%×200% */
   pointer-events: none;
   z-index: 60;
   opacity: 0.045;
@@ -366,7 +364,7 @@ html.loading body {
 
 /* ---- hero ---- */
 .hero {
-  min-height: 92vh;
+  min-height: 92svh; /* svh, not vh — no jump when the mobile URL bar shows/hides */
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -389,7 +387,7 @@ html.loading body {
 }
 .name em {
   font-style: italic;
-  color: var(--ink-dim);
+  color: #b07846; /* amber period — the brand mark, matches loader/OG/favicon */
 }
 .lede {
   max-width: 34ch;
@@ -848,6 +846,28 @@ footer.foot a:focus-visible {
   border: 0;
 }
 
+/* Skip-link (and any focusable .sr-only) must un-hide on keyboard focus —
+   otherwise the clip above hides it forever and the keyboard path is unusable. */
+.sr-only:focus-visible {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  overflow: visible;
+  clip: auto;
+  z-index: 100;
+  color: #fff;
+  background: #0a0a0c;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
 /* ---- bubble field tuner (dev / ?tune only — see BubbleControls.tsx) ----
    A small mono panel, bottom-right, for live-tuning the white bubble field. It
    only mounts in dev or with ?tune in the URL, so visitors never see it. Sits
@@ -1012,6 +1032,16 @@ footer.foot a:focus-visible {
   aspect-ratio: 1536 / 960;
   width: min(100vw, calc(100vh * 1536 / 960));
   height: min(100vh, calc(100vw * 960 / 1536));
+}
+/* On portrait screens the letterboxed landscape frame collapses to a thin strip
+   with tiny tap targets. Fill the viewport instead — the r3f canvas re-fits its
+   aspect, so cards get real size. Kiosk framing still holds in landscape. */
+@media (max-aspect-ratio: 1 / 1) {
+  .vortex-frame {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+  }
 }
 .vortex-title {
   position: fixed;

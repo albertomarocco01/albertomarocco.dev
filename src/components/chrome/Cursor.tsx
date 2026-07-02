@@ -27,6 +27,11 @@ export function Cursor() {
     let ry = my;
     let raf = 0;
 
+    // Both marks start centered so the dot doesn't sit in the top-left corner
+    // until the first pointer move (the ring was already centered, the dot wasn't).
+    dot.style.transform = `translate(${mx}px,${my}px) translate(-50%,-50%)`;
+    ring.style.transform = `translate(${rx}px,${ry}px) translate(-50%,-50%)`;
+
     const onMove = (e: PointerEvent) => {
       mx = e.clientX;
       my = e.clientY;
@@ -48,26 +53,24 @@ export function Cursor() {
       raf = requestAnimationFrame(loop);
     };
 
-    const hot = () => ring.classList.add("is-hot");
-    const cool = () => ring.classList.remove("is-hot");
-    const interactive = document.querySelectorAll(
-      "a, button, .row, .g-enter",
-    );
-    interactive.forEach((el) => {
-      el.addEventListener("mouseenter", hot);
-      el.addEventListener("mouseleave", cool);
-    });
+    // Delegate hover detection instead of binding to a snapshot of elements at
+    // mount: elements rendered after navigation (e.g. the /graphic-designs rows)
+    // would otherwise never grow the ring. pointerover bubbles, so one listener
+    // covers everything, present and future.
+    const SELECTOR = "a, button, .row, .g-enter";
+    const onOver = (e: PointerEvent) => {
+      const el = e.target as Element | null;
+      ring.classList.toggle("is-hot", !!el?.closest?.(SELECTOR));
+    };
 
     window.addEventListener("pointermove", onMove, { passive: true });
+    document.addEventListener("pointerover", onOver, { passive: true });
     raf = requestAnimationFrame(loop);
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("pointermove", onMove);
-      interactive.forEach((el) => {
-        el.removeEventListener("mouseenter", hot);
-        el.removeEventListener("mouseleave", cool);
-      });
+      document.removeEventListener("pointerover", onOver);
     };
   }, [reducedMotion]);
 

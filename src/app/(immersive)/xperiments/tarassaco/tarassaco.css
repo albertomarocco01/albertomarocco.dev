@@ -240,3 +240,75 @@
   text-shadow: 0 0 14px rgba(255, 255, 255, 0.45);
   animation: tarassaco-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* ---- sensor-failure fallback: error card + persistent keyboard hint ---- */
+.tarassaco .tara-error {
+  position: fixed;
+  inset: 0;
+  z-index: 70; /* above title + exit (z-60) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.72);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.tarassaco .tara-error-card {
+  width: 100%;
+  max-width: 30rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: 2rem 1.75rem;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(10, 10, 12, 0.9);
+}
+.tarassaco .tara-error-title {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+}
+.tarassaco .tara-error-body {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.7);
+}
+.tarassaco .tara-error-btn {
+  align-self: center;
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #fff;
+  padding: 0.7rem 1.2rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  transition: color 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+}
+.tarassaco .tara-error-btn:hover {
+  color: #000;
+  background: #fff;
+  border-color: #fff;
+}
+.tarassaco .tara-kbd-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 1.75rem;
+  transform: translateX(-50%);
+  z-index: 60;
+  pointer-events: none;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.55);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+}

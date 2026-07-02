@@ -137,9 +137,16 @@ export function Shell({
     return () => bar.removeEventListener("focusin", reveal);
   }, []);
 
+  // Section anchors only exist on the home page. On sub-routes (e.g.
+  // /graphic-designs) point them at "/#work" so the link navigates home first;
+  // onNavClick only intercepts pure "#…" hrefs, so cross-route links fall
+  // through to native navigation instead of a no-op lenis.scrollTo on a
+  // non-existent element.
+  const to = (hash: string) => (pathname === "/" ? hash : `/${hash}`);
+
   return (
     <>
-      <a href="#work" className="sr-only">
+      <a href={to("#work")} className="sr-only">
         {dict.nav.skip}
       </a>
       <div ref={topbarRef} className={`topbar${entered ? " in" : ""}`}>
@@ -150,10 +157,10 @@ export function Shell({
           <LocaleToggle locale={locale} labels={dict.locale} />
         </div>
         <nav aria-label="primary">
-          <a href="#work" onClick={onNavClick}>
+          <a href={to("#work")} onClick={onNavClick}>
             {dict.nav.work}
           </a>
-          <a href="#about" onClick={onNavClick}>
+          <a href={to("#about")} onClick={onNavClick}>
             {dict.nav.about}
           </a>
           <a href="mailto:albertomarocco.dev@gmail.com">{dict.nav.contact}</a>

@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 import { SCENE_CONFIG } from '../config/scene.config.js';
@@ -6,8 +6,8 @@ import { VortexCamera } from './VortexCamera.jsx';
 import { VortexLighting } from './VortexLighting.jsx';
 import { VortexLayout } from './VortexLayout.jsx';
 import { GalleryScene } from './GalleryScene.jsx';
-import { GalleryTransitionScene } from './GalleryTransitionScene.jsx';
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
+import { useReducedMotion } from '../utils/reducedMotion.js';
 
 export function VortexScene({
   phase,
@@ -16,16 +16,53 @@ export function VortexScene({
   onCarouselImageClick,
   onSelectionComplete,
   onReturnComplete,
-  onEnteringGalleryComplete,
   galleryBackground,
   galleryImages,
   carouselImages,
   setCarouselImages,
-  autoSelectImageId,
 }) {
   const { postProcessing } = SCENE_CONFIG;
+  const reduceMotion = useReducedMotion();
+  const [contextLost, setContextLost] = useState(false);
+
+  // Detect WebGL up front so an unsupported browser gets a message instead of a
+  // silent black canvas.
+  const webglSupported = useMemo(() => {
+    if (typeof document === 'undefined') return true;
+    try {
+      const c = document.createElement('canvas');
+      return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl')));
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const FALLBACK_STYLE = {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
+    padding: '2rem',
+    background: '#000',
+    color: 'rgba(255,255,255,0.72)',
+    font: "600 0.78rem/1.6 'Inter', sans-serif",
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    zIndex: 3,
+  };
+
+  if (!webglSupported) {
+    return (
+      <div style={FALLBACK_STYLE}>
+        This experience needs WebGL, which your browser doesn’t support.
+      </div>
+    );
+  }
 
   return (
+    <>
     <Canvas
       gl={{
         antialias: SCENE_CONFIG.renderer.antialias,
@@ -43,6 +80,14 @@ export function VortexScene({
         width: '100%',
         height: '100%',
         display: 'block',
+      }}
+      onCreated={({ gl }) => {
+        // Without preventDefault the browser drops the context permanently (frozen
+        // black canvas); with it the GPU can restore, and we surface a message
+        // meanwhile instead of leaving a dead canvas with no feedback.
+        const canvas = gl.domElement;
+        canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); setContextLost(true); }, false);
+        canvas.addEventListener('webglcontextrestored', () => setContextLost(false), false);
       }}
     >
       {SCENE_CONFIG.renderer.fog.enabled && (
@@ -69,13 +114,6 @@ export function VortexScene({
           onReturnComplete={onReturnComplete}
           carouselImages={carouselImages}
           setCarouselImages={setCarouselImages}
-          autoSelectImageId={autoSelectImageId}
-        />
-        <GalleryTransitionScene
-          phase={phase}
-          images={carouselImages}
-          selectedImage={galleryBackground}
-          onComplete={onEnteringGalleryComplete}
         />
         <GalleryScene
           phase={phase}
@@ -90,7 +128,7 @@ export function VortexScene({
             mipmapBlur
             luminanceThreshold={postProcessing.bloom.threshold}
             luminanceSmoothing={0.9}
-            intensity={postProcessing.bloom.strength}
+            intensity={reduceMotion ? 0 : postProcessing.bloom.strength}
             radius={postProcessing.bloom.radius}
           />
           <Vignette
@@ -100,5 +138,11 @@ export function VortexScene({
         </EffectComposer>
       )}
     </Canvas>
+    {contextLost && (
+      <div style={FALLBACK_STYLE}>
+        Graphics paused — the WebGL context was lost. Reload the page to continue.
+      </div>
+    )}
+    </>
   );
 }

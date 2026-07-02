@@ -37,9 +37,8 @@ import { extend, type ThreeElement } from "@react-three/fiber";
 // Number of soft orbs. Single source of truth: exported for the JS physics sim
 // (Aura.tsx) and interpolated into the fragment shader so the u_blobs[] length
 // and the loop bound always match. Keep small — the loop runs per pixel.
-// 7 (was 9): fewer orbs open real dark gaps between them, while staying dense
-// enough — with the bigger collision core + lively idle floor — for regular,
-// visible collisions. The distinct-orbs-vs-collision-frequency balance.
+// 14: dense enough to cover the field without dark gaps between orbs, while
+// keeping regular visible collisions. Keep small — the loop runs per pixel.
 export const BLOB_COUNT = 14;
 
 /**

@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Merge — Graphic Designs",
   description:
     "Selected graphic work, merged into interactive demos. Open one to explore it in the browser.",
+  alternates: { canonical: "/graphic-designs" },
 };
 
 // The merge-designs index. Each entry opens a chrome-less immersive demo under

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWindPhysics } from './hooks/useWindPhysics';
 import { GateScene } from './components/GateScene';
 import { IntroScene } from './components/IntroScene';
@@ -14,9 +14,26 @@ export default function App() {
   const [scene, setScene] = useState<Scene>('0-gate');
   const [sensorsEnabled, setSensorsEnabled] = useState(false);
   const [canInteract, setCanInteract] = useState(false);
-  
+  const [sensorsError, setSensorsError] = useState<null | 'denied' | 'timeout'>(null);
+  const [keyboardMode, setKeyboardMode] = useState(false);
+
   const handleSensorsReady = useCallback(() => {
     setScene('1-intro');
+  }, []);
+
+  const handleSensorsError = useCallback(
+    (reason: 'denied' | 'timeout' | 'unsupported') => {
+      setSensorsError(reason === 'timeout' ? 'timeout' : 'denied');
+    },
+    [],
+  );
+
+  // Fallback path: skip the sensors and drive the whole experience from the
+  // keyboard (SPACE = blow). Dismisses the error and advances off the gate.
+  const enterKeyboardMode = useCallback(() => {
+    setKeyboardMode(true);
+    setSensorsError(null);
+    setScene((prev) => (prev === '0-gate' ? '1-intro' : prev));
   }, []);
 
   const handleBlowSustained = useCallback(() => {
@@ -28,21 +45,30 @@ export default function App() {
     });
   }, []);
 
+  // Single owner for the anti-skip unlock timer. Cleared on every scene change
+  // and on unmount, so a timer armed in scene A can't fire during scene B and
+  // unlock it early (or setState after the demo is torn down).
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // When scene changes, lock interaction and clear nodes
   useEffect(() => {
     setCanInteract(false);
     clearNodes();
-    
+    if (revealTimerRef.current) { clearTimeout(revealTimerRef.current); revealTimerRef.current = null; }
+
     // For scenes without a specific reveal callback (like main scene)
     if (scene === '4-main') {
-      const timer = setTimeout(() => setCanInteract(true), SCENE_TRANSITION_DELAY);
-      return () => clearTimeout(timer);
+      revealTimerRef.current = setTimeout(() => setCanInteract(true), SCENE_TRANSITION_DELAY);
     }
+    return () => {
+      if (revealTimerRef.current) { clearTimeout(revealTimerRef.current); revealTimerRef.current = null; }
+    };
   }, [scene]);
 
   const handleRevealComplete = useCallback(() => {
     // Add anti-skip delay after the reveal animation finishes
-    setTimeout(() => setCanInteract(true), SCENE_TRANSITION_DELAY);
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = setTimeout(() => setCanInteract(true), SCENE_TRANSITION_DELAY);
   }, []);
 
   // Determine physics constraints based on current scene
@@ -57,6 +83,7 @@ export default function App() {
     canInteract,
     onBlowSustained: handleBlowSustained,
     onSensorsReady: handleSensorsReady,
+    onSensorsError: handleSensorsError,
     allowedDirection,
     sustainedDurationMs,
     disableRecovery,
@@ -106,6 +133,38 @@ export default function App() {
         <div className="tara-title" aria-hidden="true">
           <span className="tara-title-main">Tarassaco</span>
           <span className="tara-title-sub">dandelion wind</span>
+        </div>
+      )}
+
+      {/* Sensor failure: don't soft-lock on the gate — explain and offer the
+          keyboard. Also the accessible path for anyone who can't blow. */}
+      {sensorsError && (
+        <div
+          className="tara-error"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="tara-error-title"
+        >
+          <div className="tara-error-card">
+            <p id="tara-error-title" className="tara-error-title">
+              {sensorsError === 'timeout'
+                ? 'I sensori non rispondono'
+                : 'Fotocamera o microfono non disponibili'}
+            </p>
+            <p className="tara-error-body">
+              Consenti fotocamera e microfono per soffiare davvero — oppure
+              continua con la tastiera.
+            </p>
+            <button type="button" className="tara-error-btn" onClick={enterKeyboardMode}>
+              Continua — premi SPAZIO per soffiare
+            </button>
+          </div>
+        </div>
+      )}
+
+      {keyboardMode && scene !== '0-gate' && (
+        <div className="tara-kbd-hint" aria-hidden="true">
+          premi SPAZIO per soffiare
         </div>
       )}
     </div>

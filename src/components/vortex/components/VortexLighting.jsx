@@ -16,15 +16,11 @@ export function VortexLighting() {
         intensity={ambient.intensity} 
       />
       
-      {/* Primary key lighting casting standard PBR directional shadows */}
-      <directionalLight 
-        color={directional.color} 
-        intensity={directional.intensity} 
+      {/* Primary key directional light */}
+      <directionalLight
+        color={directional.color}
+        intensity={directional.intensity}
         position={directional.position}
-        castShadow={directional.castShadow}
-        shadow-mapSize-width={directional.shadowMapSize}
-        shadow-mapSize-height={directional.shadowMapSize}
-        shadow-bias={directional.shadowBias}
       />
 
       {/* Stylistic glow/mood point-lights loaded dynamically through config setup */}
