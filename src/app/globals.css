@@ -114,6 +114,18 @@ html.entering .field-canvas {
   gap: 1.8rem;
   text-align: center;
   pointer-events: none; /* the cursor layer sits above; nothing here is clickable */
+  /* Fail-safe. The veil is opaque and covers everything; if the JS that
+     dismisses it never runs to completion (a chunk 404s after a redeploy, GSAP
+     throws), the visitor is left staring at a black screen. This dissolves it
+     unaided, long after the scripted path has had its chance — on the normal
+     path GSAP has already faded it out and this settles on the same values. */
+  animation: veil-out 0.8s var(--ease) 4s forwards;
+}
+@keyframes veil-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
 }
 .loader-name {
   margin: 0;
@@ -186,8 +198,16 @@ html.loading body {
   inset: 0; /* never animated — 100% viewport is identical to the old 200%×200% */
   pointer-events: none;
   z-index: 60;
-  opacity: 0.045;
-  mix-blend-mode: screen;
+  /* No mix-blend-mode: `screen` on a #0a0a0c ground is visually equivalent to a
+     plain light overlay, but it forces a full-viewport blend recomposite every
+     scrolled frame, on top of a live WebGL canvas. Opacity nudged up to match
+     the previous apparent density. */
+  opacity: 0.055;
+  /* One 180×180 noise tile, rasterised once and repeated, instead of an inline
+     <svg> whose feTurbulence was evaluated across the whole viewport (and
+     re-evaluated on every viewport change). `stitchTiles` hides the seams. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
 }
 
 /* ---- custom cursor ---- */
@@ -482,7 +502,12 @@ html.loading body {
   align-items: center;
   gap: 1.2rem;
   height: var(--row-h);
-  transition: height 0.55s var(--ease);
+  /* No transition on `height`. Opening a row already runs a GSAP height tween on
+     .row-reveal — a layout-affecting animation that reflows the document every
+     frame. Animating this height at the same time doubled that work for 0.55s
+     on the one interaction that also has Lenis recalculating its scroll limit.
+     The +0.4rem below now lands as a single step, inside the reveal's own
+     motion. Drop `.row.open .row-head` entirely if even that reads as a jump. */
 }
 .row-head::before {
   content: "";
@@ -1004,6 +1029,12 @@ footer.foot a:focus-visible {
   .cur-ring {
     display: none;
   }
+  /* The custom cursor is what replaced the native one (`body { cursor: none }`).
+     Hiding it here without restoring the native pointer left the page with no
+     visible cursor at all. */
+  body {
+    cursor: auto;
+  }
   .wrap,
   .topbar {
     opacity: 1;
@@ -1126,11 +1157,11 @@ footer.foot a:focus-visible {
   outline: none;
 }
 .gd-demo-cover {
+  position: relative; /* containing block for the <Image fill> inside */
+  overflow: hidden;
   aspect-ratio: 4 / 5;
   border-radius: 2px;
   background-color: #0e0c0a;
-  background-size: cover;
-  background-position: center;
   border: 1px solid var(--hairline);
 }
 .gd-demo-body {

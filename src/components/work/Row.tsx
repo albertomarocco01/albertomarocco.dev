@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useLenis } from "lenis/react";
@@ -48,6 +48,14 @@ export function Row({
 }: RowProps) {
   const revealRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
+
+  // drei's <View> reads getBoundingClientRect() on every frame it renders — a
+  // forced synchronous reflow — and its loop runs whether or not the row is
+  // open, so three permanently-mounted auras taxed every scrolled frame on the
+  // home page. `visible={false}` would not have helped; the View has to go.
+  // Mounted on open, unmounted by the close tween's onComplete below.
+  const [auraLive, setAuraLive] = useState(false);
+  if (isOpen && !auraLive) setAuraLive(true);
 
   // Opening/closing a row runs a GSAP height tween that changes document height.
   // Lenis caches its max-scroll limit behind a 250ms-debounced ResizeObserver, so
@@ -101,7 +109,12 @@ export function Row({
           duration: reducedMotion ? 0 : 0.6,
           ease: FIELD_EASE,
           overwrite: "auto",
-          onComplete: syncScrollLimit,
+          onComplete: () => {
+            syncScrollLimit();
+            // The row is fully closed — drop the aura's <View> and its
+            // per-frame reflow until the row is opened again.
+            setAuraLive(false);
+          },
         });
         gsap.to(inner, {
           opacity: 0,
@@ -136,7 +149,7 @@ export function Row({
 
   const reveal = (
     <div className="row-reveal" ref={revealRef}>
-      {isGen && fieldReady && !reducedMotion && (
+      {isGen && fieldReady && !reducedMotion && auraLive && (
         <GenAura
           sizeRef={revealRef}
           variant={work.variant}

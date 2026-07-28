@@ -8,7 +8,7 @@
 export const SCENE_CONFIG = {
 
   renderer: {
-    antialias:            true, // Attiva l'antialiasing per bordi più morbidi
+    antialias:            false, // Il postprocessing è sempre attivo (vedi postProcessing.enabled) e l'ultimo pass disegna un triangolo fullscreen sul framebuffer di default: l'MSAA qui non tocca nessun bordo visibile, aggiunge solo un blit di resolve per frame
     toneMapping:          'ACESFilmicToneMapping', // Mappatura dei toni per colori più realistici
     toneMappingExposure:  1.2,  // Livello di esposizione della luce
     backgroundColor:      '#000000', // Colore di sfondo (nero)

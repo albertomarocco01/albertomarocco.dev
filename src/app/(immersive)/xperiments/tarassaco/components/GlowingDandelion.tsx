@@ -39,13 +39,24 @@ export function GlowingDandelion({ registerNode }: GlowingDandelionProps) {
     };
 
     const timer = setTimeout(registerAll, 600);
-    window.addEventListener('resize', registerAll);
-    window.addEventListener('scroll', registerAll);
-    
+
+    // No 'scroll' listener: the experience root is overflow-hidden, so there is
+    // nothing to scroll, and every fire cost 140 getBoundingClientRect() calls
+    // against nodes the physics rAF loop is concurrently writing transforms to.
+    // Resize is debounced for the same reason — and because a rect read mid-
+    // flight returns the seed's *displaced* position, which registerNode would
+    // then store as its origin.
+    let debounce: ReturnType<typeof setTimeout>;
+    const onResize = () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(registerAll, 150);
+    };
+    window.addEventListener('resize', onResize);
+
     return () => {
       clearTimeout(timer);
-      window.removeEventListener('resize', registerAll);
-      window.removeEventListener('scroll', registerAll);
+      clearTimeout(debounce);
+      window.removeEventListener('resize', onResize);
     };
   }, [registerNode]);
 

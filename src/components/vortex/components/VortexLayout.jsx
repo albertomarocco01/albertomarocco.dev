@@ -21,6 +21,14 @@ function mulberry32(a) {
 // Shared reusable Vector3 for worldToLocal conversions (avoids GC pressure)
 const _tmpVec = new THREE.Vector3();
 
+// Under "reduce motion" the choreography must become instant CUTS, not be
+// skipped: onComplete / tl.call on these very tweens is what advances the phase
+// machine, so removing them would strand the experience. Collapse the durations
+// and the staggers to ~0 and let the callbacks fire as before.
+const RM_DURATION = 0.01;
+const rmDur = (d, reduce) => (reduce ? RM_DURATION : d);
+const rmStagger = (d, reduce) => (reduce ? 0 : d);
+
 /**
  * CylinderLayer — one concentric cylinder that rotates independently.
  * Instantly stops when phase is not "idle" so that worldToLocal calculations
@@ -62,6 +70,7 @@ function CylinderLayer({ layer, cards, phase, onCardClick }) {
           cardWidth={card.cardWidth}
           cardHeight={card.cardHeight}
           phase={phase}
+          interactive={phase === 'idle'}
           outerGroupRef={card.outerGroupRef}
           animGroupRef={card.animGroupRef}
           meshRef={card.meshRef}
@@ -81,8 +90,12 @@ function CylinderLayer({ layer, cards, phase, onCardClick }) {
  * its cards appear directly at their final ring positions — no intro fly-in needed.
  * Rotation starts immediately.
  */
-function CarouselRing({ images, phase, onCarouselImageClick }) {
-  const groupRef = useRef();
+function CarouselRing({ images, phase, onCarouselImageClick, ringRef }) {
+  // The group ref is owned by VortexLayout: the return-to-vortex animation has
+  // to read this ring's live rotation to hand the vortex cards back without a
+  // visible angular jump (see the RETURN effect).
+  const groupRef = ringRef;
+  const reduceMotion = useReducedMotion();
   const [activeIndex, setActiveIndex] = React.useState(0);
   // Once the user drives the carousel (tap/keyboard), stop auto-rotating so a
   // rotation can't fire between aiming and tapping and turn an "open" into a
@@ -145,10 +158,10 @@ function CarouselRing({ images, phase, onCarouselImageClick }) {
 
     rotationTweenRef.current = gsap.to(groupRef.current.rotation, {
       y: currentRotY + diff,
-      duration: carouselConfig.selectorDuration,
+      duration: rmDur(carouselConfig.selectorDuration, reduceMotion),
       ease: carouselConfig.selectorEase,
     });
-  }, [activeIndex, phase, selectedCards.length, carouselConfig]);
+  }, [activeIndex, phase, selectedCards.length, carouselConfig, reduceMotion, groupRef]);
 
   // ── Highlight: Muove la card attiva più vicino e la ingrandisce ──
   useEffect(() => {
@@ -164,16 +177,16 @@ function CarouselRing({ images, phase, onCarouselImageClick }) {
 
       gsap.to(refs.animGroupRef.current.position, {
         z: targetZ,
-        duration: carouselConfig.selectorDuration,
+        duration: rmDur(carouselConfig.selectorDuration, reduceMotion),
         ease: carouselConfig.selectorEase,
       });
       gsap.to(refs.animGroupRef.current.scale, {
         x: targetS, y: targetS, z: targetS,
-        duration: carouselConfig.selectorDuration,
+        duration: rmDur(carouselConfig.selectorDuration, reduceMotion),
         ease: carouselConfig.selectorEase,
       });
     });
-  }, [activeIndex, phase, selectedCards, carouselConfig, cardRefs]);
+  }, [activeIndex, phase, selectedCards, carouselConfig, cardRefs, reduceMotion]);
 
   // ── Auto-Play: Passa alla card successiva (autoPlayDelay secondi) ──
   useEffect(() => {
@@ -249,11 +262,12 @@ function CarouselRing({ images, phase, onCarouselImageClick }) {
             ringRadius={carouselConfig.radius}
             cardWidth={card.cardWidth * carouselConfig.cardScale}
             cardHeight={card.cardHeight * carouselConfig.cardScale}
-            phase="carousel"
+            phase={phase}
+            interactive={phase === 'carousel'}
             outerGroupRef={cardRefs[i]?.outerGroupRef}
             animGroupRef={cardRefs[i]?.animGroupRef}
             materialRef={cardRefs[i]?.materialRef}
-            onCardClick={() => handleCardClick(i, card)}
+            onCardClick={phase === 'carousel' ? () => handleCardClick(i, card) : undefined}
           />
         );
       })}
@@ -272,6 +286,11 @@ export function VortexLayout({
   onReturnComplete,
 }) {
   const timelineRef = useRef(null);
+  const reduceMotion = useReducedMotion();
+  // Wrapper around the vortex rings, and the carousel ring group. The return
+  // animation needs both: see the RETURN effect.
+  const vortexGroupRef = useRef(null);
+  const carouselRingRef = useRef(null);
 
   // ── Build layout data with refs for each card ──
   const layoutData = useMemo(() => {
@@ -361,13 +380,16 @@ export function VortexLayout({
     timelineRef.current = tl;
 
     // ── Non-selected cards: fall into the void and dissolve ──
+    const fallDuration = rmDur(unselected.fallDuration, reduceMotion);
+    const flyDuration  = rmDur(selected.flyDuration, reduceMotion);
+
     unselectedCards.forEach((card, i) => {
       const mat        = card.materialRef.current;
       const outerGroup = card.outerGroupRef.current;
-      const delay      = i * unselected.staggerDelay;
+      const delay      = i * rmStagger(unselected.staggerDelay, reduceMotion);
 
-      if (mat)        tl.to(mat,                { opacity: 0,                                  duration: unselected.fallDuration, ease: unselected.ease }, delay);
-      if (outerGroup) tl.to(outerGroup.position, { y: `+=${unselected.fallDistance}`,           duration: unselected.fallDuration, ease: unselected.ease }, delay);
+      if (mat)        tl.to(mat,                { opacity: 0,                                  duration: fallDuration, ease: unselected.ease }, delay);
+      if (outerGroup) tl.to(outerGroup.position, { y: `+=${unselected.fallDistance}`,           duration: fallDuration, ease: unselected.ease }, delay);
     });
 
     // ── Selected cards: physically fly from vortex positions to carousel ring ──
@@ -408,18 +430,18 @@ export function VortexLayout({
       const cardScale = SCENE_CONFIG.carousel.cardScale;
 
       // Cancel floating / hover, fly position, align rotation, scale up to match carousel card size
-      if (animGroup)  tl.to(animGroup.position,  { x: 0, y: 0, z: 0,                                     duration: selected.flyDuration * 0.4, ease: 'power2.out'  }, 0);
-      if (mesh)       tl.to(mesh.position,        { z: 0,                                                  duration: 0.18,                       ease: 'power2.out'  }, 0);
-      if (mesh)       tl.to(mesh.scale,           { x: cardScale, y: cardScale, z: cardScale,              duration: selected.flyDuration,        ease: selected.ease }, 0);
-      if (outerGroup) tl.to(outerGroup.position,  { x: localTarget.x, y: localTarget.y, z: localTarget.z, duration: selected.flyDuration,        ease: selected.ease }, 0);
-      if (outerGroup) tl.to(outerGroup.rotation,  { x: 0, y: localTargetRotY, z: 0,                       duration: selected.flyDuration,        ease: selected.ease }, 0);
+      if (animGroup)  tl.to(animGroup.position,  { x: 0, y: 0, z: 0,                                     duration: flyDuration * 0.4,           ease: 'power2.out'  }, 0);
+      if (mesh)       tl.to(mesh.position,        { z: 0,                                                  duration: rmDur(0.18, reduceMotion),   ease: 'power2.out'  }, 0);
+      if (mesh)       tl.to(mesh.scale,           { x: cardScale, y: cardScale, z: cardScale,              duration: flyDuration,                 ease: selected.ease }, 0);
+      if (outerGroup) tl.to(outerGroup.position,  { x: localTarget.x, y: localTarget.y, z: localTarget.z, duration: flyDuration,                 ease: selected.ease }, 0);
+      if (outerGroup) tl.to(outerGroup.rotation,  { x: 0, y: localTargetRotY, z: 0,                       duration: flyDuration,                 ease: selected.ease }, 0);
     });
 
     // Trigger phase transition exactly when the last vortex card lands
-    tl.call(() => { if (onSelectionComplete) onSelectionComplete(); }, [], selected.flyDuration);
+    tl.call(() => { if (onSelectionComplete) onSelectionComplete(); }, [], flyDuration);
 
     return () => tl.kill();
-  }, [phase, selectedCardId, allCards, setCarouselImages, onSelectionComplete]);
+  }, [phase, selectedCardId, allCards, setCarouselImages, onSelectionComplete, reduceMotion]);
 
   // ── RETURN TO VORTEX ANIMATION ──────────────────────────────────
   useEffect(() => {
@@ -427,7 +449,8 @@ export function VortexLayout({
 
     setCarouselImages([]);
 
-    const { fadeInVortex, ease, staggerDelay } = SCENE_CONFIG.returnToVortex;
+    const { ease, staggerDelay } = SCENE_CONFIG.returnToVortex;
+    const fadeInVortex = rmDur(SCENE_CONFIG.returnToVortex.fadeInVortex, reduceMotion);
 
     if (timelineRef.current) timelineRef.current.kill();
 
@@ -436,12 +459,27 @@ export function VortexLayout({
     });
     timelineRef.current = tl;
 
+    // The carousel ring the user was just looking at is rotated by
+    // -(activeIndex / count) * 2π, but the vortex cards physically sit at
+    // UNROTATED carousel slots — so the moment the vortex group became visible
+    // again the selected cards appeared to snap around the ring by that angle.
+    // Start the whole vortex wrapper at the ring's last rotation and unwind it
+    // over the return: the cards leave from exactly where they were seen, and
+    // still land on their home coordinates (which are relative to this wrapper).
+    if (vortexGroupRef.current) {
+      const ringRotY = carouselRingRef.current ? carouselRingRef.current.rotation.y : 0;
+      vortexGroupRef.current.rotation.y = ringRotY;
+      if (ringRotY !== 0) {
+        tl.to(vortexGroupRef.current.rotation, { y: 0, duration: fadeInVortex, ease }, 0);
+      }
+    }
+
     allCards.forEach((card, i) => {
       const mat        = card.materialRef.current;
       const mesh       = card.meshRef.current;
       const outerGroup = card.outerGroupRef.current;
       const animGroup  = card.animGroupRef.current;
-      const delay      = i * staggerDelay;
+      const delay      = i * rmStagger(staggerDelay, reduceMotion);
 
       if (mat)        tl.to(mat,               { opacity: 1, emissiveIntensity: 0,                                                                    duration: fadeInVortex, ease }, delay);
       if (animGroup)  tl.to(animGroup.position, { x: 0, y: 0, z: 0,                                                                                   duration: fadeInVortex, ease }, delay);
@@ -456,11 +494,11 @@ export function VortexLayout({
     });
 
     return () => tl.kill();
-  }, [phase, allCards, onReturnComplete]);
+  }, [phase, allCards, onReturnComplete, setCarouselImages, reduceMotion]);
 
   return (
     <group name="VortexLayout">
-      <group visible={phase !== 'carousel' && phase !== 'gallery'}>
+      <group ref={vortexGroupRef} visible={phase !== 'carousel' && phase !== 'gallery'}>
         {layoutData.map((entry) => (
           <CylinderLayer
             key={entry.layer.index}
@@ -473,7 +511,12 @@ export function VortexLayout({
       </group>
 
       {carouselImages.length > 0 && (
-        <CarouselRing images={carouselImages} phase={phase} onCarouselImageClick={onCarouselImageClick} />
+        <CarouselRing
+          images={carouselImages}
+          phase={phase}
+          onCarouselImageClick={onCarouselImageClick}
+          ringRef={carouselRingRef}
+        />
       )}
     </group>
   );

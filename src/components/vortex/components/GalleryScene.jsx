@@ -6,6 +6,12 @@ import gsap from 'gsap';
 import { SCENE_CONFIG } from '../config/scene.config.js';
 import { VortexCard } from './VortexCard.jsx';
 import { getClampedSize } from '../utils/cardUtils.js';
+import { useReducedMotion } from '../utils/reducedMotion.js';
+
+// Reduce motion turns the gallery choreography into cuts. The tweens still run
+// (their onComplete / delayedCall chain is what resolves the HUD card and
+// dissolves the rest) — only the durations and staggers collapse.
+const RM_DURATION = 0.01;
 
 // ── Deterministic seeded PRNG (Mulberry32) ──
 // Keeps the gallery layout pure across renders (no StrictMode double-render
@@ -28,6 +34,7 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected })
   const timeRef    = useRef(0);
   const { gallery } = SCENE_CONFIG;
   const { camera, size } = useThree();
+  const reduceMotion = useReducedMotion();
 
   const { width: cardWidth, height: cardHeight } = getClampedSize(
     imageData.w / imageData.h, 
@@ -62,7 +69,8 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected })
   useEffect(() => {
     if (!groupRef.current) return;
 
-    const delay = gallery.staggerDelay * index + 0.1;
+    const D = (d) => (reduceMotion ? RM_DURATION : d);
+    const delay = reduceMotion ? 0 : gallery.staggerDelay * index + 0.1;
     const tweens = [];
 
     tweens.push(
@@ -70,14 +78,14 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected })
         x: finalPosition[0],
         y: finalPosition[1],
         z: finalPosition[2],
-        duration: gallery.elevationDuration,
+        duration: D(gallery.elevationDuration),
         delay,
         ease: 'power3.out',
-        onComplete: () => { 
-          flyInDone.current = true; 
+        onComplete: () => {
+          flyInDone.current = true;
 
           // Wait 1.2s -> Non-selected fly left, selected anchors HUD
-          const resolveTween = gsap.delayedCall(1.2, () => {
+          const resolveTween = gsap.delayedCall(D(1.2), () => {
             if (!groupRef.current) return;
             flyInDone.current = false; // Stop bobbing
 
@@ -90,32 +98,32 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected })
               // kills them instead of leaving them animating a detached object.
               tweens.push(gsap.to(hudAnchor.current, {
                 progress: 1,
-                duration: 0.8,
+                duration: D(0.8),
                 ease: 'power3.inOut'
               }));
               tweens.push(gsap.to(groupRef.current.scale, {
                 x: 1.3, y: 1.3, z: 1.3, // Make HUD card a nice size
-                duration: 0.8,
+                duration: D(0.8),
                 ease: 'power3.inOut'
               }));
             } else {
               // Unselected cards fly left and disappear
               tweens.push(gsap.to(groupRef.current.position, {
                 x: groupRef.current.position.x - 20,
-                duration: 0.7,
+                duration: D(0.7),
                 ease: 'power3.in'
               }));
               tweens.push(gsap.to(groupRef.current.rotation, {
                 z: groupRef.current.rotation.z - 0.5,
                 y: groupRef.current.rotation.y + 1,
-                duration: 0.7,
+                duration: D(0.7),
                 ease: 'power3.in'
               }));
               if (matRef.current) {
                 tweens.push(gsap.to(matRef.current, {
                   opacity: 0,
-                  duration: 0.5,
-                  delay: 0.2,
+                  duration: D(0.5),
+                  delay: reduceMotion ? 0 : 0.2,
                   ease: 'power2.in'
                 }));
               }
@@ -126,7 +134,7 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected })
       }),
       gsap.to(groupRef.current.scale, {
         x: 1, y: 1, z: 1,
-        duration: gallery.elevationDuration,
+        duration: D(gallery.elevationDuration),
         delay,
         ease: 'back.out(1.2)',
       })
@@ -137,15 +145,19 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected })
       tweens.push(
         gsap.to(matRef.current, {
           opacity: 1,
-          duration: 0.8,
-          delay: delay + 0.1,
+          duration: D(0.8),
+          delay: reduceMotion ? 0 : delay + 0.1,
           ease: 'power2.out',
         })
       );
     }
 
     return () => tweens.forEach(t => t.kill());
-  }, [finalPosition, isSelected, index, gallery, camera, size, cardWidth, cardHeight]);
+    // `camera`/`size`/`cardWidth`/`cardHeight` are deliberately NOT deps: none
+    // is read in this effect, and `size` from useThree() is a fresh object on
+    // every canvas resize — listing it replayed the whole fly-in choreography
+    // (and brought already-dissolved cards back) on every window drag.
+  }, [finalPosition, isSelected, index, gallery, reduceMotion]);
 
   // ── Animations Update Frame ────────────────────────────────
   useFrame((state) => {
@@ -344,8 +356,14 @@ export function GalleryScene({ phase, backgroundImage, floatingImages }) {
   // Layout is fit to the viewport when the gallery opens, then frozen: a resize
   // must NOT recompute it, or every card would snap underground and replay the
   // whole fly-in mid-view. Seeded PRNG → pure across renders (no StrictMode
-  // drift, no impure Math.random). `size` is read once at build time and
+  // drift, no impure Math.random). `size` is read once per opening and
   // deliberately excluded from the deps.
+  //
+  // Keyed on the *opening*, not on cardCount: cardCount is 8 both for the `|| 8`
+  // fallback and for a real gallery, so keying on it alone meant the memo never
+  // re-ran and the layout kept the aspect ratio captured at page load — wrong
+  // for anyone who resized, rotated, or opened the gallery on a second visit.
+  const openKey = phase === 'gallery' ? cardCount : null;
   const layouts = useMemo(() => {
     const aspect = size.width / Math.max(size.height, 1);
     const rng    = mulberry32(SCENE_CONFIG.cards.randomOffsets.seed + cardCount);
@@ -360,7 +378,7 @@ export function GalleryScene({ phase, backgroundImage, floatingImages }) {
       ],
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardCount]);
+  }, [openKey]);
 
   const isVisible = phase === 'gallery';
   if (!isVisible || safeImages.length === 0) return null;

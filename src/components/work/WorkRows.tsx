@@ -110,7 +110,13 @@ export function WorkRows({
                 onLeave={() => {
                   if (!touch.current) intentClose(work.id);
                 }}
-                onFocus={() => openNow(work.id)}
+                // Keyboard focus opens the row; touch does not. A tap fires
+                // focus *then* click, so ungated the two cancelled out and the
+                // first tap appeared to do nothing. Keyboard never reaches a
+                // hover:none device, so nothing is lost.
+                onFocus={() => {
+                  if (!touch.current) openNow(work.id);
+                }}
                 onBlur={() => intentClose(work.id)}
                 onClick={(e) => handleClick(work, e)}
               />

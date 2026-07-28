@@ -9,19 +9,25 @@ import {
   useState,
 } from "react";
 
-// Silence THREE.Clock deprecation warnings coming from React Three Fiber (R3F v9)
-if (typeof window !== "undefined") {
-  const originalWarn = console.warn;
-  console.warn = (...args: unknown[]) => {
-    if (
-      args[0] &&
-      typeof args[0] === "string" &&
-      args[0].includes("THREE.Clock")
-    ) {
-      return;
-    }
-    originalWarn.apply(console, args);
-  };
+// Silence THREE.Clock deprecation warnings coming from React Three Fiber (R3F v9).
+// Scoped to an effect with a restore, not applied at module scope: patching on
+// import meant console.warn was replaced for the life of the tab and never put
+// back, so every HMR cycle stacked another wrapper and unrelated three warnings
+// stayed swallowed while debugging the WebGL scenes.
+function useSilenceClockWarning() {
+  useEffect(() => {
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      // startsWith, not includes: only three's own prefixed deprecation line.
+      if (typeof args[0] === "string" && args[0].startsWith("THREE.Clock")) {
+        return;
+      }
+      originalWarn.apply(console, args);
+    };
+    return () => {
+      console.warn = originalWarn;
+    };
+  }, []);
 }
 
 interface AppState {
@@ -48,6 +54,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [entered, setEntered] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [fieldReady, setFieldReady] = useState(false);
+
+  useSilenceClockWarning();
 
   // Detect reduced-motion on mount; if set, enter immediately (no entrance).
   useEffect(() => {

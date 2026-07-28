@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -46,14 +47,30 @@ export default function GraphicDesigns() {
         </p>
       </header>
       <ul className="gd-demos">
-        {DEMOS.map((d) => (
+        {DEMOS.map((d, i) => (
           <li key={d.id}>
             <Link href={d.href} className="gd-demo">
-              <span
-                className="gd-demo-cover"
-                style={{ backgroundImage: `url(${d.cover})` }}
-                aria-hidden="true"
-              />
+              <span className="gd-demo-cover">
+                {/* Was a CSS background-image, so the 197KB source webp was
+                    served untouched into a ~220px box. `sizes` lets the
+                    optimizer pick a sensibly small variant; the SVG cover has
+                    nothing to optimize and is passed through instead.
+                    The first cover is above the fold and measures as the LCP
+                    element, so it gets a preload link in <head>. `preload`, not
+                    `priority` — the latter is deprecated as of Next 16. Only
+                    the first: preloading both would compete for bandwidth with
+                    the actual LCP. */}
+                <Image
+                  src={d.cover}
+                  alt=""
+                  aria-hidden="true"
+                  fill
+                  sizes="(max-width: 720px) 40vw, 220px"
+                  preload={i === 0}
+                  unoptimized={d.cover.endsWith(".svg")}
+                  style={{ objectFit: "cover" }}
+                />
+              </span>
               <span className="gd-demo-body">
                 <span className="gd-demo-title">{d.title}</span>
                 <span className="gd-demo-meta">{d.meta}</span>

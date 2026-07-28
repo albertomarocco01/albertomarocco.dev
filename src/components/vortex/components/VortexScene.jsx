@@ -64,6 +64,9 @@ export function VortexScene({
   return (
     <>
     <Canvas
+      // Match the site canvas (Field.tsx). Uncapped, r3f defaults to [1, 2],
+      // so a 2x display rendered 4x the pixels of the heaviest scene here.
+      dpr={[1, 1.5]}
       gl={{
         antialias: SCENE_CONFIG.renderer.antialias,
         toneMapping: THREE[SCENE_CONFIG.renderer.toneMapping],
@@ -122,8 +125,12 @@ export function VortexScene({
         />
       </Suspense>
 
+      {/* Composer defaults are multisampling=8 + HalfFloat render targets —
+          hundreds of MB of buffers for a Bloom and a Vignette, neither of which
+          benefits from MSAA. Raise multisampling to 2 if card edges look
+          stepped; it still costs a quarter of the default. */}
       {postProcessing.enabled && (
-        <EffectComposer>
+        <EffectComposer multisampling={0} frameBufferType={THREE.UnsignedByteType}>
           <Bloom
             mipmapBlur
             luminanceThreshold={postProcessing.bloom.threshold}

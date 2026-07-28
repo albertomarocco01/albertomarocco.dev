@@ -6,10 +6,21 @@ import { SCENE_CONFIG } from '../config/scene.config.js';
 import { buildCurvedCardGeometry, calculateBendStrength } from '../utils/curvedCardGeometry.js';
 import { useReducedMotion } from '../utils/reducedMotion.js';
 
+// three calls `object.raycast(raycaster, intersects)` unconditionally — it never
+// checks `object.visible`, so a hidden card keeps swallowing pointer events. A
+// no-op raycast is the way to actually take a mesh out of hit-testing (and it
+// must be a function: `raycast={null}` would throw inside the raycaster).
+const NO_RAYCAST = () => null;
+
 /**
  * VortexCard — renders one image card.
  * Supports phase-aware interactions: hover only in "idle", click triggers selection.
  * Material is transparent to allow animated fade out.
+ *
+ * `interactive` is owned by the parent, which is the only one that knows whether
+ * this card's group is on screen right now: the vortex rings are interactive in
+ * 'idle', the carousel ring in 'carousel'. `phase` alone can't answer that — a
+ * vortex card is still passed phase='carousel' while its whole group is hidden.
  */
 export function VortexCard({
   imageData,
@@ -19,6 +30,7 @@ export function VortexCard({
   cardWidth,
   cardHeight,
   phase,
+  interactive = false,
   onCardClick,
   // Refs exposed to parent for animation control
   outerGroupRef,    // Controls world position/rotation
@@ -38,9 +50,16 @@ export function VortexCard({
   const texture = useLoader(THREE.TextureLoader, imageData.url);
   useMemo(() => {
     texture.colorSpace = THREE.SRGBColorSpace;
-    texture.minFilter = THREE.LinearFilter;
+    // Mipmaps back on. The cards are minified 3-5x for most of the vortex, and
+    // sampling a full-res texture at that ratio is what produced the shimmer on
+    // rotation as well as a cache-thrashing read pattern. The +33% memory this
+    // costs is paid for several times over by the sources now being capped at
+    // 640px (see data/images.js) — 99MB of texels down to ~44MB with mipmaps.
+    // three clamps anisotropy to the hardware maximum.
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
     texture.magFilter = THREE.LinearFilter;
-    texture.generateMipmaps = false;
+    texture.anisotropy = 4;
+    texture.generateMipmaps = true;
   }, [texture]);
 
   // ── Curved geometry ────────────────────────────────────────────
@@ -69,6 +88,10 @@ export function VortexCard({
     geo.computeBoundingSphere();
     return geo;
   }, [ringRadius, cardWidth, cardHeight]);
+
+  // Hand-built geometry isn't owned by any loader cache, so nothing else will
+  // free its VBOs. Same pattern as Aura.tsx.
+  useEffect(() => () => geometry.dispose(), [geometry]);
 
   // ── Modulo Jitter (Floating Continuo) ───────────────────────────
   const { floating } = SCENE_CONFIG.cards;
@@ -112,9 +135,8 @@ export function VortexCard({
     // Touch fires pointerover with no matching pointerout → cards would stick at
     // hover scale. Skip hover entirely for touch; the click still fires.
     if (e.pointerType === 'touch') return;
-    // Hover feedback only on clickable cards (idle vortex + carousel), matching
-    // handleClick. Gallery cards aren't clickable, so no pointer affordance.
-    if (phase !== 'idle' && phase !== 'carousel') return;
+    // Hover feedback only on clickable cards, matching handleClick.
+    if (!interactive) return;
 
     e.stopPropagation();
     document.body.style.cursor = 'pointer';
@@ -135,35 +157,42 @@ export function VortexCard({
       duration: hover.duration, 
       ease: hover.ease,
     });
-  }, [phase, hover]);
+  }, [interactive, hover]);
 
-  const handlePointerOut = useCallback((e) => {
-    // We don't check phase here to ensure we ALWAYS clean up if we leave
+  // Never phase-gated: this must ALWAYS be able to undo a hover.
+  const resetHover = useCallback(() => {
     document.body.style.cursor = ''; // clear inline override → site's cursor:none returns
     if (!hoverGroupRef.current) return;
-    
+
     gsap.killTweensOf(hoverGroupRef.current.scale);
     gsap.killTweensOf(hoverGroupRef.current.position);
-    
+
     gsap.to(hoverGroupRef.current.scale, {
-      x: 1, y: 1, z: 1, 
-      duration: hover.duration, 
+      x: 1, y: 1, z: 1,
+      duration: hover.duration,
       ease: hover.ease,
     });
     gsap.to(hoverGroupRef.current.position, {
-      z: 0, 
-      duration: hover.duration, 
+      z: 0,
+      duration: hover.duration,
       ease: hover.ease,
     });
   }, [hover]);
 
-  // Only bind click if NOT in gallery phase
+  const handlePointerOut = useCallback(() => resetHover(), [resetHover]);
+
+  // Losing interactivity mid-hover means the mesh stops hit-testing, so no
+  // pointerout will ever arrive — without this the card stays lifted and the
+  // cursor stays a pointer for the rest of the session.
+  useEffect(() => {
+    if (interactive) return;
+    resetHover();
+  }, [interactive, resetHover]);
+
   const handleClick = (e) => {
-    if (phase === 'gallery') return; 
-    if (onCardClick) {
-      e.stopPropagation();
-      onCardClick();
-    }
+    if (!interactive || !onCardClick) return;
+    e.stopPropagation();
+    onCardClick();
   };
 
   return (
@@ -179,6 +208,7 @@ export function VortexCard({
           <mesh
             ref={meshRef}
             onClick={handleClick}
+            raycast={interactive ? THREE.Mesh.prototype.raycast : NO_RAYCAST}
             geometry={geometry}
           >
             <meshStandardMaterial

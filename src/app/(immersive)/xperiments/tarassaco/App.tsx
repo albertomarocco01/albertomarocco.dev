@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWindPhysics } from './hooks/useWindPhysics';
 import { GateScene } from './components/GateScene';
@@ -128,7 +129,7 @@ export default function App() {
           mirrors the sibling Vortex demo (nothing else here lets you leave
           the experience). The title is a gate-only cover-label — it must not
           survive into the running demo, so it's gated to scene '0-gate'. */}
-      <a href="/graphic-designs" className="tara-exit">← esci dalla demo</a>
+      <Link href="/graphic-designs" className="tara-exit">← esci dalla demo</Link>
       {scene === '0-gate' && (
         <div className="tara-title" aria-hidden="true">
           <span className="tara-title-main">Tarassaco</span>

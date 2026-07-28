@@ -77,7 +77,10 @@ export function VortexCamera({ phase }) {
       if (phase === 'idle') return;
     }
 
-    const dur = (cfg) => cfg.cameraDuration || SCENE_CONFIG.carousel.cameraDuration;
+    // Reduce motion collapses every camera move to a cut. Not skipped: the
+    // return tween's onComplete is what restarts the idle breathing.
+    const dur = (cfg) =>
+      reduceMotion ? 0.01 : cfg.cameraDuration || SCENE_CONFIG.carousel.cameraDuration;
     const easeOf = (cfg) => cfg.cameraEase || SCENE_CONFIG.carousel.cameraEase;
 
     if (phase === 'selecting' || phase === 'carousel' || phase === 'gallery') {
@@ -90,7 +93,7 @@ export function VortexCamera({ phase }) {
       gsap.to(currentRollAngle, { current: cfg.cameraRollAngle || 0, duration: dur(cfg), ease: easeOf(cfg) });
     } else if (phase === 'returning' || phase === 'idle') {
       stopBreathing();
-      const d = SCENE_CONFIG.returnToVortex?.fadeInVortex || 1.0;
+      const d = reduceMotion ? 0.01 : SCENE_CONFIG.returnToVortex?.fadeInVortex || 1.0;
       const e = SCENE_CONFIG.returnToVortex?.ease || 'power2.inOut';
       gsap.to(camera.position, {
         x: basePosition.x,
@@ -105,7 +108,7 @@ export function VortexCamera({ phase }) {
       gsap.to(currentTarget.current, { x: baseTarget.x, y: baseTarget.y, z: baseTarget.z, duration: d, ease: e });
       gsap.to(currentRollAngle, { current: SCENE_CONFIG.camera.rollAngle || 0, duration: d, ease: e });
     }
-  }, [phase, camera, basePosition, baseTarget, startBreathing, stopBreathing]);
+  }, [phase, camera, basePosition, baseTarget, startBreathing, stopBreathing, reduceMotion]);
 
   // Continuous lookAt with rolling
   useFrame(() => {

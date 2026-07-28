@@ -32,7 +32,9 @@ export function SmoothScroll({ children }: { children: React.ReactNode }) {
       ref={lenisRef}
       autoRaf={false}
       options={{
-        lerp: reducedMotion ? 1 : 0.1,
+        // 0.1 takes ~370ms to settle each wheel notch, which reads as lag
+        // rather than smoothness. 0.18 keeps the easing but halves the delay.
+        lerp: reducedMotion ? 1 : 0.18,
         smoothWheel: !reducedMotion,
         syncTouch: false,
       }}

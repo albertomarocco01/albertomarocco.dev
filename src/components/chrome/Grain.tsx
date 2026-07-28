@@ -1,20 +1,8 @@
-// Fixed full-screen fractal-noise grain, screen-blended at low opacity.
+// Fixed full-screen grain. The noise is a 180×180 SVG tile rasterised once by
+// the CSS engine and repeated (see `.grain` in globals.css) — as a viewport-sized
+// inline <svg> the feTurbulence was evaluated over every pixel on screen, and
+// re-evaluated whenever the viewport changed (mobile URL bar retracting).
+// `stitchTiles="stitch"` makes the tile seams invisible.
 export function Grain() {
-  return (
-    <svg
-      className="grain"
-      aria-hidden="true"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <filter id="grain-noise">
-        <feTurbulence
-          type="fractalNoise"
-          baseFrequency="0.9"
-          numOctaves={2}
-          stitchTiles="stitch"
-        />
-      </filter>
-      <rect width="100%" height="100%" filter="url(#grain-noise)" />
-    </svg>
-  );
+  return <div className="grain" aria-hidden="true" />;
 }

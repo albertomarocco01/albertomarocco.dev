@@ -145,8 +145,16 @@ export function useWindPhysics({
     const onKeyUp = (e: KeyboardEvent) => {
       if (isBlowKey(e)) isKeyBlowingRef.current = false;
     };
+    // keyup never fires if the window loses focus mid-press (alt-tab, a click
+    // into devtools), which latched the blow on forever: endless wind and
+    // scenes advancing by themselves. Release defensively on both signals.
+    const releaseKey = () => {
+      isKeyBlowingRef.current = false;
+    };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', releaseKey);
+    document.addEventListener('visibilitychange', releaseKey);
 
     // The mic path derives force from RMS above threshold; a key press has none,
     // so give the keyboard a firm, steady synthetic level.
@@ -328,6 +336,13 @@ export function useWindPhysics({
       // them, keyboard-only (SPACE) otherwise. Reads the effect-scoped analyser/
       // video handles, which stay null when acquisition failed.
       let lastDetect = 0; // throttles face detection to ~30fps
+      // The integration below was written per-frame, so every constant was
+      // implicitly tuned for 60Hz: on a 144Hz display the text blew away 2.4x
+      // faster, and after a tab returned from the background the first frame's
+      // gap threw it off screen. `dt` is expressed in 60Hz frames so the tuning
+      // constants keep their meaning, and is clamped so a long stall (alt-tab,
+      // GC pause) can never integrate into a jump.
+      let lastFrame = performance.now();
       const physicsLoop = () => {
           if (!isMounted) return;
 
@@ -346,7 +361,12 @@ export function useWindPhysics({
           }
 
           const now = performance.now();
-          
+          // Elapsed time in 60Hz frame units: dt === 1 reproduces the old
+          // per-frame behaviour exactly, so every tuned constant keeps its
+          // meaning. Capped at 3 frames (~50ms).
+          const dt = Math.min((now - lastFrame) / 16.667, 3);
+          lastFrame = now;
+
           // 2. MediaPipe Analysis — throttled to ~30fps. Mouth direction doesn't
           // need 60, and detectForVideo with numFaces:2 is the battery hog.
           if (faceLandmarkerRef.current && video && video.readyState >= 2 && now - lastDetect >= 33) {
@@ -396,18 +416,18 @@ export function useWindPhysics({
             
             if (activeMouths.length > 0) {
               activeMouths.forEach(x => {
-                if (x < 0.5) windFrontX_LTR += 180; 
-                else windFrontX_RTL -= 180;
+                if (x < 0.5) windFrontX_LTR += 180 * dt;
+                else windFrontX_RTL -= 180 * dt;
               });
             } else {
               // Fallback if no face but blowing (e.g. camera covered)
-              if (allowedDirectionRef.current === 'left') windFrontX_LTR += 180;
-              else windFrontX_RTL -= 180;
+              if (allowedDirectionRef.current === 'left') windFrontX_LTR += 180 * dt;
+              else windFrontX_RTL -= 180 * dt;
             }
           } else {
             blowStartTimeRef.current = 0;
-            windFrontX_LTR -= 200;
-            windFrontX_RTL += 200;
+            windFrontX_LTR -= 200 * dt;
+            windFrontX_RTL += 200 * dt;
           }
           
           windFrontX_LTR = Math.max(-500, Math.min(windFrontX_LTR, window.innerWidth + 500));
@@ -487,13 +507,17 @@ export function useWindPhysics({
                 }
               }
 
-              state.vx = (state.vx + ax) * FRICTION_DRAG;
-              state.vy = (state.vy + ay) * FRICTION_DRAG;
-              state.vRot = (state.vRot + aRot) * FRICTION_DRAG;
+              // Velocity is in px per 60Hz frame. Acceleration integrates over
+              // dt, drag compounds over dt (pow, not multiply — 0.96 twice is
+              // not 0.96 once), and position integrates over dt.
+              const drag = Math.pow(FRICTION_DRAG, dt);
+              state.vx = (state.vx + ax * dt) * drag;
+              state.vy = (state.vy + ay * dt) * drag;
+              state.vRot = (state.vRot + aRot * dt) * drag;
 
-              state.dx += state.vx;
-              state.dy += state.vy;
-              state.rot += state.vRot;
+              state.dx += state.vx * dt;
+              state.dy += state.vy * dt;
+              state.rot += state.vRot * dt;
 
               if (Math.abs(state.vx) > 0.05 || Math.abs(state.vy) > 0.05 || Math.abs(state.dx) > 0.5) {
                 el.style.transform = `translate(${state.dx}px, ${state.dy}px) rotate(${state.rot}deg)`;
@@ -515,6 +539,8 @@ export function useWindPhysics({
       isMounted = false;
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', releaseKey);
+      document.removeEventListener('visibilitychange', releaseKey);
       if (readyTimer) clearTimeout(readyTimer);
       // Restore the console methods we patched to swallow MediaPipe noise.
       console.error = consoleOriginals.error;

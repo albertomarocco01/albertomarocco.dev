@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLenis } from "lenis/react";
 import { useGSAP } from "@gsap/react";
@@ -146,23 +147,29 @@ export function Shell({
 
   return (
     <>
-      <a href={to("#work")} className="sr-only">
+      {/* `Link`, not `<a>`: off the home page `to()` yields "/#work", which
+          onNavClick deliberately lets through — as a raw anchor that meant a
+          full document reload (remounting Lenis, the loader and every chunk)
+          instead of a client transition. Link still renders a real <a> with
+          the same href, so both click handlers behave exactly as before.
+          The mailto stays an <a> — nothing to route. */}
+      <Link href={to("#work")} className="sr-only">
         {dict.nav.skip}
-      </a>
+      </Link>
       <div ref={topbarRef} className={`topbar${entered ? " in" : ""}`}>
         <div className="topbar-left">
-          <a href="/" onClick={onWordmarkClick}>
+          <Link href="/" onClick={onWordmarkClick}>
             alberto marocco
-          </a>
+          </Link>
           <LocaleToggle locale={locale} labels={dict.locale} />
         </div>
         <nav aria-label="primary">
-          <a href={to("#work")} onClick={onNavClick}>
+          <Link href={to("#work")} onClick={onNavClick}>
             {dict.nav.work}
-          </a>
-          <a href={to("#about")} onClick={onNavClick}>
+          </Link>
+          <Link href={to("#about")} onClick={onNavClick}>
             {dict.nav.about}
-          </a>
+          </Link>
           <a href="mailto:albertomarocco.dev@gmail.com">{dict.nav.contact}</a>
         </nav>
       </div>

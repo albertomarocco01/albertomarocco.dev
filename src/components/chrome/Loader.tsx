@@ -9,8 +9,10 @@ import { registerGsap, FIELD_EASE } from "@/lib/motion";
 // Crossfade (s) of the veil out onto the live field once the bar fills.
 const FADE = 0.5;
 // Hard ceiling (ms) — dismiss the veil even if GSAP never runs (chunk failure,
-// CustomEase missing, etc.). Comfortably past the full fill + fade (~2.2s).
-const SAFETY_MS = 3020;
+// CustomEase missing, etc.). Comfortably past the full fill + fade (~1.35s).
+// A CSS-only `veil-out` in globals.css backs even this up, for the case where
+// no JS runs at all.
+const SAFETY_MS = 2000;
 
 /**
  * Loading veil, shown on every load / refresh. A full-viewport opaque void panel
@@ -91,10 +93,13 @@ export function Loader({ tag }: { tag: string }) {
         .timeline({ onUpdate: paint })
         // Quick off the line, then two deliberate hesitations before settling —
         // the "stall" cadence that reads as a real load buying time.
-        .to(prog, { v: 34, duration: 0.36, ease: "power2.out" })
-        .to(prog, { v: 58, duration: 0.36, ease: "power1.inOut" }, "+=0.12")
-        .to(prog, { v: 82, duration: 0.31, ease: "power1.inOut" }, "+=0.1")
-        .to(prog, { v: 100, duration: 0.36, ease: FIELD_EASE }, "+=0.07")
+        // Halved from the original cadence: 1.68s of invented progress was
+        // charged on top of the real hydration cost before the site could be
+        // touched. Same four beats, same hesitations, ~0.85s.
+        .to(prog, { v: 34, duration: 0.18, ease: "power2.out" })
+        .to(prog, { v: 58, duration: 0.18, ease: "power1.inOut" }, "+=0.06")
+        .to(prog, { v: 82, duration: 0.16, ease: "power1.inOut" }, "+=0.05")
+        .to(prog, { v: 100, duration: 0.18, ease: FIELD_EASE }, "+=0.04")
         // Fill is full: reveal the home now, so the topbar fade + field bloom
         // run concurrently with — not after — the veil dissolving.
         .add(reveal)

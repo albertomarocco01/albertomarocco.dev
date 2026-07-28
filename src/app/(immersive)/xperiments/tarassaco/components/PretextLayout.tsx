@@ -58,8 +58,14 @@ export function PretextLayout({
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
       
-      ctx.font = '16px "Inter", sans-serif';
-      
+      // Must mirror what the DOM actually renders, or the absolutely-positioned
+      // words drift and overlap. The container is `.tarassaco` (font stack
+      // below) at `text-base` = 16px with `tracking-wide` = 0.025em. Canvas
+      // measureText ignores letter-spacing, so add it back: 0.025em × 16px =
+      // 0.4px per character, applied after every character including the last.
+      ctx.font = '16px "Inter", ui-sans-serif, system-ui, sans-serif';
+      const LETTER_SPACING = 0.4;
+
       const lineHeight = 32;
       let currentX = 0;
       let currentY = 0;
@@ -70,7 +76,7 @@ export function PretextLayout({
       for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
         const metrics = ctx.measureText(token);
-        const wordWidth = metrics.width;
+        const wordWidth = metrics.width + token.length * LETTER_SPACING;
 
         // Dynamic Exclusion Zone
         let allowedWidth = currentY < exclusionHeight ? Math.max(200, width - exclusionWidth - 40) : width;
