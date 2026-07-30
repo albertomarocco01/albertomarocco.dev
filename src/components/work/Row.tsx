@@ -139,7 +139,7 @@ export function Row({
       <span className="row-idx">{work.index}</span>
       <span className="row-title">{work.title}</span>
       <span className="row-meta">
-        {work.meta}
+        {text.meta}
         <span className="arrow" aria-hidden="true">
           {isGen ? "→" : "↗"}
         </span>
@@ -168,7 +168,7 @@ export function Row({
             <Image
               className="preview-img"
               src={work.image!}
-              alt={work.imageAlt ?? `${work.title} — site preview`}
+              alt={text.alt ?? work.title}
               fill
               sizes="(max-width: 720px) 92vw, (max-width: 1280px) 86vw, 1120px"
               placeholder="blur"

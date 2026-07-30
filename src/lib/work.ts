@@ -13,13 +13,13 @@ import viniMontarello from "@/assets/work/vini-montarello.webp";
 // (kept as a plain union here so this data module never imports three).
 export type WorkVariant = "amber" | "ember" | "teal" | "violet";
 
-// Translatable copy (description, cue) lives in the dictionary, keyed by `id`
-// (see src/lib/i18n.ts). This file stays structural and language-neutral.
+// Translatable copy (meta line, description, cue, image alt) lives in the
+// dictionary, keyed by `id` (see src/lib/i18n.ts). This file stays structural
+// and language-neutral — only ids, indices, project names and colours.
 export interface Work {
   id: string;
   index: string;
   title: string;
-  meta: string;
   type: "web" | "gen";
   /** present on `gen` rows — selects the shader colour family */
   variant?: WorkVariant;
@@ -31,8 +31,6 @@ export interface Work {
   mediaGradient?: string;
   /** optimized site preview on `web` rows — shown via next/image, not a plate */
   image?: StaticImageData;
-  /** alt text for the preview image */
-  imageAlt?: string;
 }
 
 export interface WorkSection {
@@ -49,14 +47,11 @@ export const WORK_SECTIONS: WorkSection[] = [
         id: "vini-montarello",
         index: "01",
         title: "Vini Montarello",
-        meta: "web · 2025",
         type: "web",
         href: "https://vinimontarello.it",
         external: true,
         mediaGradient: "linear-gradient(135deg,#1a1410,#0e0c0a 55%,#241a12)",
         image: viniMontarello,
-        imageAlt:
-          "Vini Montarello homepage — vineyards in the Monferrato hills behind the winery's wordmark",
       },
     ],
   },
@@ -67,7 +62,6 @@ export const WORK_SECTIONS: WorkSection[] = [
         id: "merge-graphic-designs",
         index: "01",
         title: "Merge — Graphic Designs",
-        meta: "graphic · 2025",
         type: "web",
         href: "/graphic-designs",
         external: false,
@@ -82,7 +76,6 @@ export const WORK_SECTIONS: WorkSection[] = [
         id: "liminal-field",
         index: "01",
         title: "Liminal Field",
-        meta: "installation · led · 2025",
         type: "gen",
         variant: "amber",
       },
@@ -90,7 +83,6 @@ export const WORK_SECTIONS: WorkSection[] = [
         id: "aura-loops",
         index: "02",
         title: "Aura Loops",
-        meta: "generative · touchdesigner · 2024",
         type: "gen",
         variant: "teal",
       },
@@ -98,7 +90,6 @@ export const WORK_SECTIONS: WorkSection[] = [
         id: "studio-next",
         index: "03",
         title: "Studio — next",
-        meta: "web · soon",
         type: "gen",
         variant: "violet",
       },

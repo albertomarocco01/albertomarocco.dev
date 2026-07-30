@@ -163,7 +163,7 @@ export function Shell({
           </Link>
           <LocaleToggle locale={locale} labels={dict.locale} />
         </div>
-        <nav aria-label="primary">
+        <nav aria-label={dict.nav.primary}>
           <Link href={to("#work")} onClick={onNavClick}>
             {dict.nav.work}
           </Link>
