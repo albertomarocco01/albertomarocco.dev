@@ -22,10 +22,11 @@ export default async function SiteLayout({
   const dict = getDictionary(locale);
   return (
     <>
-      {/* No-JS fallback: without hydration the veil would never dissolve, so
-          hide it and show the static home directly. */}
+      {/* No-JS fallback: without hydration the veil would never dissolve and
+          the hero entrance would never be played, so hide the one and settle
+          the other on its revealed state. */}
       <noscript>
-        <style>{`.loader{display:none!important}`}</style>
+        <style>{`.loader{display:none!important}.hero .eyebrow,.hero .name .nw,.hero .lede .w{opacity:1!important;filter:none!important;transform:none!important;animation:none!important}`}</style>
       </noscript>
       <AppProvider>
         <Glow />

@@ -12,16 +12,20 @@ import { Row } from "./Row";
  * close grace) avoids flicker on quick sweeps; focus opens instantly; siblings
  * dim via CSS. Touch taps toggle gen rows and follow links on web rows.
  *
+ * Renders exactly one section of WORK_SECTIONS — each now has its own route
+ * (/websites, /xperiments), and the page's own <h1> already names it, so the
+ * old per-section label is gone with the stacked home page.
+ *
  * `items` is the active dictionary's per-work copy, keyed by `work.id`; each
- * Row reads its own description/cue from it.
+ * Row reads its own meta/description/cue from it.
  */
 export function WorkRows({
+  section,
   items,
-  sections,
 }: {
+  /** which WORK_SECTIONS entry to render, by id */
+  section: string;
   items: Record<string, WorkText>;
-  /** section id → visible label */
-  sections: Record<string, string>;
 }) {
   const { reducedMotion, fieldReady } = useApp();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -88,42 +92,35 @@ export function WorkRows({
     }
   }, []);
 
+  const works = WORK_SECTIONS.find((s) => s.id === section)?.items ?? [];
+
   return (
-    <>
-      {WORK_SECTIONS.map((section) => (
-        <div className="work-section" key={section.id}>
-          <div className="sect-label">
-            <span>{sections[section.id]}</span>
-          </div>
-          <div className={`rows${openId ? " has-open" : ""}`}>
-            {section.items.map((work) => (
-              <Row
-                key={work.id}
-                work={work}
-                text={items[work.id]}
-                isOpen={openId === work.id}
-                reducedMotion={reducedMotion}
-                fieldReady={fieldReady}
-                onEnter={() => {
-                  if (!touch.current) intentOpen(work.id);
-                }}
-                onLeave={() => {
-                  if (!touch.current) intentClose(work.id);
-                }}
-                // Keyboard focus opens the row; touch does not. A tap fires
-                // focus *then* click, so ungated the two cancelled out and the
-                // first tap appeared to do nothing. Keyboard never reaches a
-                // hover:none device, so nothing is lost.
-                onFocus={() => {
-                  if (!touch.current) openNow(work.id);
-                }}
-                onBlur={() => intentClose(work.id)}
-                onClick={(e) => handleClick(work, e)}
-              />
-            ))}
-          </div>
-        </div>
+    <div className={`rows${openId ? " has-open" : ""}`}>
+      {works.map((work) => (
+        <Row
+          key={work.id}
+          work={work}
+          text={items[work.id]}
+          isOpen={openId === work.id}
+          reducedMotion={reducedMotion}
+          fieldReady={fieldReady}
+          onEnter={() => {
+            if (!touch.current) intentOpen(work.id);
+          }}
+          onLeave={() => {
+            if (!touch.current) intentClose(work.id);
+          }}
+          // Keyboard focus opens the row; touch does not. A tap fires focus
+          // *then* click, so ungated the two cancelled out and the first tap
+          // appeared to do nothing. Keyboard never reaches a hover:none device,
+          // so nothing is lost.
+          onFocus={() => {
+            if (!touch.current) openNow(work.id);
+          }}
+          onBlur={() => intentClose(work.id)}
+          onClick={(e) => handleClick(work, e)}
+        />
       ))}
-    </>
+    </div>
   );
 }

@@ -41,6 +41,14 @@ export interface DemoText {
   desc: string;
 }
 
+/** Head + heading copy shared by the plain index pages (/websites, /xperiments). */
+export interface PageText {
+  metaTitle: string;
+  metaDescription: string;
+  title: string;
+  lede: string;
+}
+
 export interface Dictionary {
   /** document-level metadata (title stays a brand token) */
   meta: {
@@ -53,6 +61,10 @@ export interface Dictionary {
     contact: string;
     /** aria-label for the topbar <nav> landmark */
     primary: string;
+    /** the three work routes, spelled out in the topbar */
+    websites: string;
+    graphic: string;
+    xperiments: string;
   };
   locale: {
     /** aria-label for the toggle group */
@@ -69,6 +81,18 @@ export interface Dictionary {
     /** lowercase tag shown beside the progress counter on the loading veil */
     tag: string;
   };
+  /** the section teasers revealed by scrolling past the hero on the home page */
+  home: {
+    /** aria-label for the teaser nav landmark */
+    aria: string;
+    /** mono cue under every teaser label */
+    cue: string;
+    teasers: {
+      websites: string;
+      graphic: string;
+      xperiments: string;
+    };
+  };
   ticker: string[];
   work: {
     /** section landmark label */
@@ -80,7 +104,17 @@ export interface Dictionary {
   about: {
     label: string;
     body: string;
+    metaTitle: string;
+    metaDescription: string;
+    title: string;
+    /** the contact block that closes /about */
+    contactLabel: string;
+    contactBody: string;
   };
+  /** the /websites index */
+  websites: PageText;
+  /** the /xperiments index */
+  xperiments: PageText;
   footer: {
     vat: string;
     instagram: string;
@@ -115,11 +149,14 @@ const en: Dictionary = {
       "Creative technologist & full-stack developer in Turin — high-performance web interfaces and real-time generative visuals, for screens and LED walls alike.",
   },
   nav: {
-    skip: "skip to work",
+    skip: "skip to content",
     work: "work",
     about: "about",
     contact: "contact",
     primary: "primary",
+    websites: "websites",
+    graphic: "graphic designs",
+    xperiments: "xperiments",
   },
   locale: {
     label: "language",
@@ -132,6 +169,15 @@ const en: Dictionary = {
   },
   loader: {
     tag: "loading",
+  },
+  home: {
+    aria: "Sections",
+    cue: "open",
+    teasers: {
+      websites: "Websites",
+      graphic: "Merge Graphic Designs",
+      xperiments: "XPERIMENTS",
+    },
   },
   ticker: [
     "generative visuals",
@@ -187,6 +233,27 @@ const en: Dictionary = {
   about: {
     label: "about",
     body: "Computer Science graduate (University of Turin, 2025) working at the seam between web engineering and immersive visuals. I make sites that perform and installations that breathe — and this one runs my own generative work, live, as the proof.",
+    metaTitle: "About",
+    metaDescription:
+      "Creative technologist and full-stack developer in Turin — web engineering, real-time visuals, and how to get in touch.",
+    title: "About",
+    contactLabel: "contact",
+    contactBody:
+      "Open to collaborations and commissions from 2026 — web, installations, LED. Write, or find me on Instagram.",
+  },
+  websites: {
+    metaTitle: "Websites",
+    metaDescription:
+      "Full-stack websites — design, code and motion in one pass. Built to a performance budget, never from a template.",
+    title: "Websites",
+    lede: "Sites built end to end — design, code and motion in one pass. Slow scroll, real performance budgets, no template underneath.",
+  },
+  xperiments: {
+    metaTitle: "XPERIMENTS",
+    metaDescription:
+      "Real-time generative work — shaders, LED walls, installations, each one painted live in the browser.",
+    title: "XPERIMENTS",
+    lede: "Real-time generative work — shaders, LED walls, installations. Each one is painted live by the shared WebGL canvas: open a row to watch it run.",
   },
   footer: {
     vat: "P.IVA — placeholder",
@@ -229,11 +296,14 @@ const it: Dictionary = {
       "Creative technologist & full-stack developer a Torino — interfacce web ad alte prestazioni e visual generative in tempo reale, per schermi e led wall.",
   },
   nav: {
-    skip: "salta ai lavori",
+    skip: "salta al contenuto",
     work: "lavori",
     about: "about",
     contact: "contatti",
     primary: "principale",
+    websites: "siti",
+    graphic: "graphic designs",
+    xperiments: "xperiments",
   },
   locale: {
     label: "lingua",
@@ -246,6 +316,15 @@ const it: Dictionary = {
   },
   loader: {
     tag: "caricamento",
+  },
+  home: {
+    aria: "Sezioni",
+    cue: "apri",
+    teasers: {
+      websites: "Siti web",
+      graphic: "Merge Graphic Designs",
+      xperiments: "XPERIMENTS",
+    },
   },
   ticker: [
     "visual generative",
@@ -301,6 +380,27 @@ const it: Dictionary = {
   about: {
     label: "about",
     body: "Laureato in Informatica (Università di Torino, 2025), lavoro nel punto d'incontro tra ingegneria web e visual immersive. Realizzo siti che rendono e installazioni che respirano — e questo sito manda in scena dal vivo il mio lavoro generativo: è la prova.",
+    metaTitle: "About",
+    metaDescription:
+      "Creative technologist e full-stack developer a Torino — ingegneria web, visual in tempo reale, e come mettersi in contatto.",
+    title: "About",
+    contactLabel: "contatti",
+    contactBody:
+      "Aperto a collaborazioni e commissioni dal 2026 — web, installazioni, led. Scrivimi, oppure trovami su Instagram.",
+  },
+  websites: {
+    metaTitle: "Siti web",
+    metaDescription:
+      "Siti full-stack — design, codice e motion in un unico passaggio. Costruiti su un budget di performance, mai da un template.",
+    title: "Siti web",
+    lede: "Siti costruiti da capo a fondo — design, codice e motion in un unico passaggio. Scroll lento, budget di performance veri, nessun template sotto.",
+  },
+  xperiments: {
+    metaTitle: "XPERIMENTS",
+    metaDescription:
+      "Lavoro generativo in tempo reale — shader, led wall, installazioni, dipinti dal vivo nel browser.",
+    title: "XPERIMENTS",
+    lede: "Lavoro generativo in tempo reale — shader, led wall, installazioni. Ognuno è dipinto dal vivo dal canvas WebGL condiviso: apri una riga per vederlo girare.",
   },
   footer: {
     vat: "P.IVA — placeholder",

@@ -22,6 +22,20 @@ import {
  * and the content wrap (visible from first paint). Server-rendered page content
  * is passed through as children so the hero paints as static HTML.
  */
+
+/**
+ * The primary nav. Every entry is a real route now — the home page carries the
+ * opening and nothing else, so there are no in-page section anchors left to
+ * smooth-scroll to and no `/#work`-style cross-route hrefs to special-case.
+ * `key` indexes the active dictionary's `nav` block.
+ */
+const NAV = [
+  { href: "/websites", key: "websites" },
+  { href: "/graphic-designs", key: "graphic" },
+  { href: "/xperiments", key: "xperiments" },
+  { href: "/about", key: "about" },
+] as const;
+
 export function Shell({
   children,
   dict,
@@ -57,38 +71,28 @@ export function Shell({
         onComplete: () => root.classList.remove("entering"),
       });
 
-      // Only the topbar fades in; the hero is untouched.
-      tl.from(".topbar", { autoAlpha: 0, duration: 1.2, ease: FIELD_EASE })
-        // Hold the timeline open for the full 1.8s field bloom so removing
-        // `entering` never cuts the brightness pulse short.
-        .to({}, { duration: 0.6 });
+      // The topbar now arrives *after* the hero name has finished generating
+      // (eyebrow at 0s, "Alberto" at 0.12s, "Marocco." at 0.36s + 0.95s — see
+      // the `hero-in` rules in globals.css), so the opening reads as one
+      // sequence instead of everything landing at once. `from` renders its
+      // start value immediately, so the bar stays hidden through the delay.
+      // The 2.35s total also outlasts the 1.8s field bloom, so removing
+      // `entering` never cuts the brightness pulse short.
+      tl.from(".topbar", {
+        autoAlpha: 0,
+        duration: 1.2,
+        delay: 1.15,
+        ease: FIELD_EASE,
+      });
     },
     { dependencies: [entered, reducedMotion] },
   );
 
-  // Smooth, slow scroll for in-page nav anchors via the shared Lenis instance.
-  // The anchors keep their real `href`; under reduced motion (or no Lenis) we
-  // fall through to the native instant jump, preserving anchor semantics.
-  const onNavClick = useCallback(
-    (e: React.MouseEvent<HTMLAnchorElement>) => {
-      if (reducedMotion || !lenis) return;
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      const href = e.currentTarget.getAttribute("href");
-      if (!href || !href.startsWith("#")) return;
-      e.preventDefault();
-      // `#top` is the document top (no such element to query) — scroll to 0;
-      // section anchors scroll to their selector. Same duration/easing.
-      lenis.scrollTo(href === "#top" ? 0 : href, {
-        duration: NAV_SCROLL_DURATION,
-        easing: fieldEasing,
-      });
-    },
-    [lenis, reducedMotion],
-  );
-
-  // Wordmark: real link to "/" so it navigates home from any route. Only when
-  // already on the home page do we intercept it for the smooth Lenis
-  // scroll-to-top instead of a same-page reload.
+  // Wordmark: real link to "/" so it navigates home from any route. On the home
+  // page itself it is swallowed rather than followed — that page owns the
+  // viewport and never scrolls (HomeSequence.tsx), so there is nothing to
+  // navigate to and a same-page reload would be the only visible effect. The
+  // scrollTo is what makes it a no-op on every other path through this branch.
   const onWordmarkClick = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>) => {
       if (pathname !== "/" || reducedMotion || !lenis) return;
@@ -99,14 +103,14 @@ export function Shell({
     [pathname, reducedMotion, lenis],
   );
 
-  // Auto-hide the (transparent, scrim-free) topbar so it never collides with
-  // the "selected work" label and the ghosted row titles below: tuck it away on
-  // scroll down, reveal it on scroll up, always show it near the very top.
-  // Driven off the shared Lenis instance and applied as a single class toggle
-  // through `topbarRef` — no setState on the scroll tick. CSS owns the cheap
-  // transform transition; GSAP still owns the entrance opacity, so the two
-  // compose without fighting. Skipped under reduced motion: the bar stays
-  // statically visible, exactly as before.
+  // Auto-hide the (transparent, scrim-free) topbar so it never collides with the
+  // page titles and ghosted row titles below: tuck it away on scroll down,
+  // reveal it on scroll up, always show it near the very top. Driven off the
+  // shared Lenis instance and applied as a single class toggle through
+  // `topbarRef` — no setState on the scroll tick. CSS owns the cheap transform
+  // transition; GSAP still owns the entrance opacity, so the two compose without
+  // fighting. Skipped under reduced motion: the bar stays statically visible,
+  // exactly as before.
   useLenis(
     (instance) => {
       if (reducedMotion) return;
@@ -138,42 +142,45 @@ export function Shell({
     return () => bar.removeEventListener("focusin", reveal);
   }, []);
 
-  // Section anchors only exist on the home page. On sub-routes (e.g.
-  // /graphic-designs) point them at "/#work" so the link navigates home first;
-  // onNavClick only intercepts pure "#…" hrefs, so cross-route links fall
-  // through to native navigation instead of a no-op lenis.scrollTo on a
-  // non-existent element.
-  const to = (hash: string) => (pathname === "/" ? hash : `/${hash}`);
-
   return (
     <>
-      {/* `Link`, not `<a>`: off the home page `to()` yields "/#work", which
-          onNavClick deliberately lets through — as a raw anchor that meant a
-          full document reload (remounting Lenis, the loader and every chunk)
-          instead of a client transition. Link still renders a real <a> with
-          the same href, so both click handlers behave exactly as before.
-          The mailto stays an <a> — nothing to route. */}
-      <Link href={to("#work")} className="sr-only">
+      {/* A plain <a>, not `Link`: the target is a fragment on the page already
+          being viewed, on every route — there is nothing to route to, and Lenis
+          re-syncs from the native scroll the jump produces. */}
+      <a href="#main" className="sr-only">
         {dict.nav.skip}
-      </Link>
+      </a>
       <div ref={topbarRef} className={`topbar${entered ? " in" : ""}`}>
         <div className="topbar-left">
-          <Link href="/" onClick={onWordmarkClick}>
+          <Link href="/" className="wordmark" onClick={onWordmarkClick}>
             alberto marocco
           </Link>
           <LocaleToggle locale={locale} labels={dict.locale} />
         </div>
         <nav aria-label={dict.nav.primary}>
-          <Link href={to("#work")} onClick={onNavClick}>
-            {dict.nav.work}
-          </Link>
-          <Link href={to("#about")} onClick={onNavClick}>
-            {dict.nav.about}
-          </Link>
-          <a href="mailto:albertomarocco.dev@gmail.com">{dict.nav.contact}</a>
+          {NAV.map((item) => {
+            // Exact match is enough: the only deeper /xperiments/* routes are the
+            // immersive demos, which render outside this shell entirely.
+            const current = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={current ? "is-current" : undefined}
+                aria-current={current ? "page" : undefined}
+              >
+                {dict.nav[item.key]}
+              </Link>
+            );
+          })}
         </nav>
       </div>
-      <div className={`wrap${entered ? " in" : ""}`}>{children}</div>
+      {/* `tabIndex={-1}` so the skip link can actually move focus here; the
+          outline is suppressed in CSS since this is a programmatic target, not
+          an interactive control. */}
+      <div id="main" tabIndex={-1} className={`wrap${entered ? " in" : ""}`}>
+        {children}
+      </div>
     </>
   );
 }

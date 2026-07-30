@@ -1,5 +1,6 @@
-// Work, grouped into sections. Each section renders its own label + rows; the
-// open-one-at-a-time state stays global across all of them (see WorkRows).
+// Work, grouped into sections — one section per route (/websites, /xperiments).
+// A page asks WorkRows for its section by id; open-one-at-a-time state is per
+// rendered list.
 // `gen` rows host the live WebGL aura, each in its own colour family (amber /
 // teal / violet — the same domain-warped smoke, different tints). `web` rows
 // show a still media plate (or a real site preview) and link out / route
@@ -55,20 +56,9 @@ export const WORK_SECTIONS: WorkSection[] = [
       },
     ],
   },
-  {
-    id: "graphic",
-    items: [
-      {
-        id: "merge-graphic-designs",
-        index: "01",
-        title: "Merge — Graphic Designs",
-        type: "web",
-        href: "/graphic-designs",
-        external: false,
-        mediaGradient: "linear-gradient(135deg,#161020,#0b0a10 55%,#1d1424)",
-      },
-    ],
-  },
+  // No `graphic` section: its only row was a self-link to /graphic-designs, which
+  // is now a first-class route in the topbar and a home teaser. Its dictionary
+  // entry (work.items["merge-graphic-designs"]) is left in place, unused.
   {
     id: "experiments",
     items: [

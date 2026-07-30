@@ -94,6 +94,30 @@ function seedOrbs(orbs: Orb[], aspect: number, speedScale: number) {
   }
 }
 
+// ---- entrance burst ----
+// The opening: every orb is collapsed into a tight knot at the centre and fired
+// straight outward, so the field explodes into being instead of fading up
+// already-spread. Nothing downstream changes — the existing walls, drag and
+// collisions carry the orbs from here to the same resting distribution as
+// before; this only rewrites where they start.
+const BURST_RADIUS = 0.075; // knot half-size, in the shader's normalized-height space
+const BURST_BOOST = 2.6; // launch speed as a multiple of the seeded entrance speed
+
+function igniteBurst(orbs: Orb[], aspect: number, speedScale: number) {
+  const launch = (BASE_SPEED * START_ENERGY * BURST_BOOST + IDLE_DRIFT) * speedScale;
+  for (let i = 0; i < orbs.length; i++) {
+    const o = orbs[i];
+    // Even fan (so the blast is radial, not clumped) with a per-orb jitter, and
+    // a varied start radius so they don't leave the centre as one ring.
+    const ang = (i / orbs.length) * TAU + hash2(i, 3.1) * 0.9;
+    const rad = BURST_RADIUS * (0.35 + hash2(i, 7.7) * 0.65);
+    o.x = Math.cos(ang) * rad * aspect;
+    o.y = Math.sin(ang) * rad;
+    o.vx = Math.cos(ang) * launch;
+    o.vy = Math.sin(ang) * launch;
+  }
+}
+
 // One physics tick: decay the energy envelope, then integrate, bounce off the
 // soft walls, and resolve pairwise elastic collisions. O(n²) but n = BLOB_COUNT.
 function stepPhysics(
@@ -262,21 +286,18 @@ export function Aura({
   const nextTimer = useRef<number | null>(null);
 
   const { entered } = useApp();
-  const prevEntered = useRef(entered);
+  // Deliberately seeded `false`, not `entered`: the field mounts on idle, which
+  // can land *after* the loader has already entered. Seeding it from `entered`
+  // meant that race silently swallowed the burst.
+  const prevEntered = useRef(false);
+  const burstArmed = useRef(false);
 
   useEffect(() => {
     if (entered && !prevEntered.current && !reducedMotion && white) {
-      // Trigger energetic bubble speed explosion upon loading completion,
-      // scaled by the live `speed` param so a faster setting bursts harder.
-      energy.current = START_ENERGY;
-      const speed =
-        (BASE_SPEED * START_ENERGY * 2.5 + IDLE_DRIFT) *
-        getBubbleParams().speed;
-      for (let i = 0; i < orbs.current.length; i++) {
-        const ang = Math.random() * Math.PI * 2;
-        orbs.current[i].vx = Math.cos(ang) * speed;
-        orbs.current[i].vy = Math.sin(ang) * speed;
-      }
+      // Arm the entrance explosion. Applied in useFrame rather than here: the
+      // orbs are seeded on the first frame that knows the viewport box, which
+      // may not have happened yet, and the burst needs the aspect ratio too.
+      burstArmed.current = true;
       invalidate();
     }
     prevEntered.current = entered;
@@ -413,6 +434,14 @@ export function Aura({
       if (!orbsReady.current && resOk) {
         seedOrbs(orbs.current, aspect, bp.speed);
         orbsReady.current = true;
+      }
+      // Entrance: collapse to the centre and detonate, once the orbs exist and
+      // the box is known. Held armed until then, so a field that mounts late
+      // still gets its opening.
+      if (burstArmed.current && orbsReady.current && resOk) {
+        burstArmed.current = false;
+        igniteBurst(orbs.current, aspect, bp.speed);
+        energy.current = START_ENERGY;
       }
     }
 

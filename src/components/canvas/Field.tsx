@@ -37,7 +37,7 @@ function isSoftwareRenderer(
  * Mounted once, after first paint + idle (see FieldMount), never on first paint.
  */
 export function Field() {
-  const { reducedMotion } = useApp();
+  const { reducedMotion, entered } = useApp();
 
   // The ambient field is now a full-site background: it runs the whole time the
   // tab is visible, behind every section, so the bubbles stay present while you
@@ -64,7 +64,13 @@ export function Field() {
 
   return (
     <>
-      {!reducedMotion && <AmbientField active={active} staticOnly={staticOnly} />}
+      {/* Gated on `entered` as well as visibility: the field holds at fade 0
+          with its orbs knotted at the centre until the loader lifts, so the
+          opening reads as an explosion out of nothing rather than a fade-up of
+          an already-spread field. */}
+      {!reducedMotion && (
+        <AmbientField active={active && entered} staticOnly={staticOnly} />
+      )}
       <Canvas
         className="field-canvas"
         // R3F sets inline position:relative on its container; override here so

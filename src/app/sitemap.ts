@@ -7,10 +7,28 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: SITE, lastModified, changeFrequency: "monthly", priority: 1 },
     {
+      url: `${SITE}/websites`,
+      lastModified,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
       url: `${SITE}/graphic-designs`,
       lastModified,
       changeFrequency: "monthly",
       priority: 0.8,
+    },
+    {
+      url: `${SITE}/xperiments`,
+      lastModified,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${SITE}/about`,
+      lastModified,
+      changeFrequency: "yearly",
+      priority: 0.7,
     },
     {
       url: `${SITE}/xperiments/vortex`,

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 
+import { Footer } from "@/components/Footer";
 import { getDictionary, getLocale } from "@/lib/i18n";
 
 // `generateMetadata` rather than a static object: the title and description come
@@ -34,62 +35,64 @@ const DEMOS = [
 ];
 
 export default async function GraphicDesigns() {
-  const { gd } = getDictionary(await getLocale());
+  const dict = getDictionary(await getLocale());
+  const { gd } = dict;
   return (
-    <main className="gd">
-      <Link href="/" className="gd-back">
-        {gd.back}
-      </Link>
-      <header className="gd-head">
-        <span className="sect-label">
-          <span>{gd.label}</span>
-        </span>
-        <h1 className="gd-title">{gd.title}</h1>
-        <p className="gd-lede">{gd.lede}</p>
-      </header>
-      <ul className="gd-demos">
-        {DEMOS.map((d, i) => {
-          const text = gd.demos[d.id];
-          return (
-            <li key={d.id}>
-              <Link href={d.href} className="gd-demo">
-                <span className="gd-demo-cover">
-                  {/* Was a CSS background-image, so the 197KB source webp was
-                      served untouched into a ~220px box. `sizes` lets the
-                      optimizer pick a sensibly small variant; the SVG cover has
-                      nothing to optimize and is passed through instead.
-                      The first cover is above the fold and measures as the LCP
-                      element, so it gets a preload link in <head>. `preload`, not
-                      `priority` — the latter is deprecated as of Next 16. Only
-                      the first: preloading both would compete for bandwidth with
-                      the actual LCP. */}
-                  <Image
-                    src={d.cover}
-                    alt=""
-                    aria-hidden="true"
-                    fill
-                    sizes="(max-width: 720px) 40vw, 220px"
-                    preload={i === 0}
-                    unoptimized={d.cover.endsWith(".svg")}
-                    style={{ objectFit: "cover" }}
-                  />
-                </span>
-                <span className="gd-demo-body">
-                  <span className="gd-demo-title">{text.title}</span>
-                  <span className="gd-demo-meta">{text.meta}</span>
-                  <span className="gd-demo-desc">{text.desc}</span>
-                  <span className="gd-demo-cta">
-                    {gd.cta}
-                    <span className="arrow" aria-hidden="true">
-                      →
+    <>
+      <main className="gd">
+        {/* No "← back": the topbar carries every route now, this one included. */}
+        <header className="gd-head">
+          <span className="sect-label">
+            <span>{gd.label}</span>
+          </span>
+          <h1 className="gd-title">{gd.title}</h1>
+          <p className="gd-lede">{gd.lede}</p>
+        </header>
+        <ul className="gd-demos">
+          {DEMOS.map((d, i) => {
+            const text = gd.demos[d.id];
+            return (
+              <li key={d.id}>
+                <Link href={d.href} className="gd-demo">
+                  <span className="gd-demo-cover">
+                    {/* Was a CSS background-image, so the 197KB source webp was
+                        served untouched into a ~220px box. `sizes` lets the
+                        optimizer pick a sensibly small variant; the SVG cover has
+                        nothing to optimize and is passed through instead.
+                        The first cover is above the fold and measures as the LCP
+                        element, so it gets a preload link in <head>. `preload`, not
+                        `priority` — the latter is deprecated as of Next 16. Only
+                        the first: preloading both would compete for bandwidth with
+                        the actual LCP. */}
+                    <Image
+                      src={d.cover}
+                      alt=""
+                      aria-hidden="true"
+                      fill
+                      sizes="(max-width: 720px) 40vw, 220px"
+                      preload={i === 0}
+                      unoptimized={d.cover.endsWith(".svg")}
+                      style={{ objectFit: "cover" }}
+                    />
+                  </span>
+                  <span className="gd-demo-body">
+                    <span className="gd-demo-title">{text.title}</span>
+                    <span className="gd-demo-meta">{text.meta}</span>
+                    <span className="gd-demo-desc">{text.desc}</span>
+                    <span className="gd-demo-cta">
+                      {gd.cta}
+                      <span className="arrow" aria-hidden="true">
+                        →
+                      </span>
                     </span>
                   </span>
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </main>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </main>
+      <Footer footer={dict.footer} />
+    </>
   );
 }
