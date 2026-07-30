@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { VortexCopy } from "./copy";
 
 // The vortex is browser-only (WebGL, postprocessing, GSAP-driven three refs).
 // ssr:false keeps the whole tree — three/r3f/drei/postprocessing — off the
@@ -17,10 +18,10 @@ const VortexExperience = dynamic(
 // `.vortex-immersive` restores a normal cursor over the site-wide `body { cursor:
 // none }` (this route has no custom Cursor) and owns the viewport. The immersive
 // route group inherits no site chrome — no topbar, no footer, no loader veil.
-export function VortexClient() {
+export function VortexClient({ copy }: { copy: VortexCopy }) {
   return (
     <div className="vortex-immersive">
-      <VortexExperience exitHref="/graphic-designs" />
+      <VortexExperience copy={copy} exitHref="/graphic-designs" />
     </div>
   );
 }

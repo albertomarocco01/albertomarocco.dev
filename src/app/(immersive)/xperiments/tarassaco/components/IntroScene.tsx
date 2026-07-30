@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 
 interface IntroSceneProps {
+  /** the word the bar resolves into once the fill completes */
+  word: string;
   registerNode: (el: HTMLElement | null, x: number, y: number) => void;
   clearNodes: () => void;
   onRevealComplete: () => void;
 }
 
-export function IntroScene({ registerNode, clearNodes, onRevealComplete }: IntroSceneProps) {
+export function IntroScene({ word, registerNode, clearNodes, onRevealComplete }: IntroSceneProps) {
   const [progress, setProgress] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -46,7 +48,7 @@ export function IntroScene({ registerNode, clearNodes, onRevealComplete }: Intro
   
   const text = progress < 100 
     ? `[${bar}] ${progress}%` 
-    : `[██████████] BLOW`;
+    : `[██████████] ${word}`;
 
   // Split text into words so they blow away individually
   const words = text.split(' ');

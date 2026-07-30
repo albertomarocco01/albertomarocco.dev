@@ -10,6 +10,7 @@ import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import { useReducedMotion } from '../utils/reducedMotion.js';
 
 export function VortexScene({
+  copy,
   phase,
   selectedCardId,
   onCardSelect,
@@ -56,7 +57,7 @@ export function VortexScene({
   if (!webglSupported) {
     return (
       <div style={FALLBACK_STYLE}>
-        This experience needs WebGL, which your browser doesn’t support.
+        {copy.noWebgl}
       </div>
     );
   }
@@ -147,7 +148,7 @@ export function VortexScene({
     </Canvas>
     {contextLost && (
       <div style={FALLBACK_STYLE}>
-        Graphics paused — the WebGL context was lost. Reload the page to continue.
+        {copy.contextLost}
       </div>
     )}
     </>

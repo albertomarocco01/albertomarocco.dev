@@ -1,17 +1,19 @@
 import { useState, useCallback } from 'react';
 import { MiniDandelion } from './MiniDandelion';
 import { PretextLayout } from './PretextLayout';
+import type { TarassacoCopy } from '../copy';
 
 interface EastSceneProps {
+  copy: TarassacoCopy;
   registerNode: (el: HTMLElement | null, x: number, y: number) => void;
   clearNodes: () => void;
   windowWidth: number;
   onRevealComplete: () => void;
 }
 
-export function EastScene({ registerNode, clearNodes, windowWidth, onRevealComplete }: EastSceneProps) {
+export function EastScene({ copy, registerNode, clearNodes, windowWidth, onRevealComplete }: EastSceneProps) {
   const [showDandelion, setShowDandelion] = useState(false);
-  const text = "The East Wind replies. A counter-breath from the horizon, restoring balance to the scattered light.";
+  const text = copy.east;
 
   const handleRevealComplete = useCallback(() => {
     setShowDandelion(true);
@@ -23,7 +25,7 @@ export function EastScene({ registerNode, clearNodes, windowWidth, onRevealCompl
       {/* Mini Dandelion on the RIGHT + directional blow hint - only after reveal */}
       <div className={`absolute right-8 md:right-16 top-1/2 -translate-y-1/2 flex flex-col items-center gap-4 transition-opacity duration-1000 ${showDandelion ? 'opacity-100' : 'opacity-0'}`}>
         <MiniDandelion />
-        <span className="tara-hint">blow on the right →</span>
+        <span className="tara-hint">{copy.blowRight}</span>
       </div>
       
       <div className="max-w-2xl w-full">

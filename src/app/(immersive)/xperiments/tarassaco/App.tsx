@@ -6,12 +6,13 @@ import { IntroScene } from './components/IntroScene';
 import { WestScene } from './components/WestScene';
 import { EastScene } from './components/EastScene';
 import { DandelionScene } from './components/DandelionScene';
+import type { TarassacoCopy } from './copy';
 
 export const SCENE_TRANSITION_DELAY = 800; // Anti-skip cool-down
 
 type Scene = '0-gate' | '1-intro' | '2-west' | '3-east' | '4-main';
 
-export default function App() {
+export default function App({ copy }: { copy: TarassacoCopy }) {
   const [scene, setScene] = useState<Scene>('0-gate');
   const [sensorsEnabled, setSensorsEnabled] = useState(false);
   const [canInteract, setCanInteract] = useState(false);
@@ -103,22 +104,23 @@ export default function App() {
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center overflow-hidden relative selection:bg-white selection:text-black">
       
-      {scene === '0-gate' && <GateScene onStart={() => setSensorsEnabled(true)} />}
+      {scene === '0-gate' && <GateScene copy={copy} onStart={() => setSensorsEnabled(true)} />}
       
       {scene === '1-intro' && (
-        <IntroScene registerNode={registerNode} clearNodes={clearNodes} onRevealComplete={handleRevealComplete} />
+        <IntroScene word={copy.intro} registerNode={registerNode} clearNodes={clearNodes} onRevealComplete={handleRevealComplete} />
       )}
 
       {scene === '2-west' && (
-        <WestScene registerNode={registerNode} clearNodes={clearNodes} windowWidth={windowWidth} onRevealComplete={handleRevealComplete} />
+        <WestScene copy={copy} registerNode={registerNode} clearNodes={clearNodes} windowWidth={windowWidth} onRevealComplete={handleRevealComplete} />
       )}
 
       {scene === '3-east' && (
-        <EastScene registerNode={registerNode} clearNodes={clearNodes} windowWidth={windowWidth} onRevealComplete={handleRevealComplete} />
+        <EastScene copy={copy} registerNode={registerNode} clearNodes={clearNodes} windowWidth={windowWidth} onRevealComplete={handleRevealComplete} />
       )}
 
       {scene === '4-main' && (
         <DandelionScene
+          copy={copy}
           windowWidth={windowWidth}
           registerNode={registerNode}
           clearNodes={clearNodes}
@@ -129,7 +131,7 @@ export default function App() {
           mirrors the sibling Vortex demo (nothing else here lets you leave
           the experience). The title is a gate-only cover-label — it must not
           survive into the running demo, so it's gated to scene '0-gate'. */}
-      <Link href="/graphic-designs" className="tara-exit">← esci dalla demo</Link>
+      <Link href="/graphic-designs" className="tara-exit">{copy.exit}</Link>
       {scene === '0-gate' && (
         <div className="tara-title" aria-hidden="true">
           <span className="tara-title-main">Tarassaco</span>
@@ -148,16 +150,11 @@ export default function App() {
         >
           <div className="tara-error-card">
             <p id="tara-error-title" className="tara-error-title">
-              {sensorsError === 'timeout'
-                ? 'I sensori non rispondono'
-                : 'Fotocamera o microfono non disponibili'}
+              {sensorsError === 'timeout' ? copy.errTimeout : copy.errDenied}
             </p>
-            <p className="tara-error-body">
-              Consenti fotocamera e microfono per soffiare davvero — oppure
-              continua con la tastiera.
-            </p>
+            <p className="tara-error-body">{copy.errBody}</p>
             <button type="button" className="tara-error-btn" onClick={enterKeyboardMode}>
-              Continua — premi SPAZIO per soffiare
+              {copy.errButton}
             </button>
           </div>
         </div>
@@ -165,7 +162,7 @@ export default function App() {
 
       {keyboardMode && scene !== '0-gate' && (
         <div className="tara-kbd-hint" aria-hidden="true">
-          premi SPAZIO per soffiare
+          {copy.keyboardHint}
         </div>
       )}
     </div>

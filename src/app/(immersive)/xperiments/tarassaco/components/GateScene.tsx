@@ -1,7 +1,8 @@
 import { Mic, Camera, Loader2 } from 'lucide-react';
 import { useState } from 'react';
+import type { TarassacoCopy } from '../copy';
 
-export function GateScene({ onStart }: { onStart: () => void }) {
+export function GateScene({ copy, onStart }: { copy: TarassacoCopy; onStart: () => void }) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = () => {
@@ -18,12 +19,12 @@ export function GateScene({ onStart }: { onStart: () => void }) {
       >
         {loading ? (
           <>
-            <span>INITIALIZING</span>
+            <span>{copy.initializing}</span>
             <Loader2 size={18} className="animate-spin" />
           </>
         ) : (
           <>
-            <span>CLICK TO ENABLE</span>
+            <span>{copy.enable}</span>
             <div className="flex items-center gap-2">
               <Mic size={18} />
               <Camera size={18} />
@@ -50,8 +51,7 @@ export function GateScene({ onStart }: { onStart: () => void }) {
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
         }}
       >
-        Camera &amp; microphone are processed locally in your browser. Nothing is
-        recorded, stored or sent anywhere.
+        {copy.privacy}
       </p>
     </div>
   );

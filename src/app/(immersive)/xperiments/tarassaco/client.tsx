@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { TarassacoCopy } from "./copy";
 import "./tarassaco.css";
 
 // The whole experience is browser-only: getUserMedia (camera + mic), AudioContext,
@@ -13,10 +14,10 @@ const App = dynamic(() => import("./App"), { ssr: false });
 // classes the original Vite app used via Tailwind) so none of it leaks into the
 // site's hand-authored design system, and restores a normal cursor over the
 // site-wide `cursor: none`.
-export function TarassacoClient() {
+export function TarassacoClient({ copy }: { copy: TarassacoCopy }) {
   return (
     <div className="tarassaco">
-      <App />
+      <App copy={copy} />
     </div>
   );
 }

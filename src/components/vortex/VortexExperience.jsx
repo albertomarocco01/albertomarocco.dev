@@ -15,10 +15,14 @@ import { VortexScene } from "./components/VortexScene.jsx";
  * mouse/touch interaction.
  *
  * Controls: click a vortex card → carousel → click an image → gallery. Step back
- * a phase with the on-screen arrow, ← / Esc. "esci dalla demo" leaves entirely
+ * a phase with the on-screen arrow, ← / Esc. The exit link leaves entirely
  * (back to the merge-designs list — `exitHref`).
+ *
+ * `copy` is the active locale's strings (see ../../app/(immersive)/xperiments/
+ * vortex/copy.ts), resolved on the server and handed down through VortexClient —
+ * this whole tree is `ssr: false`, so it can't read the cookie itself.
  */
-export function VortexExperience({ exitHref = "/graphic-designs" }) {
+export function VortexExperience({ copy, exitHref = "/graphic-designs" }) {
   const router = useRouter();
   const [phase, setPhase] = useState("idle");
   const [selectedCardId, setSelectedCardId] = useState(null);
@@ -105,9 +109,10 @@ export function VortexExperience({ exitHref = "/graphic-designs" }) {
       <div
         className="vortex-frame"
         role="application"
-        aria-label="Image Vortex — interactive 3D gallery. Enter opens the carousel, arrow keys browse it, Escape exits."
+        aria-label={copy.aria}
       >
         <VortexScene
+          copy={copy}
           phase={phase}
           selectedCardId={selectedCardId}
           onCardSelect={handleCardSelect}
@@ -126,19 +131,19 @@ export function VortexExperience({ exitHref = "/graphic-designs" }) {
       </span>
 
       <Link href={exitHref} className="vortex-exit">
-        ✕ esci dalla demo
+        {copy.exit}
       </Link>
 
       {canGoBack && (
         <button type="button" className="vortex-back" onClick={back}>
-          ← {phase === "gallery" ? "carousel" : "vortex"}
+          {phase === "gallery" ? copy.backToCarousel : copy.backToVortex}
         </button>
       )}
 
       {/* Progress overlay while the 54 textures load (replaces the black screen). */}
       <Loader
         containerStyles={{ background: "#000" }}
-        dataInterpolation={(p) => `Loading ${p.toFixed(0)}%`}
+        dataInterpolation={(p) => copy.loading.replace("{p}", p.toFixed(0))}
       />
     </div>
   );
