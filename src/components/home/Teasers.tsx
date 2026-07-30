@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Dictionary } from "@/lib/i18n";
+import { TeaserFX } from "./TeaserFX";
 
 /**
  * The three section teasers — the right-hand column of the home page, inside the
@@ -21,7 +22,18 @@ export function Teasers({ home }: { home: Dictionary["home"] }) {
       {TEASERS.map((t) => (
         <Link key={t.key} href={t.href} className="teaser">
           <span className="teaser-idx">{t.idx}</span>
-          <span className="teaser-label">{home.teasers[t.key]}</span>
+          {/* The rolling label: two stacked copies inside an overflow-clipped
+              box; hover/focus rolls to the italic duplicate (CSS only, see
+              `.teaser-roll`). The duplicate is aria-hidden, so the accessible
+              name stays the single label. */}
+          <span className="teaser-label">
+            <span className="teaser-roll">
+              <span className="teaser-line">{home.teasers[t.key]}</span>
+              <span className="teaser-line teaser-line-alt" aria-hidden="true">
+                {home.teasers[t.key]}
+              </span>
+            </span>
+          </span>
           <span className="teaser-cue">
             {home.cue}
             <span className="arrow" aria-hidden="true">
@@ -30,6 +42,9 @@ export function Teasers({ home }: { home: Dictionary["home"] }) {
           </span>
         </Link>
       ))}
+      {/* Client half of the hover/focus effects: excites the bubble field
+          near the hovered label. Renders nothing. */}
+      <TeaserFX />
     </nav>
   );
 }

@@ -12,6 +12,7 @@ import {
 } from "./aura-material";
 import { useApp } from "@/components/providers/AppProvider";
 import { getBubbleParams } from "./bubble-params";
+import { excite, type ExciteState } from "./excite";
 
 // AuraMaterial must be extended once; importing for its side effect.
 void AuraMaterial;
@@ -226,6 +227,52 @@ function stepPhysics(
         b.vy += imp * invB * ny;
       }
     }
+  }
+}
+
+// ---- teaser-hover excitation (see excite.ts / TeaserFX.tsx) ----
+// A hovered/focused teaser aims `excite` at its label; here the envelope eases
+// toward its target (in AND out — the agitation never snaps), the centre
+// smooths over on a switch, and orbs inside the reach get pulled toward the
+// label plus a per-frame velocity jitter. The integrate step's speed-tracking
+// (SPEED_TRACK) constantly relaxes speeds back to the calm envelope, so the
+// two together read as a local simmer that dissolves the moment the pointer
+// leaves. Strength/reach are the live `excite`/`exciteRadius` params.
+const EXCITE_EASE = 3.5; // envelope lerp rate — ~300ms breathe in/out
+const EXCITE_CENTER_SMOOTH = 7; // centre lerp rate on teaser switch
+const EXCITE_JITTER = 0.9; // agitation share relative to the attraction pull
+const EXCITE_PAD = 0.06; // reach pad past the label rect (field space)
+
+function stepExcite(
+  orbs: Orb[],
+  ex: ExciteState,
+  delta: number,
+  strength: number,
+  radiusMult: number,
+) {
+  ex.level += (ex.targetLevel - ex.level) * Math.min(1, delta * EXCITE_EASE);
+  if (ex.level < 0.01) {
+    // At rest: park the centre on the target so a fresh hover starts in place
+    // instead of swooping in from the previous teaser.
+    ex.x = ex.tx;
+    ex.y = ex.ty;
+    return;
+  }
+  const cs = Math.min(1, delta * EXCITE_CENTER_SMOOTH);
+  ex.x += (ex.tx - ex.x) * cs;
+  ex.y += (ex.ty - ex.y) * cs;
+  const reach = ex.r * radiusMult + EXCITE_PAD;
+  for (let i = 0; i < orbs.length; i++) {
+    const o = orbs[i];
+    const dx = ex.x - o.x;
+    const dy = ex.y - o.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist >= reach) continue;
+    const fall = 1 - dist / reach;
+    const a = strength * ex.level * fall * delta;
+    const inv = 1 / Math.max(dist, 1e-4);
+    o.vx += dx * inv * a + (Math.random() * 2 - 1) * a * EXCITE_JITTER;
+    o.vy += dy * inv * a + (Math.random() * 2 - 1) * a * EXCITE_JITTER;
   }
 }
 
@@ -462,7 +509,10 @@ export function Aura({
     if (white && bp) {
       // Advance the orb sim only while the field is open (mirrors u_time), then
       // publish the live centres/radii to the shader. `bp.speed` paces it.
-      if (active) stepPhysics(orbs.current, energy, delta, aspect, bp.speed);
+      if (active) {
+        stepPhysics(orbs.current, energy, delta, aspect, bp.speed);
+        stepExcite(orbs.current, excite, delta, bp.excite, bp.exciteRadius);
+      }
       writeBlobs(blobVecs, orbs.current);
 
       // Cursor parallax: heavily smooth the pointer toward its target and decay

@@ -466,6 +466,7 @@ html.home-live body {
   color: var(--ink-dim);
 }
 .name {
+  position: relative; /* anchors the melt tracker (.melt-wrap) to the glyph box */
   font-family: var(--serif);
   font-weight: 300;
   font-size: clamp(2.8rem, 9vw, 7.5rem);
@@ -473,6 +474,28 @@ html.home-live body {
   letter-spacing: -0.02em;
   margin: 1.4rem 0 0;
   color: var(--ink);
+}
+/* GPU melt overlay (NameMelt): a tracker the shared canvas scissors into, bled
+   past the glyph box (em-relative, so it scales with the type) to give
+   displaced pixels room. Paints nothing itself — the canvas does. */
+.melt-wrap,
+.melt-view {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+.melt-wrap {
+  inset: -0.35em;
+}
+.melt-view {
+  inset: 0;
+}
+/* While the GPU copy is live the DOM glyphs step aside. Opacity (not
+   visibility) keeps the h1 in the a11y tree; the raster is pixel-aligned and
+   the swap happens below 1px of displacement, so it never pops. No transition —
+   a fade would show both copies at half strength. */
+.name.is-melting {
+  opacity: 0;
 }
 .name em {
   font-style: italic;
@@ -684,16 +707,49 @@ html.hero-done .teaser {
   color: var(--ink-ghost);
 }
 /* Sized to share the viewport with the name rather than own it: the name is the
-   headline, these are the doors. */
+   headline, these are the doors.
+
+   The label is also a one-line roll: two stacked copies (the second italic,
+   aria-hidden) inside this overflow-clipped box; hover/focus translates the
+   stack one step up. The clip window is padded by --bleed so Fraunces'
+   ascenders/descenders never get shaved by the 1.06 line-height (the serif
+   overflows its line box), the copies are spaced 2×--bleed apart so the
+   waiting copy stays fully outside the padded window, and the step compensates
+   — all em-based, so every clamp size just works. The paddings are cancelled
+   out of layout by the margins: zero shift vs the plain label. */
 .teaser-label {
+  --line: 1.06em; /* must match the line-height below */
+  --bleed: 0.15em;
   display: block;
-  margin-top: 0.4rem;
+  overflow: hidden;
+  height: var(--line); /* one-line window — the box must not grow to fit both copies */
+  padding: var(--bleed) 0;
+  box-sizing: content-box; /* height = the line itself; the padding adds the bleed */
+  margin-top: calc(0.4rem - var(--bleed));
+  margin-bottom: calc(var(--bleed) * -1);
   font-family: var(--serif);
   font-weight: 300;
   font-size: clamp(1.5rem, 2.6vw, 2.6rem);
   line-height: 1.06;
   letter-spacing: -0.02em;
   color: var(--ink);
+}
+.teaser-roll,
+.teaser-line {
+  display: block;
+}
+.teaser-line-alt {
+  margin-top: calc(var(--bleed) * 2);
+  font-style: italic;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .teaser-roll {
+    transition: transform 0.55s var(--ease);
+  }
+  .teaser:hover .teaser-roll,
+  .teaser:focus-visible .teaser-roll {
+    transform: translateY(calc(-1 * (var(--line) + 2 * var(--bleed))));
+  }
 }
 .teaser-cue {
   display: block;

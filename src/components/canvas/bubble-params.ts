@@ -30,6 +30,10 @@ export type BubbleParams = {
   size: number;
   /** shader BLOB_SOFT — gaussian softness; higher = softer, more diffuse orbs */
   softness: number;
+  /** teaser-hover excitation — attraction/agitation strength near the label */
+  excite: number;
+  /** excitation reach as a multiple of the hovered label's half-size */
+  exciteRadius: number;
 };
 
 // Shipped defaults. Movement is a touch faster and the field a touch brighter
@@ -40,6 +44,8 @@ export const BUBBLE_DEFAULTS: BubbleParams = {
   glow: 0.85,
   size: 1.3,
   softness: 0.85,
+  excite: 0.7,
+  exciteRadius: 1.6,
 };
 
 /** Slider metadata for the controller — order here is the display order. */
@@ -55,6 +61,8 @@ export const BUBBLE_CONTROLS: ReadonlyArray<{
   { key: "glow", label: "glow", min: 0.15, max: 1, step: 0.01 },
   { key: "size", label: "size", min: 0.6, max: 2.4, step: 0.05 },
   { key: "softness", label: "softness", min: 0.4, max: 1.6, step: 0.05 },
+  { key: "excite", label: "excite", min: 0, max: 2.5, step: 0.05 },
+  { key: "exciteRadius", label: "excite reach", min: 0.6, max: 3, step: 0.05 },
 ];
 
 const STORAGE_KEY = "am.bubbles.v1";

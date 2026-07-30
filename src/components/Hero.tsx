@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import type { Dictionary } from "@/lib/i18n";
+import { NameMelt } from "@/components/canvas/NameMelt";
 
 // Static, server-rendered hero — zero 3D, the LCP-critical layer. Copy comes in
 // as a prop so the component stays a server component (no client JS).
@@ -19,6 +20,10 @@ export function Hero({ hero }: { hero: Dictionary["hero"] }) {
         <span className="nw">
           Marocco<em>.</em>
         </span>
+        {/* Client overlay for the cursor liquid-melt. Renders nothing on the
+            server and nothing at all until the shared field is ready, so the
+            h1 above stays the untouched LCP element. */}
+        <NameMelt />
       </h1>
       {/* The spaces are real text nodes *between* the spans, not inside them:
           trailing whitespace inside an inline-block is trimmed, which would
