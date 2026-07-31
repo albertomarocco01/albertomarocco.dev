@@ -13,7 +13,14 @@ export function Hero({ hero }: { hero: Dictionary["hero"] }) {
   const lede = hero.lede.split(" ");
   return (
     <header className="hero">
-      <p className="eyebrow">{hero.eyebrow}</p>
+      {/* The inner span is the water-filter target (globals.css). It cannot go
+          on the <p> itself: the entrance (`hero-reveal`, fill: both) animates
+          `filter` there, which would both suppress a static url() filter and —
+          with url() in the keyframes — turn the blur reveal into a discrete
+          jump. The span is outside that animation, so the two never meet. */}
+      <p className="eyebrow">
+        <span>{hero.eyebrow}</span>
+      </p>
       <h1 className="name">
         <span className="nw">Alberto</span>
         <br />
@@ -32,6 +39,10 @@ export function Hero({ hero }: { hero: Dictionary["hero"] }) {
         {lede.map((word, i) => (
           <Fragment key={i}>
             {i > 0 ? " " : null}
+            {/* Per-word spans exist for the scrubbed compose (HomeSequence
+                reveals them one by one). The water tremble no longer needs
+                them: the displacement filter sits on the .lede block itself,
+                one continuous noise field across the whole paragraph. */}
             <span className="w">{word}</span>
           </Fragment>
         ))}

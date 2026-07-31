@@ -24,15 +24,22 @@ import { useApp } from "@/components/providers/AppProvider";
  *               intent (at CURTAIN_DOWN — the gap is hysteresis, so a jittery
  *               trackpad can't flutter an 0.85s transition).
  *
- * Both composing movements advance on their own AUTO_DELAY_MS after the one
- * before them settles, and input *adds* to that pace instead of replacing it —
- * touching the page can only make it faster, never slower. The curtain has no
- * clock: it only ever moves on real intent, in either direction.
+ * All three movements advance on their own after an idle beat (IDLE_MS, per
+ * gate — the curtain waits longer, it is the one step that puts something *over*
+ * the page rather than composing what is already there), and forward input
+ * *adds* to that pace instead of replacing it: touching the page can only make
+ * it faster, never slower. Backward input cancels the running scrub — otherwise
+ * the clock would shove back down against the hand — and re-arms the beat from
+ * wherever the scrub-back landed. So the whole thing is a loop with no dead
+ * ends: scroll up and the teasers fold away, scroll down *or simply wait* and
+ * they compose again, at any position, in either direction.
  *
- * `p` is reversible inside a movement and ratchets at 2: once everything is
- * composed it never folds away again, which is also what makes a locale switch
- * safe (the re-rendered spans are covered by `html.hero-done`, which lands at
- * the same moment, rather than by this driver's per-node bookkeeping).
+ * `p` is therefore reversible over its whole range. The one thing that ends the
+ * loop is an escape hatch (below): it latches the floor at P_COMPOSED and
+ * settles every node through `html.hero-done`. That class is also what makes a
+ * locale switch safe — the re-rendered spans are revealed by CSS rather than by
+ * this driver's per-node bookkeeping — and every way out of this page goes
+ * through a hatch (a teaser or the topbar takes focus or a pointerdown first).
  *
  * Lenis: `data-lenis-prevent` on <body> for as long as this is mounted, so the
  * shared instance ignores the gesture entirely instead of accumulating it. The
@@ -51,7 +58,15 @@ import { useApp } from "@/components/providers/AppProvider";
  *   - focus entering the footer: raise the curtain, so tabbing to a link can
  *     never land on something off-screen.
  *   - Escape key: compose.
- *   - hard timeout: HARD_MS after mount everything composes unconditionally.
+ *   - hard timeout: HARD_MS after mount, if the sequence never got going at all
+ *     (a broken chunk, a dead clock), everything composes unconditionally. It
+ *     asks whether the page has *ever* composed, not where `p` is right now — an
+ *     unattended page is long past P_COMPOSED by then, and latching a working
+ *     sequence mid-scrub would kill the loop under a visitor who is only playing
+ *     with it.
+ *
+ * None of the hatches can move `p` backwards, so none of them can yank a raised
+ * curtain back down.
  */
 
 /** Consumed scroll mapped onto one movement, as a fraction of the viewport. */
@@ -62,26 +77,34 @@ const TOUCH_MULT = 1.8;
 const LINE_PX = 40;
 const KEY_STEP = 0.12; // ArrowDown / ArrowUp
 const KEY_PAGE = 0.3; // Space / PageDown / PageUp
-const AUTO_DELAY_MS = 1600; // idle beat before a movement starts composing itself
 const AUTO_S = 2.2; // auto-advance: seconds to cover one movement
-// Unconditional compose, ~1.6× the slowest honest path: the veil (~1.4s) plus
-// two idle beats and two movements is ~9s unattended, so this must sit well
-// clear of it or it would cut the teasers in halfway through composing.
+// Compose if the sequence never got going, ~1.6× the slowest honest path to
+// P_COMPOSED: the veil (~1.4s) plus two idle beats and two movements is ~9s
+// unattended, so this must sit well clear of it or it would cut the teasers in
+// halfway through composing.
 const HARD_MS = 15000;
 
 /** Movement boundaries on the shared accumulator. */
 const P_LEDE = 1; // lede fully composed
-const P_COMPOSED = 2; // teasers fully composed — the ratchet floor
+const P_COMPOSED = 2; // teasers fully composed — where the escape hatches land
 const CURTAIN_UP = 2.5;
 const CURTAIN_DOWN = 2.3;
 const P_MAX = 2.6; // nothing past the raised curtain, so reversing is immediate
+
+/** What the clock scrubs towards, and the idle beat it waits out first. The
+ *  curtain's is longer: composing the page is the show, but drawing the footer
+ *  over it is an interruption, and 1.6s of stillness would feel pushy. */
+const GATES = [P_LEDE, P_COMPOSED, P_MAX];
+const IDLE_MS = [1600, 1600, 2800];
+/** Index of the first gate above `v`, or -1 with nothing left to compose. */
+const gateAbove = (v: number) => GATES.findIndex((g) => v < g - 1e-3);
 
 /**
  * Has the sequence already composed in this *page load*? Module-scoped,
  * deliberately not sessionStorage: a refresh re-evaluates the module and replays
  * the whole opening (which is the point — the show is the front door), while a
  * client-side return to `/` from another route skips straight to the composed
- * state and keeps only the curtain live. Set in the ratchet, so StrictMode's
+ * state and keeps only the curtain live. Set in `apply`, so StrictMode's
  * mount → cleanup → remount still replays.
  */
 let composed = false;
@@ -91,7 +114,7 @@ export function HomeSequence() {
   // All transient state lives in refs — the input path never calls setState
   // (same hot-path discipline as Cursor/Shell).
   const p = useRef(0);
-  const floor = useRef(0); // ratchet: 0 until composed, P_COMPOSED after
+  const floor = useRef(0); // 0 while the loop is live, P_COMPOSED once latched
   const words = useRef(0); // lede words currently in
   const tiles = useRef(0); // teasers currently in
   const curtain = useRef(false);
@@ -123,7 +146,13 @@ export function HomeSequence() {
     // event. Cleanup hands restoration, the scroll and Lenis back.
     history.scrollRestoration = "manual";
     window.scrollTo(0, 0);
-    hard.current = window.setTimeout(compose, HARD_MS);
+    // Only if nothing ever drove the page — see the hatch list above. `composed`
+    // and not `p`: the check has to ask whether the sequence *ever* worked, not
+    // where it happens to be at 15s, or scrubbing back at the wrong moment would
+    // be answered by a latch.
+    hard.current = window.setTimeout(() => {
+      if (!composed) compose();
+    }, HARD_MS);
     return () => {
       root.classList.remove("home-live", "hero-in", "hero-done");
       document.body.removeAttribute("data-lenis-prevent");
@@ -155,7 +184,7 @@ export function HomeSequence() {
     curtain.current = false;
 
     // Returning to `/` inside the same page load: skip the show, keep the
-    // curtain live. Everything starts composed and the ratchet is already down.
+    // curtain live. Everything starts composed and already latched.
     const replay = !composed;
     p.current = replay ? 0 : P_COMPOSED;
     floor.current = replay ? 0 : P_COMPOSED;
@@ -177,8 +206,8 @@ export function HomeSequence() {
     }
 
     // Map the accumulator onto the three movements; only what changed is
-    // touched. Reaching P_COMPOSED drops the ratchet and settles everything
-    // through `hero-done`, which reveals independently of this bookkeeping.
+    // touched. Every branch is symmetric — the same crossing that reveals a node
+    // folds it away again on the way back.
     const apply = () => {
       const v = p.current;
 
@@ -210,11 +239,11 @@ export function HomeSequence() {
         foot?.classList.toggle("is-up", up);
       }
 
-      if (v >= P_COMPOSED && floor.current < P_COMPOSED) {
-        floor.current = P_COMPOSED;
-        composed = true;
-        root.classList.add("hero-done");
-      }
+      // Not a ratchet: `p` stays free to fold everything away again. This only
+      // records that the show has played once in this page load, so a
+      // client-side return to `/` skips it (a link click normally latches
+      // through the focusin hatch, but Safari doesn't focus links on click).
+      if (v >= P_COMPOSED) composed = true;
     };
 
     const set = (to: number) => {
@@ -222,41 +251,74 @@ export function HomeSequence() {
       apply();
     };
     const step = (dp: number) => set(p.current + dp);
-    jump.current = set;
 
-    // Auto-composition. AUTO_DELAY_MS after the veil lifts the lede starts
-    // composing on its own at AUTO_S pace; once it lands, the same idle beat
-    // runs again and the teasers follow. This is not an idle *window* — input
-    // neither cancels the clock nor re-arms it, the listeners call step()
-    // directly, so a gesture simply adds to what the clock is contributing. The
-    // sequence is never slower than the unattended pace and faster the moment
-    // it's touched. Which is really a mobile fix: nobody scrolls in the first
-    // second there, and the show has to play regardless.
-    let gate = P_LEDE;
+    // Every escape hatch lands here: the visitor wants the site, not the show.
+    // The floor comes up so the composition can't fold away any more, and
+    // `hero-done` settles every node revealed independently of the per-node
+    // bookkeeping (which is what makes a locale switch safe). Forward-only —
+    // a hatch must never yank a raised curtain back down. The curtain itself
+    // stays live above the floor, so the clock is re-armed for it.
+    const latch = (to: number) => {
+      floor.current = P_COMPOSED;
+      root.classList.add("hero-done");
+      set(Math.max(to, p.current));
+      arm();
+    };
+    jump.current = latch;
+
+    // Auto-composition. An idle beat, then a scrub to the next gate at AUTO_S
+    // pace, then the same again for the gate after it — the whole sequence
+    // plays itself, unattended, all the way to the raised curtain.
+    //
+    // Forward input is *not* an idle window: it neither cancels the clock nor
+    // re-arms it, the listeners add to `p` directly, so a gesture simply adds to
+    // what the clock is contributing. The sequence is never slower than the
+    // unattended pace and faster the moment it's touched — really a mobile fix,
+    // nobody scrolls in the first second there and the show has to play anyway.
+    //
+    // Backward input is: it stops the scrub (a clock pushing down while the hand
+    // pulls up is a fight, and the hand wins nothing) and re-arms from where the
+    // scrub-back landed, so the beat is always the *last* thing that happened.
+    let goal = 0; // index in GATES the running scrub is heading for
     let last = 0;
+    const stopAuto = () => {
+      if (raf.current != null) cancelAnimationFrame(raf.current);
+      if (timer.current != null) window.clearTimeout(timer.current);
+      raf.current = null;
+      timer.current = null;
+    };
     const tick = (t: number) => {
       const dt = last ? (t - last) / 1000 : 0;
       last = t;
       step(dt / AUTO_S);
-      if (p.current < gate) {
+      if (p.current < GATES[goal]) {
         raf.current = requestAnimationFrame(tick);
         return;
       }
       raf.current = null;
-      if (gate < P_COMPOSED) {
-        gate = P_COMPOSED;
-        arm(); // the same beat again before the teasers compose
-      }
+      arm(); // the next gate, after its own beat
     };
-    // A declaration, not a const: `tick` above calls it to chain the second beat.
+    // A declaration, not a const: `latch` and `tick` above both call it.
     function arm() {
+      stopAuto();
+      const g = gateAbove(p.current);
+      if (g < 0) return; // curtain up, nothing left to advance
+      goal = g;
       timer.current = window.setTimeout(() => {
         timer.current = null;
         last = 0;
         raf.current = requestAnimationFrame(tick);
-      }, AUTO_DELAY_MS);
+      }, IDLE_MS[g]);
     }
-    if (replay) arm();
+    // Armed on a return visit too: the show is skipped, but the curtain is live
+    // and rises on its own like everywhere else.
+    arm();
+
+    // Real intent, as opposed to the clock's — the only path that re-arms.
+    const input = (dp: number) => {
+      step(dp);
+      if (dp < 0) arm();
+    };
 
     const span = () => Math.max(window.innerHeight * SPAN_VH, 1);
 
@@ -270,7 +332,7 @@ export function HomeSequence() {
           : e.deltaMode === 2
             ? e.deltaY * window.innerHeight
             : e.deltaY;
-      step(px / span());
+      input(px / span());
     };
 
     let touchY: number | null = null;
@@ -280,7 +342,7 @@ export function HomeSequence() {
     const onTouchMove = (e: TouchEvent) => {
       if (touchY == null || e.touches.length !== 1) return; // pinch — not ours
       const y = e.touches[0].clientY;
-      step(((touchY - y) * TOUCH_MULT) / span());
+      input(((touchY - y) * TOUCH_MULT) / span());
       touchY = y;
     };
 
@@ -288,28 +350,30 @@ export function HomeSequence() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       switch (e.key) {
         case " ":
-          step(e.shiftKey ? -KEY_PAGE : KEY_PAGE);
+          input(e.shiftKey ? -KEY_PAGE : KEY_PAGE);
           break;
         case "PageDown":
-          step(KEY_PAGE);
+          input(KEY_PAGE);
           break;
         case "PageUp":
-          step(-KEY_PAGE);
+          input(-KEY_PAGE);
           break;
         case "ArrowDown":
-          step(KEY_STEP);
+          input(KEY_STEP);
           break;
         case "ArrowUp":
-          step(-KEY_STEP);
+          input(-KEY_STEP);
           break;
         case "End":
-          set(P_MAX);
+          latch(P_MAX);
           break;
         case "Home":
+          // Back to the start of the loop — and the beat starts over with it.
           set(floor.current);
+          arm();
           break;
         case "Escape":
-          set(P_COMPOSED);
+          latch(P_COMPOSED);
           break;
       }
     };
@@ -321,8 +385,8 @@ export function HomeSequence() {
     const onFocusIn = (e: FocusEvent) => {
       const t = e.target;
       if (!(t instanceof Node)) return;
-      if (foot?.contains(t)) set(P_MAX);
-      else if (!hero?.contains(t)) set(P_COMPOSED);
+      if (foot?.contains(t)) latch(P_MAX);
+      else if (!hero?.contains(t)) latch(P_COMPOSED);
     };
     // A pointer on the topbar: the visitor wants the site, not the show.
     const topbar = document.querySelector<HTMLElement>(".topbar");
@@ -341,10 +405,7 @@ export function HomeSequence() {
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("focusin", onFocusIn);
       topbar?.removeEventListener("pointerdown", compose);
-      if (raf.current != null) cancelAnimationFrame(raf.current);
-      if (timer.current != null) window.clearTimeout(timer.current);
-      raf.current = null;
-      timer.current = null;
+      stopAuto();
       jump.current = null;
       root.classList.remove("hero-in");
     };

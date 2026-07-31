@@ -563,7 +563,12 @@ html.home-live body {
      fail-safe animation above, and a property whose value changes in the same
      style change that cancels an animation does not start a transition (the name
      simply snapped to revealed — measured in Chrome). A differently *named*
-     animation always replays from frame 0, so the swap is what makes it move. */
+     animation always replays from frame 0, so the swap is what makes it move.
+
+     The water tremble runs alongside all of this untouched: it is an SVG
+     displacement filter on *other* boxes (the eyebrow's inner span, the .lede
+     block — see the water section below), so the reveal's own `filter` never
+     meets it. */
   html.hero-in .hero .eyebrow {
     animation: hero-reveal 0.7s var(--ease) both;
   }
@@ -571,7 +576,8 @@ html.home-live body {
     animation: hero-reveal 0.95s var(--ease) 0.12s both;
   }
   html.hero-in .hero .name .nw:nth-of-type(2) {
-    animation-delay: 0.36s; /* "Marocco." trails "Alberto" by 240ms */
+    /* "Marocco." trails "Alberto" by 240ms. */
+    animation-delay: 0.36s;
   }
 
   /* Movement 2 — the lede, scrubbed word by word by consumed scroll input (see
@@ -579,7 +585,6 @@ html.home-live body {
      fail-safe was already retired one style change earlier (at `hero-in`), so
      unlike the name above they do animate. */
   html.hero-in .hero .lede .w {
-    animation: none;
     transition: opacity 0.55s var(--ease), filter 0.55s var(--ease),
       transform 0.55s var(--ease);
   }
@@ -603,6 +608,9 @@ html.home-live body {
     opacity: 1;
     filter: blur(0);
     transform: none;
+    /* Cancelling the fail-safe is the job here — its `both` fill would
+       otherwise keep beating the values above. The water tremble lives on
+       other boxes (see below) and is untouched by this. */
     animation: none;
   }
 }
@@ -633,6 +641,74 @@ html.home-live body {
     filter: blur(0);
     transform: none;
   }
+}
+
+/* ---- water: every text on the home in constant liquid motion, like type
+   reflected on still water ----
+   Three SVG displacement filters (defs SSR'd in the home page markup — see
+   (site)/page.tsx), one per text scale. Three and not one because
+   feDisplacementMap's `scale` is absolute px: the amplitude that reads as
+   water on the display serif chews the 11px mono to pieces, which is what
+   killed the first attempt at this. Per scale, amplitude is tuned to the font
+   size and turbulence frequency to the glyph size, so every block shares one
+   character of motion — features a few glyphs wide, drifting over ~7–9s. The
+   glyphs genuinely deform; this replaced a rigid per-word translate/rotate
+   keyframe that read as unstable text, not water.
+
+   The SMIL <animate> on each turbulence is what moves the water: no JS, not
+   one main-thread frame, and a hidden tab paints nothing. Measured on the
+   real page (melt live, all twelve targets filtered, SMIL running): 60fps
+   flat, p95 17.1ms, zero frames over 34ms — indistinguishable from baseline.
+
+   Placement dodges every `filter` the page already animates. The eyebrow's
+   reveal fills `filter` forever (so the water sits on its inner span); the
+   teaser entrance transitions `filter: blur` on .teaser (so the water sits on
+   the label/idx/cue spans inside). The lede and the footer row are filtered
+   as whole blocks: one continuous noise field across the words reads as one
+   water surface, and the per-word tempo/phase machinery the rigid tremble
+   needed goes away entirely.
+
+   The name is the melt shader's job wherever that overlay mounts (u_idle in
+   melt-material.ts — same motion character, slightly stronger, it is the
+   biggest type). `hover: none` is where the overlay never mounts, so only
+   there the DOM h1 takes the display filter. Desktop-without-WebGL keeps a
+   still name — too rare to spend a filter on.
+
+   Scoped to `home-live` (lands at hydration, so first paint and LCP are
+   filter-free) and to no-preference: under reduced motion, with JS off or a
+   broken chunk, none of this exists and the text sits static, undistorted.
+   Safari ignores url() filters on HTML content and degrades to exactly that
+   static text. */
+@media (prefers-reduced-motion: no-preference) {
+  html.home-live .hero .eyebrow > span {
+    display: inline-block; /* a clean one-line box for the filter region */
+    filter: url(#water-s);
+  }
+  html.home-live .hero .lede {
+    filter: url(#water-m);
+  }
+  html.home-live .teasers .teaser-idx,
+  html.home-live .teasers .teaser-cue {
+    filter: url(#water-s);
+  }
+  html.home-live .teasers .teaser-label {
+    filter: url(#water-l);
+  }
+  html.home-live .foot.curtain .foot-inner {
+    filter: url(#water-s);
+  }
+}
+@media (prefers-reduced-motion: no-preference) and (hover: none) {
+  html.home-live .hero .name {
+    filter: url(#water-l);
+  }
+}
+/* The defs sit in the page flow (server-rendered) but must never take space. */
+.water-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
 }
 
 /* ---- home: one viewport, name left, teasers right (driven by HomeSequence) ----

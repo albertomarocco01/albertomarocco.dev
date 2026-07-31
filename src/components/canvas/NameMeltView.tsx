@@ -16,14 +16,23 @@ void MeltMaterial;
  * the glyphs to a texture once fonts are ready and the entrance animations have
  * settled, and displaces that texture under the cursor (melt-material.ts).
  *
- * Rest costs nothing: the mesh is only visible — and the DOM h1 only hidden —
- * while the engage/turbulence envelopes are alive. At rest the visitor is
- * looking at the genuine DOM text (crispest possible at any DPR) and the view
- * draws nothing; the swap happens at <1px of displacement, so it never pops.
+ * The handover is one-way and happens at the raster: from then on the mesh is
+ * drawn and the DOM h1 is hidden, because the idle tremble (u_idle) never
+ * decays — the name is never actually at rest. Never at rest is not always at
+ * full rate, though: while only the tremble runs, the melt requests no frames
+ * of its own — it rides the ~30fps the ambient field is already rendering and
+ * keeps a 20fps fallback floor for when everything else goes quiet — and the
+ * cursor melt lifts it back to every frame. Before the raster the visitor is
+ * looking at the genuine DOM text and the view draws nothing; the swap happens
+ * at <1px of displacement onto a pixel-aligned copy, so it never pops.
  *
- * Hot paths are allocation- and setState-free: pointer/wheel handlers write
- * refs, the envelopes decay in useFrame, uniforms are mutated in place — the
- * same discipline as Aura/Cursor/HomeSequence.
+ * The cursor is the only input. Scroll intent belongs to the sequence machine
+ * (HomeSequence) and deliberately does not reach the name: the name answers the
+ * hand, the page answers the wheel.
+ *
+ * Hot paths are allocation- and setState-free: the pointer handler writes refs,
+ * the envelopes decay in useFrame, uniforms are mutated in place — the same
+ * discipline as Aura/Cursor/HomeSequence.
  */
 
 // ---- envelopes ----
@@ -31,18 +40,33 @@ const ENGAGE_UP = 7; // ramp-in lerp rate — the melt answers the hand quickly
 const ENGAGE_DECAY_HOVER = 0.9; // idle decay while the pointer rests on the name
 const ENGAGE_DECAY_AWAY = 3.2; // faster decay once the pointer leaves
 const FRESH_MS = 90; // "still moving" window after the last pointermove
-const TURB_DECAY = 2.4; // scroll turbulence half-lifes away in ~0.3s
-const TURB_GAIN = 1 / 900; // wheel px -> turbulence
-const TURB_MAX = 0.8;
 const MOUSE_SMOOTH = 9; // pointer-follow lerp rate (light lag = liquid trail)
-const ALIVE_EPS = 0.012; // below this the effect parks and the DOM h1 returns
+// JS mirror of the shader's own `u_engage > 0.004` melt branch: below it the
+// cursor melt contributes nothing and only the idle tremble is moving.
+const ENGAGE_EPS = 0.004;
+// Idle fallback cadence. While idle the melt adds no frames of its own — it
+// rides whatever the ambient field is already rendering (~30fps) — and this
+// floor only fires when everyone else has gone quiet. A drift measured in
+// tenths cannot tell 20fps from 60.
+const IDLE_FALLBACK_MS = 50;
+// A tab that was hidden for a minute comes back with one enormous delta; the
+// envelopes handle that fine (exp(-huge) is 0) but u_time would teleport the
+// tremble. Two frames' worth is plenty for any real drop.
+const DT_MAX = 0.05;
 
 // ---- look ----
 const RADIUS_EM = 0.8; // cursor falloff radius, in h1 font-size units
 const STRENGTH_EM = 0.24; // max displacement, in h1 font-size units
+// Constant tremble amplitude, in h1 font-size units. Tuned against the DOM
+// water filters (globals.css): same character of motion, slightly stronger
+// here — the name is the biggest type on the page and may lead.
+const IDLE_EM = 0.03;
 
 // ---- raster ----
-const DPR_CAP = 2;
+// The device's real DPR, so the GPU copy is as crisp as the DOM glyphs it
+// replaces — capped at 2 it read visibly softer on 3x displays. 3 only bounds
+// the texture on exotic zoom/monitor combos.
+const DPR_CAP = 3;
 const RASTER_DEBOUNCE_MS = 150;
 
 type MeltIO = {
@@ -58,7 +82,6 @@ type MeltIO = {
   moveAt: number; // performance.now() of the last pointermove inside
   inside: boolean;
   engage: number;
-  turb: number;
 };
 
 /** One text run: set the exact computed font, anchor to the DOM baseline via
@@ -101,6 +124,17 @@ function MeltScene({ ioRef }: { ioRef: React.RefObject<MeltIO> }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const invalidate = useThree((s) => s.invalidate);
   const melting = useRef(false);
+  const idleTimer = useRef<number | null>(null);
+
+  // Drop a pending idle-throttle timer on unmount, and null the ref: under
+  // StrictMode a kept stale id would make the throttle branch no-op forever on
+  // the remount (same lesson as Aura's requestNext timer).
+  useEffect(() => {
+    return () => {
+      if (idleTimer.current != null) window.clearTimeout(idleTimer.current);
+      idleTimer.current = null;
+    };
+  }, []);
 
   // Fullscreen triangle in clip space (same pattern as Aura).
   const geometry = useMemo(() => {
@@ -116,35 +150,33 @@ function MeltScene({ ioRef }: { ioRef: React.RefObject<MeltIO> }) {
   }, []);
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  useFrame((_, delta) => {
+  useFrame((_, raw) => {
     const m = matRef.current;
     const mesh = meshRef.current;
     const io = ioRef.current;
     if (!m || !mesh || !io) return;
 
-    // Envelopes first — they decide whether anything at all is happening.
+    const delta = Math.min(raw, DT_MAX);
+
+    // The texture is the gate, and it only ever opens: the tremble below has no
+    // envelope, so from the first raster the GPU copy owns these pixels.
+    // Opacity (not visibility) keeps the h1 in the a11y tree.
+    const alive = io.tex != null;
+    if (alive !== melting.current) {
+      melting.current = alive;
+      mesh.visible = alive;
+      io.h1?.classList.toggle("is-melting", alive);
+    }
+    if (!alive) return; // no raster yet — no uniform writes, no invalidate
+
     // "Fresh" input pulls engage up; otherwise it decays (slowly while the
-    // pointer rests on the name, quickly once it leaves). A long stall (tab
-    // hidden) lands with exp(-huge) ~ 0: already settled, no burst.
+    // pointer rests on the name, quickly once it leaves).
     const fresh = io.inside && performance.now() - io.moveAt < FRESH_MS;
     if (fresh) io.engage += (1 - io.engage) * Math.min(1, delta * ENGAGE_UP);
     else
       io.engage *= Math.exp(
         -delta * (io.inside ? ENGAGE_DECAY_HOVER : ENGAGE_DECAY_AWAY),
       );
-    io.turb *= Math.exp(-delta * TURB_DECAY);
-
-    const alive =
-      io.tex != null && (io.engage > ALIVE_EPS || io.turb > ALIVE_EPS);
-    if (alive !== melting.current) {
-      melting.current = alive;
-      mesh.visible = alive;
-      // The swap: displacement is <1px at ALIVE_EPS and the raster is
-      // pixel-aligned, so toggling is invisible. Opacity (not visibility)
-      // keeps the h1 in the a11y tree.
-      io.h1?.classList.toggle("is-melting", alive);
-    }
-    if (!alive) return; // parked — no uniform writes, no invalidate
 
     io.smoothX += (io.targetX - io.smoothX) * Math.min(1, delta * MOUSE_SMOOTH);
     io.smoothY += (io.targetY - io.smoothY) * Math.min(1, delta * MOUSE_SMOOTH);
@@ -155,9 +187,26 @@ function MeltScene({ ioRef }: { ioRef: React.RefObject<MeltIO> }) {
     m.uniforms.u_radius.value = io.em * RADIUS_EM;
     m.uniforms.u_strength.value = io.em * STRENGTH_EM;
     m.uniforms.u_engage.value = io.engage;
-    m.uniforms.u_turb.value = io.turb;
+    m.uniforms.u_idle.value = io.em * IDLE_EM;
     m.uniforms.u_time.value += delta;
-    invalidate(); // unthrottled while alive — the melt wants 60fps
+
+    // The melt wants every frame. The idle-only tremble wants none of its own:
+    // it advances on whatever frames the rest of the canvas produces (the
+    // ambient field renders ~30fps), and the debounced fallback below only
+    // fires if no other frame arrived in time — a floor, not a cadence, so
+    // idle cost is the ambient field's rate and never 60fps again. A timeout
+    // and not a skipped invalidate: on a demand loop, a frame nobody requests
+    // is a loop that stops.
+    if (idleTimer.current != null) {
+      window.clearTimeout(idleTimer.current);
+      idleTimer.current = null;
+    }
+    if (fresh || io.engage > ENGAGE_EPS) invalidate();
+    else
+      idleTimer.current = window.setTimeout(() => {
+        idleTimer.current = null;
+        invalidate();
+      }, IDLE_FALLBACK_MS);
   });
 
   return (
@@ -181,7 +230,6 @@ export function NameMeltView() {
     moveAt: 0,
     inside: false,
     engage: 0,
-    turb: 0,
   });
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -257,11 +305,17 @@ export function NameMeltView() {
     // fail-safe) animates transform+blur on the spans, and rects measured
     // mid-flight would bake the offset in. Recurse because finishing one
     // animation can start another (fail-safe cancelled -> hero-in plays).
+    // Infinite ones are excluded so one stray looping animation can never
+    // stall this forever.
     const whenStill = () => {
       if (disposed) return;
       const anims = h1
         .getAnimations({ subtree: true })
-        .filter((a) => a.playState === "running");
+        .filter(
+          (a) =>
+            a.playState === "running" &&
+            a.effect?.getComputedTiming().iterations !== Infinity,
+        );
       if (anims.length) {
         Promise.allSettled(anims.map((a) => a.finished)).then(whenStill);
         return;
@@ -319,28 +373,13 @@ export function NameMeltView() {
       io.moveAt = performance.now();
     };
 
-    // Scroll intent (consumed by HomeSequence, the page never moves) feeds a
-    // brief global turbulence. Passive read-only listener, same stance as the
-    // sequence's own.
-    const onWheel = (e: WheelEvent) => {
-      const px =
-        e.deltaMode === 1
-          ? e.deltaY * 40
-          : e.deltaMode === 2
-            ? e.deltaY * window.innerHeight
-            : e.deltaY;
-      io.turb = Math.min(TURB_MAX, io.turb + Math.abs(px) * TURB_GAIN);
-    };
-
     window.addEventListener("pointermove", onMove, { passive: true });
-    window.addEventListener("wheel", onWheel, { passive: true });
 
     return () => {
       disposed = true;
       ro.disconnect();
       window.removeEventListener("resize", requestRaster);
       window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("wheel", onWheel);
       mq?.removeEventListener("change", onDpr);
       if (debounce != null) window.clearTimeout(debounce);
       h1.classList.remove("is-melting");

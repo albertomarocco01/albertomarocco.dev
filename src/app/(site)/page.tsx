@@ -36,6 +36,53 @@ export default async function Home() {
         <Hero hero={dict.hero} />
         <Teasers home={dict.home} />
       </main>
+      {/* The water: three SVG displacement filters, one per text scale, that
+          globals.css applies to every home text (the "type reflected on still
+          water" tremble). Three defs and not one because feDisplacementMap's
+          `scale` is absolute px — the amplitude that reads as water on the
+          display serif would chew the 11px mono to pieces, so each scale gets
+          its own turbulence frequency and amplitude, tuned to its font size.
+          The SMIL <animate> drifts the noise field at low Hz: no JS, no main
+          thread, and a hidden tab paints nothing. Server-rendered so the
+          filters exist before hydration; they cost nothing until a stylesheet
+          rule actually references them (all applications are scoped to
+          `html.home-live` + no-preference, so first paint and reduced motion
+          never touch them). */}
+      <svg className="water-defs" aria-hidden="true" focusable="false" width="0" height="0">
+        <filter id="water-l" x="-15%" y="-40%" width="130%" height="180%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="1" seed="7">
+            <animate
+              attributeName="baseFrequency"
+              values="0.012 0.02;0.017 0.027;0.012 0.02"
+              dur="9s"
+              repeatCount="indefinite"
+            />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" scale="2.6" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        <filter id="water-m" x="-15%" y="-25%" width="130%" height="150%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.02 0.032" numOctaves="1" seed="3">
+            <animate
+              attributeName="baseFrequency"
+              values="0.02 0.032;0.027 0.041;0.02 0.032"
+              dur="8s"
+              repeatCount="indefinite"
+            />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" scale="1.7" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        <filter id="water-s" x="-20%" y="-60%" width="140%" height="220%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.035 0.05" numOctaves="1" seed="11">
+            <animate
+              attributeName="baseFrequency"
+              values="0.035 0.05;0.045 0.063;0.035 0.05"
+              dur="7s"
+              repeatCount="indefinite"
+            />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" scale="1.0" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
       <Footer footer={dict.footer} curtain />
       <HomeSequence />
     </>
