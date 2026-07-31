@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import type { Dictionary } from "@/lib/i18n";
 import { TeaserFX } from "./TeaserFX";
 
@@ -19,8 +20,15 @@ const TEASERS = [
 export function Teasers({ home }: { home: Dictionary["home"] }) {
   return (
     <nav className="teasers" aria-label={home.aria}>
-      {TEASERS.map((t) => (
-        <Link key={t.key} href={t.href} className="teaser">
+      {TEASERS.map((t, i) => (
+        // `--i` phases the water drift (globals.css) — it inherits down to the
+        // idx / label lines / cue, so each teaser floats offset from the next.
+        <Link
+          key={t.key}
+          href={t.href}
+          className="teaser"
+          style={{ "--i": i } as CSSProperties}
+        >
           <span className="teaser-idx">{t.idx}</span>
           {/* The rolling label: two stacked copies inside an overflow-clipped
               box; hover/focus rolls to the italic duplicate (CSS only, see

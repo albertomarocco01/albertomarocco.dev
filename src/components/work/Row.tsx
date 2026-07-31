@@ -129,7 +129,7 @@ export function Row({
   );
 
   const isGen = work.type === "gen";
-  // A real, optimized capture of the live site (Vini Montarello). next/image
+  // A real, optimized capture of the live site. next/image
   // serves it lazily with a blur-up placeholder, sized to the reveal box (CLS 0),
   // with a "visit site" overlay making the preview read as the clickable link.
   const hasPreview = !isGen && !!work.image;

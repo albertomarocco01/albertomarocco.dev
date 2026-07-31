@@ -18,7 +18,10 @@ import { useApp } from "@/components/providers/AppProvider";
  *               never depends on the visitor. Meanwhile p composes the lede word
  *               by word, in a shuffled order, so it reads as a sentence
  *               assembling rather than a line typing.
- *   p 1 → 2     the teaser column composes, 01 → 02 → 03.
+ *   p 1 → 2     the teaser column enters — a hysteresis toggle like the
+ *               curtain's (in past TEASER_IN, out past TEASER_OUT), with the
+ *               01 → 02 → 03 stagger left to CSS transition delays. One clean
+ *               movement in either direction, never a half-composed column.
  *   p 2 → 2.6   the footer rises as a curtain over the bottom edge of the
  *               viewport (`is-up` at CURTAIN_UP) and lowers again on upward
  *               intent (at CURTAIN_DOWN — the gap is hysteresis, so a jittery
@@ -87,6 +90,11 @@ const HARD_MS = 15000;
 /** Movement boundaries on the shared accumulator. */
 const P_LEDE = 1; // lede fully composed
 const P_COMPOSED = 2; // teasers fully composed — where the escape hatches land
+/** The teaser column is a curtain-style hysteresis toggle inside [1, 2]: in
+ *  crossing TEASER_IN on the way down, out crossing TEASER_OUT on the way up.
+ *  The gap keeps a jittery trackpad from fluttering the 0.9s transition. */
+const TEASER_IN = 1.5;
+const TEASER_OUT = 1.15;
 const CURTAIN_UP = 2.5;
 const CURTAIN_DOWN = 2.3;
 const P_MAX = 2.6; // nothing past the raised curtain, so reversing is immediate
@@ -116,7 +124,7 @@ export function HomeSequence() {
   const p = useRef(0);
   const floor = useRef(0); // 0 while the loop is live, P_COMPOSED once latched
   const words = useRef(0); // lede words currently in
-  const tiles = useRef(0); // teasers currently in
+  const tiles = useRef(false); // teaser column currently in
   const curtain = useRef(false);
   const timer = useRef<number | null>(null);
   const raf = useRef<number | null>(null);
@@ -180,7 +188,7 @@ export function HomeSequence() {
     [...lede, ...teasers].forEach((el) => el.classList.remove("is-in"));
     foot?.classList.remove("is-up");
     words.current = 0;
-    tiles.current = 0;
+    tiles.current = false;
     curtain.current = false;
 
     // Returning to `/` inside the same page load: skip the show, keep the
@@ -223,14 +231,12 @@ export function HomeSequence() {
         words.current = nw;
       }
 
-      const nt = Math.round(
-        Math.min(Math.max(v - P_LEDE, 0), 1) * teasers.length,
-      );
-      if (nt !== tiles.current) {
-        // Three elements — cheaper to set all of them than to work out which
-        // changed, and it self-heals if a class ever drifts.
-        teasers.forEach((el, i) => el.classList.toggle("is-in", i < nt));
-        tiles.current = nt;
+      // The teaser column, as one unit — same stance as the curtain below;
+      // the 01 → 02 → 03 stagger is CSS transition delays on `.is-in`.
+      const tin = v >= (tiles.current ? TEASER_OUT : TEASER_IN);
+      if (tin !== tiles.current) {
+        tiles.current = tin;
+        teasers.forEach((el) => el.classList.toggle("is-in", tin));
       }
 
       const up = v >= (curtain.current ? CURTAIN_DOWN : CURTAIN_UP);

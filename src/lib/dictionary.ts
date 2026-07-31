@@ -204,6 +204,13 @@ const en: Dictionary = {
         cue: "visit site",
         alt: "Vini Montarello homepage — vineyards in the Monferrato hills behind the winery's wordmark",
       },
+      "toretto-blend": {
+        meta: "web · 2024",
+        description:
+          "Spirits brand site — Mediterranean meets Jamaica. Cinematic video hero, age gate, drinks & stockists.",
+        cue: "visit site",
+        alt: "Toretto Blend homepage — the embossed bottle label lit in amber, reading RUM Jamaica & Liquore ai fiori d'arancio",
+      },
       "merge-graphic-designs": {
         meta: "graphic · 2025",
         description:
@@ -350,6 +357,13 @@ const it: Dictionary = {
           "Brand vinicolo & e-commerce. Sviluppo full-stack, scroll lento, il prodotto come rito.",
         cue: "visita il sito",
         alt: "Homepage di Vini Montarello — i vigneti delle colline del Monferrato dietro il logotipo della cantina",
+      },
+      "toretto-blend": {
+        meta: "web · 2024",
+        description:
+          "Sito di brand per uno spirit — il Mediterraneo che incontra la Giamaica. Hero video cinematografico, age gate, drink e punti vendita.",
+        cue: "visita il sito",
+        alt: "Homepage di Toretto Blend — l'etichetta in rilievo della bottiglia illuminata d'ambra, con la scritta RUM Jamaica & Liquore ai fiori d'arancio",
       },
       "merge-graphic-designs": {
         meta: "grafica · 2025",

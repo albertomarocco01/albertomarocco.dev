@@ -58,9 +58,9 @@ const DT_MAX = 0.05;
 const RADIUS_EM = 0.8; // cursor falloff radius, in h1 font-size units
 const STRENGTH_EM = 0.24; // max displacement, in h1 font-size units
 // Constant tremble amplitude, in h1 font-size units. Tuned against the DOM
-// water filters (globals.css): same character of motion, slightly stronger
-// here — the name is the biggest type on the page and may lead.
-const IDLE_EM = 0.03;
+// water drift (globals.css): same character of motion, stronger here — the
+// name is the biggest type on the page and leads.
+const IDLE_EM = 0.055;
 
 // ---- raster ----
 // The device's real DPR, so the GPU copy is as crisp as the DOM glyphs it

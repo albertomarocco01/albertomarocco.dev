@@ -5,10 +5,11 @@
 // teal / violet — the same domain-warped smoke, different tints). `web` rows
 // show a still media plate (or a real site preview) and link out / route
 // internally. No stock imagery anywhere — gen rows render Alberto's own shader
-// live, and the one preview is a capture of his actual shipped site.
+// live, and the previews are captures of his actual shipped sites.
 
 import type { StaticImageData } from "next/image";
 import viniMontarello from "@/assets/work/vini-montarello.webp";
+import torettoBlend from "@/assets/work/toretto-blend.webp";
 
 // Mirrors the keys of VARIANT_PALETTE in src/components/canvas/aura-material.ts
 // (kept as a plain union here so this data module never imports three).
@@ -53,6 +54,16 @@ export const WORK_SECTIONS: WorkSection[] = [
         external: true,
         mediaGradient: "linear-gradient(135deg,#1a1410,#0e0c0a 55%,#241a12)",
         image: viniMontarello,
+      },
+      {
+        id: "toretto-blend",
+        index: "02",
+        title: "Toretto Blend",
+        type: "web",
+        href: "https://www.torettoblend.com",
+        external: true,
+        mediaGradient: "linear-gradient(135deg,#1c0e04,#0b0705 55%,#2a1508)",
+        image: torettoBlend,
       },
     ],
   },

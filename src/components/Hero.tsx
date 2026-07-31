@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import type { CSSProperties } from "react";
 import type { Dictionary } from "@/lib/i18n";
 import { NameMelt } from "@/components/canvas/NameMelt";
 
@@ -9,17 +10,29 @@ import { NameMelt } from "@/components/canvas/NameMelt";
 // HTML, and the entrance (see HomeSequence + the `hero-in` rules in globals.css)
 // only ever animates opacity/filter/transform on markup that already exists.
 // Nothing is injected by JS, so SEO and LCP are untouched.
+//
+// `--i` is the word's phase in the water drift (globals.css): a negative
+// animation-delay per index makes the motion flow along the line instead of
+// bobbing in lockstep.
+const phase = (i: number) => ({ "--i": i }) as CSSProperties;
+
 export function Hero({ hero }: { hero: Dictionary["hero"] }) {
+  const eyebrow = hero.eyebrow.split(" ");
   const lede = hero.lede.split(" ");
   return (
     <header className="hero">
-      {/* The inner span is the water-filter target (globals.css). It cannot go
-          on the <p> itself: the entrance (`hero-reveal`, fill: both) animates
-          `filter` there, which would both suppress a static url() filter and —
-          with url() in the keyframes — turn the blur reveal into a discrete
-          jump. The span is outside that animation, so the two never meet. */}
+      {/* Per-word spans: the reveal (`hero-reveal`, fill: both) animates
+          opacity/filter/transform on the <p> itself, the water drift animates
+          transform on the words inside — the two never share a box. */}
       <p className="eyebrow">
-        <span>{hero.eyebrow}</span>
+        {eyebrow.map((word, i) => (
+          <Fragment key={i}>
+            {i > 0 ? " " : null}
+            <span className="ew" style={phase(i)}>
+              {word}
+            </span>
+          </Fragment>
+        ))}
       </p>
       <h1 className="name">
         <span className="nw">Alberto</span>
@@ -39,11 +52,14 @@ export function Hero({ hero }: { hero: Dictionary["hero"] }) {
         {lede.map((word, i) => (
           <Fragment key={i}>
             {i > 0 ? " " : null}
-            {/* Per-word spans exist for the scrubbed compose (HomeSequence
-                reveals them one by one). The water tremble no longer needs
-                them: the displacement filter sits on the .lede block itself,
-                one continuous noise field across the whole paragraph. */}
-            <span className="w">{word}</span>
+            {/* .w is the compose target (HomeSequence reveals them one by one,
+                and its transition owns opacity/filter/transform); .wv inside
+                carries the water drift, so the two never fight. */}
+            <span className="w">
+              <span className="wv" style={phase(i)}>
+                {word}
+              </span>
+            </span>
           </Fragment>
         ))}
       </p>

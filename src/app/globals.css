@@ -565,10 +565,9 @@ html.home-live body {
      simply snapped to revealed — measured in Chrome). A differently *named*
      animation always replays from frame 0, so the swap is what makes it move.
 
-     The water tremble runs alongside all of this untouched: it is an SVG
-     displacement filter on *other* boxes (the eyebrow's inner span, the .lede
-     block — see the water section below), so the reveal's own `filter` never
-     meets it. */
+     The water drift runs alongside all of this untouched: it is a transform
+     animation on *other* boxes (the word spans inside — see the water section
+     below), so the reveal's own animation never meets it. */
   html.hero-in .hero .eyebrow {
     animation: hero-reveal 0.7s var(--ease) both;
   }
@@ -609,7 +608,7 @@ html.home-live body {
     filter: blur(0);
     transform: none;
     /* Cancelling the fail-safe is the job here — its `both` fill would
-       otherwise keep beating the values above. The water tremble lives on
+       otherwise keep beating the values above. The water drift lives on
        other boxes (see below) and is untouched by this. */
     animation: none;
   }
@@ -645,70 +644,79 @@ html.home-live body {
 
 /* ---- water: every text on the home in constant liquid motion, like type
    reflected on still water ----
-   Three SVG displacement filters (defs SSR'd in the home page markup — see
-   (site)/page.tsx), one per text scale. Three and not one because
-   feDisplacementMap's `scale` is absolute px: the amplitude that reads as
-   water on the display serif chews the 11px mono to pieces, which is what
-   killed the first attempt at this. Per scale, amplitude is tuned to the font
-   size and turbulence frequency to the glyph size, so every block shares one
-   character of motion — features a few glyphs wide, drifting over ~7–9s. The
-   glyphs genuinely deform; this replaced a rigid per-word translate/rotate
-   keyframe that read as unstable text, not water.
+   One compositor-only keyframe, applied per word (hero) or per line (teasers),
+   with everything in em so the amplitude scales with the type. The phase is a
+   negative animation-delay driven by --i (the word / teaser index, set in the
+   SSR markup), so every box starts mid-cycle offset from its neighbour and the
+   motion flows along the line instead of bobbing in lockstep.
 
-   The SMIL <animate> on each turbulence is what moves the water: no JS, not
-   one main-thread frame, and a hidden tab paints nothing. Measured on the
-   real page (melt live, all twelve targets filtered, SMIL running): 60fps
-   flat, p95 17.1ms, zero frames over 34ms — indistinguishable from baseline.
+   Why not SVG displacement filters: tried, and a dead end — Chromium never
+   repaints HTML content when the referenced filter primitive animates (SMIL
+   ticks the animVal, the pixels stay frozen). Transform keyframes composite
+   per frame with no main-thread work, and a hidden tab paints nothing.
 
-   Placement dodges every `filter` the page already animates. The eyebrow's
-   reveal fills `filter` forever (so the water sits on its inner span); the
-   teaser entrance transitions `filter: blur` on .teaser (so the water sits on
-   the label/idx/cue spans inside). The lede and the footer row are filtered
-   as whole blocks: one continuous noise field across the words reads as one
-   water surface, and the per-word tempo/phase machinery the rigid tremble
-   needed goes away entirely.
+   Placement dodges every property the page already animates: the hero reveal
+   fills opacity/filter/transform on .eyebrow / .nw / .w, so the drift sits on
+   word spans inside them (.ew / .wv); the teaser entrance transitions on
+   .teaser and the hover roll owns .teaser-roll's transform, so the drift sits
+   on .teaser-line / .teaser-idx / .teaser-cue.
 
    The name is the melt shader's job wherever that overlay mounts (u_idle in
-   melt-material.ts — same motion character, slightly stronger, it is the
-   biggest type). `hover: none` is where the overlay never mounts, so only
-   there the DOM h1 takes the display filter. Desktop-without-WebGL keeps a
-   still name — too rare to spend a filter on.
+   melt-material.ts — same motion character, stronger, it is the biggest
+   type). Where the overlay never mounts (touch, no WebGL) the name stays
+   still: its reveal animation owns `transform`, and a second animation cannot
+   add to it.
 
    Scoped to `home-live` (lands at hydration, so first paint and LCP are
-   filter-free) and to no-preference: under reduced motion, with JS off or a
-   broken chunk, none of this exists and the text sits static, undistorted.
-   Safari ignores url() filters on HTML content and degrades to exactly that
-   static text. */
+   untouched) and to no-preference: under reduced motion, with JS off or a
+   broken chunk, none of this exists and the text sits static. */
 @media (prefers-reduced-motion: no-preference) {
-  html.home-live .hero .eyebrow > span {
-    display: inline-block; /* a clean one-line box for the filter region */
-    filter: url(#water-s);
+  html.home-live .hero .eyebrow .ew,
+  html.home-live .hero .lede .wv {
+    display: inline-block; /* transforms don't apply to inline boxes */
   }
-  html.home-live .hero .lede {
-    filter: url(#water-m);
-  }
+  html.home-live .hero .eyebrow .ew,
+  html.home-live .hero .lede .wv,
   html.home-live .teasers .teaser-idx,
-  html.home-live .teasers .teaser-cue {
-    filter: url(#water-s);
-  }
-  html.home-live .teasers .teaser-label {
-    filter: url(#water-l);
-  }
+  html.home-live .teasers .teaser-cue,
+  html.home-live .teasers .teaser-line,
   html.home-live .foot.curtain .foot-inner {
-    filter: url(#water-s);
+    animation: water-drift 4.8s ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * -0.55s);
+  }
+  /* The footer row is one wide box — rotating it would lift its far edges by
+     whole pixels, so it only bobs. */
+  html.home-live .foot.curtain .foot-inner {
+    animation-name: water-bob;
+    animation-duration: 6.5s;
   }
 }
-@media (prefers-reduced-motion: no-preference) and (hover: none) {
-  html.home-live .hero .name {
-    filter: url(#water-l);
+/* Irregular waypoints on both axes plus a slight tilt: a loop, but not a
+   metronome. Amplitudes sit inside .teaser-label's --bleed (0.15em), so the
+   drifting label lines never get shaved by their overflow clip. */
+@keyframes water-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0.05em, 0) rotate(0.2deg);
+  }
+  28% {
+    transform: translate3d(0.04em, -0.06em, 0) rotate(-0.35deg);
+  }
+  52% {
+    transform: translate3d(-0.05em, 0.03em, 0) rotate(0.4deg);
+  }
+  78% {
+    transform: translate3d(0.03em, -0.04em, 0) rotate(-0.2deg);
   }
 }
-/* The defs sit in the page flow (server-rendered) but must never take space. */
-.water-defs {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
+@keyframes water-bob {
+  0%,
+  100% {
+    transform: translate3d(0, 0.09em, 0);
+  }
+  50% {
+    transform: translate3d(0, -0.09em, 0);
+  }
 }
 
 /* ---- home: one viewport, name left, teasers right (driven by HomeSequence) ----
@@ -771,6 +779,15 @@ html.hero-done .teaser {
   pointer-events: auto;
   filter: blur(0);
   transform: none;
+}
+/* The column enters staggered, 01 → 02 → 03 — the curtain's clean rise, three
+   times. The delays live on the `.is-in` state only, so the fold on the way
+   out drops them and the three leave as one movement. */
+html.home-live .teaser.is-in:nth-of-type(2) {
+  transition-delay: 0.12s;
+}
+html.home-live .teaser.is-in:nth-of-type(3) {
+  transition-delay: 0.24s;
 }
 .teaser:focus-visible {
   outline: none;
