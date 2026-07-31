@@ -448,6 +448,30 @@ html.home-live body {
     gap: 0.4rem;
   }
 }
+/* Touch targets. The bar is mono type sized to be read, not pressed: the nav
+   links are ~19px tall and the en/it switch ~13px square. Growing them with
+   padding would grow the bar, and the bar's height is already what the home's
+   top padding is cut to clear. So the hit area is a pseudo-element instead —
+   it moves nothing. Row 1 expands up into the bar's own top padding, row 2 down
+   into its bottom padding, and each stops half-way into the 0.75rem gap between
+   them, so the two rows meet without stealing each other's taps. */
+@media (hover: none) {
+  .topbar .wordmark,
+  .locale-opt {
+    position: relative;
+  }
+  .topbar .wordmark::before,
+  .locale-opt::before {
+    content: "";
+    position: absolute;
+    inset: -1.05rem -0.4rem -0.35rem;
+  }
+  .topbar nav a::before {
+    content: "";
+    position: absolute;
+    inset: -0.35rem -0.4rem -0.85rem;
+  }
+}
 
 /* ---- hero ---- */
 /* The left-hand column of the home grid. `.home` owns the viewport height now,
@@ -773,22 +797,18 @@ html.home-live .teaser {
     filter 0.9s var(--ease),
     transform 0.9s var(--ease);
 }
-html.home-live .teaser.is-in,
-html.hero-done .teaser {
+/* Unlike the lede, no `hero-done` reveal here: the column stays driver-owned
+   for the whole page life so upward intent can always fold it — the driver
+   re-syncs `.is-in` on every (re)mount, locale switches included. */
+html.home-live .teaser.is-in {
   opacity: 1;
   pointer-events: auto;
   filter: blur(0);
   transform: none;
 }
-/* The column enters staggered, 01 → 02 → 03 — the curtain's clean rise, three
-   times. The delays live on the `.is-in` state only, so the fold on the way
-   out drops them and the three leave as one movement. */
-html.home-live .teaser.is-in:nth-of-type(2) {
-  transition-delay: 0.12s;
-}
-html.home-live .teaser.is-in:nth-of-type(3) {
-  transition-delay: 0.24s;
-}
+/* No transition delays here: the 01 → 02 → 03 stagger is the driver's — each
+   tile has its own threshold on the scrub, so scroll pace *is* the stagger,
+   forwards and back. */
 .teaser:focus-visible {
   outline: none;
 }
@@ -1065,6 +1085,51 @@ html.home-live .teaser.is-in:nth-of-type(3) {
   transition:
     opacity 0.8s var(--ease),
     transform 0.8s var(--ease);
+}
+/* The ghost state is only half a design: it exists so hover can lift it, and
+   touch has no hover. Left alone, every title stays at --ink-ghost (1.7:1 on the
+   void) for the whole visit and /websites and /xperiments read as empty pages.
+   Settle them on the colours an *open* row already uses — the reveal drama is
+   gone here either way, and `.rows.has-open` still dims the siblings, so tapping
+   a row still focuses it. Must sit after the three rules it overrides: a media
+   query adds no specificity, so source order is all that decides this. */
+@media (hover: none) {
+  .row-title {
+    color: var(--ink);
+  }
+  .row-idx,
+  .row-meta {
+    color: var(--ink-dim);
+  }
+}
+/* Narrow: `1fr auto` with a nowrap meta is wider than the phone on the longest
+   strings — /xperiments' "installazione · led · …" pushed the row head out to
+   486px inside a 390px viewport, which `body { overflow-x: hidden }` then just
+   clipped. Let the meta wrap and let the title track shrink to fit instead of
+   the row growing past the screen. */
+@media (max-width: 560px) {
+  /* `height` (not min-height) on both, so the open state's +0.4rem step is
+     neutralised too: at this width the head has to size to its own content —
+     a two-line title plus a wrapped meta does not fit 5.4rem, and the fixed
+     height was cropping it. The row is the link, so a taller head is also a
+     bigger tap target. */
+  .row-head,
+  .row.open .row-head {
+    height: auto;
+    min-height: var(--row-h);
+    padding: 1.1rem 0;
+    grid-template-columns: 2.4rem minmax(0, 1fr);
+    align-items: start;
+    gap: 0.35rem 0.8rem;
+  }
+  .row-title,
+  .row-meta {
+    grid-column: 2;
+  }
+  .row-meta {
+    text-align: left;
+    white-space: normal;
+  }
 }
 
 .row-reveal {
@@ -1466,6 +1531,25 @@ html.home-live .foot.curtain .foot-inner {
 html.home-live .foot.curtain.is-up {
   transform: none;
 }
+/* On a phone the four footer items wrap to three rows and the curtain becomes a
+   152px opaque panel — over a page whose teaser column already runs to within
+   ~30px of the bottom edge. It cannot be made to clear the column at these
+   heights (there is no room), so it is made as small as the content allows:
+   tighter padding, tighter row gap, and no elastic spacer holding the domain on
+   a line of its own. Roughly a third of the height comes back. The other half
+   of this is in HomeSequence — the clock no longer raises the curtain unasked on
+   coarse pointers, so this only ever covers content the visitor swiped for. */
+@media (max-width: 560px) {
+  html.home-live .foot.curtain {
+    padding: 1.1rem clamp(1.1rem, 5vw, 1.6rem) 1.2rem;
+  }
+  html.home-live .foot.curtain .foot-inner {
+    gap: 0.5rem 1.4rem;
+  }
+  html.home-live .foot.curtain .spacer {
+    display: none;
+  }
+}
 
 /* visually-hidden but available to assistive tech */
 .sr-only {
@@ -1674,12 +1758,17 @@ html.home-live .foot.curtain.is-up {
   height: min(100vh, calc(100vw * 960 / 1536));
 }
 /* On portrait screens the letterboxed landscape frame collapses to a thin strip
-   with tiny tap targets. Fill the viewport instead — the r3f canvas re-fits its
-   aspect, so cards get real size. Kiosk framing still holds in landscape. */
+   with tiny tap targets. Fill the width instead — the r3f canvas re-fits its
+   aspect, so cards get real size. Kiosk framing still holds in landscape.
+   Capped at 3:4 rather than the full viewport height: the camera's 50° FOV is
+   vertical, so on a 0.46-aspect phone the horizontal field collapses to ~9 world
+   units against a ring 20 units wide — the camera ends up effectively inside the
+   vortex and one card fills the screen. 3:4 buys back enough width to read the
+   arc as an arc, without shrinking the cards back to strip size. */
 @media (max-aspect-ratio: 1 / 1) {
   .vortex-frame {
     width: 100%;
-    height: 100%;
+    height: min(100%, calc(100vw * 4 / 3));
     aspect-ratio: auto;
   }
 }
@@ -1736,6 +1825,15 @@ html.home-live .foot.curtain.is-up {
   color: var(--ink);
   border-color: var(--ink-dim);
   outline: none;
+}
+/* Phones: the centred title and the top-left exit button share one 1.4rem band
+   and overlap from ~390px down (the title is nowrap and tracked at 0.42em, so it
+   cannot give the width back). Drop the title under the controls rather than
+   shrink either of them. */
+@media (max-width: 560px) {
+  .vortex-title {
+    top: 4.3rem;
+  }
 }
 
 /* ── Merge — Graphic Designs index (list of demos, in the site chrome) ──────── */

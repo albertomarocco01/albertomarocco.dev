@@ -208,6 +208,16 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
+/* Phones: the gate's consent notice (bottom: 2rem, inline-styled in GateScene)
+   wraps to four lines there and reaches ~5.5rem up — straight through the
+   title's sub-line at 4.5rem, so the two render on top of each other on the
+   first screen a visitor sees. Lift the title clear of it. */
+@media (max-width: 560px) {
+  .tarassaco .tara-title {
+    bottom: 9rem;
+  }
+}
+
 .tarassaco .tara-exit {
   position: fixed;
   top: 2rem;

@@ -18,10 +18,11 @@ import { useApp } from "@/components/providers/AppProvider";
  *               never depends on the visitor. Meanwhile p composes the lede word
  *               by word, in a shuffled order, so it reads as a sentence
  *               assembling rather than a line typing.
- *   p 1 → 2     the teaser column enters — a hysteresis toggle like the
- *               curtain's (in past TEASER_IN, out past TEASER_OUT), with the
- *               01 → 02 → 03 stagger left to CSS transition delays. One clean
- *               movement in either direction, never a half-composed column.
+ *   p 1 → 2     the teaser column enters one tile at a time — three small
+ *               curtains in a row (in past TEASER_IN[i], out past
+ *               TEASER_OUT[i], ~one wheel notch apart), so scrubbing in either
+ *               direction steps 01 → 02 → 03 forwards or 03 → 02 → 01 back,
+ *               and the auto scrub walks the same stagger on its own.
  *   p 2 → 2.6   the footer rises as a curtain over the bottom edge of the
  *               viewport (`is-up` at CURTAIN_UP) and lowers again on upward
  *               intent (at CURTAIN_DOWN — the gap is hysteresis, so a jittery
@@ -35,7 +36,9 @@ import { useApp } from "@/components/providers/AppProvider";
  * the clock would shove back down against the hand — and re-arms the beat from
  * wherever the scrub-back landed. So the whole thing is a loop with no dead
  * ends: scroll up and the teasers fold away, scroll down *or simply wait* and
- * they compose again, at any position, in either direction.
+ * they compose again, at any position, in either direction. Once the page has
+ * composed the loop bottoms out at P_REST — reverse scroll folds the chrome
+ * (teasers, then the curtain) and no more; the opening never dismantles again.
  *
  * `p` is therefore reversible over its whole range. The one thing that ends the
  * loop is an escape hatch (below): it latches the floor at P_COMPOSED and
@@ -74,36 +77,55 @@ import { useApp } from "@/components/providers/AppProvider";
 
 /** Consumed scroll mapped onto one movement, as a fraction of the viewport. */
 const SPAN_VH = 0.72;
-/** Finger travel is scarcer than wheel travel. */
-const TOUCH_MULT = 1.8;
+/** Finger travel is scarcer than wheel travel — but not by as much as it looks.
+ *  The wheel arrives in discrete notches and lands ~one teaser per notch; a
+ *  finger streams touchmove continuously, so the multiplier is what decides how
+ *  many of the 0.2-spaced teaser thresholds a single gesture crosses. At 1.8 a
+ *  perfectly ordinary 200px flick crossed three of them inside 150ms and the
+ *  column read as one block reveal instead of the authored 01 → 02 → 03 stagger.
+ *  0.9 puts one tile at ~15% of the viewport's height — a short swipe — which is
+ *  the wheel's cadence, and a full-screen drag still covers three. Touch only:
+ *  the wheel/key paths above are untouched. */
+const TOUCH_MULT = 0.9;
 /** deltaMode 1 (lines) → px; 40px ≈ one Chrome wheel notch's worth per 3 lines. */
 const LINE_PX = 40;
 const KEY_STEP = 0.12; // ArrowDown / ArrowUp
 const KEY_PAGE = 0.3; // Space / PageDown / PageUp
-const AUTO_S = 2.2; // auto-advance: seconds to cover one movement
+const AUTO_S = 2.6; // auto-advance: seconds to cover one movement
 // Compose if the sequence never got going, ~1.6× the slowest honest path to
-// P_COMPOSED: the veil (~1.4s) plus two idle beats and two movements is ~9s
+// P_COMPOSED: the veil (~1.4s) plus two idle beats and two movements is ~10.4s
 // unattended, so this must sit well clear of it or it would cut the teasers in
 // halfway through composing.
-const HARD_MS = 15000;
+const HARD_MS = 17000;
 
 /** Movement boundaries on the shared accumulator. */
 const P_LEDE = 1; // lede fully composed
 const P_COMPOSED = 2; // teasers fully composed — where the escape hatches land
-/** The teaser column is a curtain-style hysteresis toggle inside [1, 2]: in
- *  crossing TEASER_IN on the way down, out crossing TEASER_OUT on the way up.
- *  The gap keeps a jittery trackpad from fluttering the 0.9s transition. */
-const TEASER_IN = 1.5;
-const TEASER_OUT = 1.15;
+/** The teaser column steps one tile at a time inside [1, 2] — the same
+ *  per-node bookkeeping as the lede words, but each tile is its own small
+ *  curtain: in crossing its TEASER_IN on the way down, out crossing its
+ *  TEASER_OUT on the way up. Roughly one wheel notch per tile, in either
+ *  direction; the 0.1 gap per tile keeps a jittery trackpad from fluttering
+ *  the 0.9s transition, and the 0.2 spacing is what turns a flick into a
+ *  stagger instead of a block reveal. The auto scrub crosses them at the same
+ *  spacing, so the unattended show steps 01 → 02 → 03 too (~0.5s apart). */
+const TEASER_IN = [1.5, 1.7, 1.9];
+const TEASER_OUT = [1.4, 1.6, 1.8];
+/** Once the page has composed, reverse input bottoms out here — just under the
+ *  lowest TEASER_OUT, so scrolling up folds the chrome (curtain, then the
+ *  tiles, one per notch) and nothing else: the lede and the name never come
+ *  apart again, and overshooting the fold costs nothing. The idle beat
+ *  recomposes from here, re-stepping the tiles on the way. */
+const P_REST = 1.3;
 const CURTAIN_UP = 2.5;
 const CURTAIN_DOWN = 2.3;
 const P_MAX = 2.6; // nothing past the raised curtain, so reversing is immediate
 
 /** What the clock scrubs towards, and the idle beat it waits out first. The
  *  curtain's is longer: composing the page is the show, but drawing the footer
- *  over it is an interruption, and 1.6s of stillness would feel pushy. */
+ *  over it is an interruption, and 1.9s of stillness would feel pushy. */
 const GATES = [P_LEDE, P_COMPOSED, P_MAX];
-const IDLE_MS = [1600, 1600, 2800];
+const IDLE_MS = [1900, 1900, 3200];
 /** Index of the first gate above `v`, or -1 with nothing left to compose. */
 const gateAbove = (v: number) => GATES.findIndex((g) => v < g - 1e-3);
 
@@ -124,7 +146,7 @@ export function HomeSequence() {
   const p = useRef(0);
   const floor = useRef(0); // 0 while the loop is live, P_COMPOSED once latched
   const words = useRef(0); // lede words currently in
-  const tiles = useRef(false); // teaser column currently in
+  const tiles = useRef<boolean[]>([]); // per-teaser in/out, by index
   const curtain = useRef(false);
   const timer = useRef<number | null>(null);
   const raf = useRef<number | null>(null);
@@ -188,14 +210,15 @@ export function HomeSequence() {
     [...lede, ...teasers].forEach((el) => el.classList.remove("is-in"));
     foot?.classList.remove("is-up");
     words.current = 0;
-    tiles.current = false;
+    tiles.current = [];
     curtain.current = false;
 
     // Returning to `/` inside the same page load: skip the show, keep the
-    // curtain live. Everything starts composed and already latched.
+    // chrome live. Everything starts composed, with the floor at P_REST so
+    // the teasers and the curtain still answer upward intent.
     const replay = !composed;
     p.current = replay ? 0 : P_COMPOSED;
-    floor.current = replay ? 0 : P_COMPOSED;
+    floor.current = replay ? 0 : P_REST;
     if (replay) root.classList.add("hero-in");
     else root.classList.add("hero-done");
 
@@ -231,13 +254,17 @@ export function HomeSequence() {
         words.current = nw;
       }
 
-      // The teaser column, as one unit — same stance as the curtain below;
-      // the 01 → 02 → 03 stagger is CSS transition delays on `.is-in`.
-      const tin = v >= (tiles.current ? TEASER_OUT : TEASER_IN);
-      if (tin !== tiles.current) {
-        tiles.current = tin;
-        teasers.forEach((el) => el.classList.toggle("is-in", tin));
-      }
+      // The teasers, one tile per step — each with its own hysteresis, so a
+      // scrub in either direction walks them 01 → 02 → 03 (or back) instead
+      // of moving the column as a block.
+      teasers.forEach((el, i) => {
+        const was = !!tiles.current[i];
+        const on = v >= (was ? (TEASER_OUT[i] ?? v) : (TEASER_IN[i] ?? Infinity));
+        if (on !== was) {
+          tiles.current[i] = on;
+          el.classList.toggle("is-in", on);
+        }
+      });
 
       const up = v >= (curtain.current ? CURTAIN_DOWN : CURTAIN_UP);
       if (up !== curtain.current) {
@@ -245,11 +272,16 @@ export function HomeSequence() {
         foot?.classList.toggle("is-up", up);
       }
 
-      // Not a ratchet: `p` stays free to fold everything away again. This only
-      // records that the show has played once in this page load, so a
-      // client-side return to `/` skips it (a link click normally latches
-      // through the focusin hatch, but Safari doesn't focus links on click).
-      if (v >= P_COMPOSED) composed = true;
+      // Once the show has played, the floor comes up to P_REST: the loop stays
+      // live for the chrome (teasers + curtain) but the opening — lede, name —
+      // is settled for good. `composed` additionally records the play for this
+      // page load, so a client-side return to `/` skips it (a link click
+      // normally latches through the focusin hatch, but Safari doesn't focus
+      // links on click).
+      if (v >= P_COMPOSED) {
+        composed = true;
+        if (floor.current < P_REST) floor.current = P_REST;
+      }
     };
 
     const set = (to: number) => {
@@ -259,13 +291,13 @@ export function HomeSequence() {
     const step = (dp: number) => set(p.current + dp);
 
     // Every escape hatch lands here: the visitor wants the site, not the show.
-    // The floor comes up so the composition can't fold away any more, and
-    // `hero-done` settles every node revealed independently of the per-node
-    // bookkeeping (which is what makes a locale switch safe). Forward-only —
-    // a hatch must never yank a raised curtain back down. The curtain itself
-    // stays live above the floor, so the clock is re-armed for it.
+    // `hero-done` settles the opening (eyebrow, name, lede) through CSS,
+    // independent of the per-word bookkeeping — which is what makes a locale
+    // switch safe. The teasers stay driver-owned: `set` lands at P_COMPOSED,
+    // and `apply` raises the floor to P_REST there, so the chrome (column +
+    // curtain) keeps answering upward intent after a hatch. Forward-only — a
+    // hatch must never yank a raised curtain back down.
     const latch = (to: number) => {
-      floor.current = P_COMPOSED;
       root.classList.add("hero-done");
       set(Math.max(to, p.current));
       arm();
@@ -285,6 +317,16 @@ export function HomeSequence() {
     // Backward input is: it stops the scrub (a clock pushing down while the hand
     // pulls up is a fight, and the hand wins nothing) and re-arms from where the
     // scrub-back landed, so the beat is always the *last* thing that happened.
+    // How far the *clock* is allowed to drive on its own. Coarse pointers stop
+    // at P_COMPOSED: the curtain is the one movement that draws something over
+    // the page, and on a phone the teaser column runs to within ~30px of the
+    // bottom edge, so an unattended raise leaves the resting home with two of
+    // its three doors under an opaque panel — and nothing lowers it again. It
+    // still rises on real forward intent (swipe on past the teasers, End, focus
+    // into the footer), exactly as on desktop; only the clock stops pushing.
+    const autoTop = window.matchMedia("(pointer: coarse)").matches
+      ? P_COMPOSED
+      : P_MAX;
     let goal = 0; // index in GATES the running scrub is heading for
     let last = 0;
     const stopAuto = () => {
@@ -308,7 +350,7 @@ export function HomeSequence() {
     function arm() {
       stopAuto();
       const g = gateAbove(p.current);
-      if (g < 0) return; // curtain up, nothing left to advance
+      if (g < 0 || GATES[g] > autoTop) return; // nothing left for the clock
       goal = g;
       timer.current = window.setTimeout(() => {
         timer.current = null;
@@ -316,11 +358,19 @@ export function HomeSequence() {
         raf.current = requestAnimationFrame(tick);
       }, IDLE_MS[g]);
     }
+    // Sync the classes to wherever `p` starts. A no-op on a fresh load (p = 0);
+    // on a return visit or a locale switch it re-marks the teaser column in
+    // the same breath as the remount — the column has no `hero-done` fallback
+    // in CSS, this bookkeeping is its only reveal.
+    apply();
     // Armed on a return visit too: the show is skipped, but the curtain is live
     // and rises on its own like everywhere else.
     arm();
 
     // Real intent, as opposed to the clock's — the only path that re-arms.
+    // Upward intent needs no special casing any more: the curtain folds first
+    // (its hysteresis sits highest), then each further notch peels one tile,
+    // and the floor at P_REST is where the peeling stops.
     const input = (dp: number) => {
       step(dp);
       if (dp < 0) arm();
