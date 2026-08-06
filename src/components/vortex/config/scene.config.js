@@ -144,7 +144,6 @@ export const SCENE_CONFIG = {
 
   // ── SCENA GALLERY (SCENA 3) ───────────────────────────────────
   gallery: {
-    backgroundOpacity: 0.20,  // Opacità del backdrop (l'immagine cliccata, dietro le card)
     elevationStart:   -12,    // Le card partono da sotto lo schermo
     elevationDuration: 1.4,
     staggerDelay:      0.15,

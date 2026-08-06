@@ -29,6 +29,7 @@ export function VortexExperience({ copy, exitHref = "/graphic-designs" }) {
   const [galleryBackground, setGalleryBackground] = useState(null);
   const [galleryImages, setGalleryImages] = useState([]);
   const [carouselImages, setCarouselImages] = useState([]);
+  const [galleryCaption, setGalleryCaption] = useState(null);
 
   // Mirror phase into a ref so the stable callbacks below (passed into the three
   // scene) read the latest phase without being re-created on every transition.
@@ -52,12 +53,17 @@ export function VortexExperience({ copy, exitHref = "/graphic-designs" }) {
     (imageData, _clickedIdx, allCarouselImages) => {
       if (phaseRef.current !== "carousel") return;
       setGalleryBackground(imageData);
+      // Draw the mystic line HERE, in the event handler — render must stay pure
+      // (StrictMode double-render), so no Math.random() inside the scene tree.
+      // Re-picking the same card later may show a different line; that's wanted.
+      const lines = copy.captions;
+      setGalleryCaption(lines[Math.floor(Math.random() * lines.length)]);
       const allImages = allCarouselImages.map((c) => c.imageData);
       setGalleryImages(allImages);
       setCarouselImages(allImages);
       setPhase("gallery");
     },
-    [],
+    [copy],
   );
 
   // ── Back navigation (replaces the tablet's force_return) ───────────────────
@@ -71,6 +77,7 @@ export function VortexExperience({ copy, exitHref = "/graphic-designs" }) {
     if (cur === "gallery") {
       setGalleryBackground(null);
       setGalleryImages([]);
+      setGalleryCaption(null);
       setPhase("carousel");
     } else if (cur === "carousel") {
       setPhase("returning");
@@ -120,6 +127,7 @@ export function VortexExperience({ copy, exitHref = "/graphic-designs" }) {
           onSelectionComplete={handleSelectionComplete}
           onReturnComplete={handleReturnComplete}
           galleryBackground={galleryBackground}
+          galleryCaption={galleryCaption}
           galleryImages={galleryImages}
           carouselImages={carouselImages}
           setCarouselImages={setCarouselImages}
@@ -128,6 +136,16 @@ export function VortexExperience({ copy, exitHref = "/graphic-designs" }) {
 
       <span className="vortex-title" aria-hidden="true">
         Image Vortex
+      </span>
+
+      {/* Idle-only nudge. Stays mounted so opacity can transition both ways
+          (out on card click, back in after "← vortex"); the canvas aria-label
+          already explains the interaction, so this is decorative. */}
+      <span
+        className={`vortex-hint${phase === "idle" ? "" : " is-hidden"}`}
+        aria-hidden="true"
+      >
+        {copy.pickHint}
       </span>
 
       <Link href={exitHref} className="vortex-exit">

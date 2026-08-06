@@ -18,6 +18,7 @@ export function VortexScene({
   onSelectionComplete,
   onReturnComplete,
   galleryBackground,
+  galleryCaption,
   galleryImages,
   carouselImages,
   setCarouselImages,
@@ -123,6 +124,7 @@ export function VortexScene({
           phase={phase}
           backgroundImage={galleryBackground}
           floatingImages={galleryImages}
+          caption={galleryCaption}
         />
       </Suspense>
 

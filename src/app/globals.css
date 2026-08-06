@@ -1801,6 +1801,64 @@ html.home-live .foot.curtain.is-up {
   user-select: none;
   white-space: nowrap;
 }
+/* "pick a card" — idle-scene hint in the title's voice, tucked bottom-center in
+   the letterbox band, clear of the ring and the corner chrome. Visibility is
+   phase-driven (`.is-hidden` toggled by VortexExperience); the global
+   reduced-motion rule collapses the fade to a cut. */
+.vortex-hint {
+  position: fixed;
+  bottom: 2.4rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  font-size: clamp(0.68rem, 1.3vw, 0.82rem);
+  font-weight: 300;
+  letter-spacing: 0.38em;
+  text-indent: 0.38em; /* offset the trailing tracking so it stays optically centered */
+  text-transform: uppercase;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow:
+    0 0 10px rgba(255, 255, 255, 0.5),
+    0 0 26px rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  transition: opacity 0.7s var(--ease);
+}
+.vortex-hint.is-hidden {
+  opacity: 0;
+}
+/* Mystic caption beside the gallery's docked HUD card (drei <Html>, so it lives
+   inside the canvas frame). Chrome voice: tracked lowercase mono, dim white —
+   clearly more present than the tiny IMG badge, subordinate to the image.
+   Opacity is driven inline by the scene (fade-in only after the dock tween);
+   the global reduced-motion rule collapses the transition to a cut. */
+.vortex-caption {
+  /* drei's Html wrapper shrink-wraps to min-content (one word per line);
+     an explicit max-content width, capped, restores the intended single line. */
+  width: max-content;
+  max-width: min(34vw, 320px);
+  font-family: var(--mono);
+  font-size: clamp(0.66rem, 1.6vw, 0.8rem);
+  letter-spacing: 0.18em;
+  line-height: 1.9;
+  text-transform: lowercase;
+  color: rgba(255, 255, 255, 0.78);
+  text-shadow: 0 0 14px rgba(255, 255, 255, 0.28);
+  text-wrap: balance;
+  transform: translateY(-50%); /* Html anchors top-left → center on the card's midline */
+  transition: opacity 0.9s var(--ease);
+  pointer-events: none;
+  user-select: none;
+}
+/* Portrait or narrow canvases: the caption drops under the HUD card, centered —
+   the wrapper uses drei's `center`, so no midline correction here. */
+.vortex-caption--below {
+  max-width: min(72vw, 300px);
+  transform: none;
+  text-align: center;
+}
 .vortex-exit,
 .vortex-back {
   position: fixed;

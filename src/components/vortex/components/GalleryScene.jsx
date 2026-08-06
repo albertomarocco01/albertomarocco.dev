@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useEffect, useLayoutEffect, useState } from 'react';
-import { useFrame, useThree, useLoader } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import gsap from 'gsap';
@@ -27,7 +27,7 @@ function mulberry32(a) {
 }
 
 // ── Single floating card with bob and label ──────────────────────
-function FloatingCard({ imageData, finalPosition, rotation, index, isSelected }) {
+function FloatingCard({ imageData, finalPosition, rotation, index, isSelected, caption }) {
   const groupRef   = useRef();
   const matRef     = useRef();
   const flyInDone  = useRef(false);
@@ -35,6 +35,12 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected })
   const { gallery } = SCENE_CONFIG;
   const { camera, size } = useThree();
   const reduceMotion = useReducedMotion();
+
+  // The mystic line may only surface once the HUD card has finished docking —
+  // flipped by the anchor tween's onComplete (a cut under reduced motion, where
+  // that tween collapses to RM_DURATION). Fresh mount per gallery visit, so a
+  // re-pick starts hidden again.
+  const [captionVisible, setCaptionVisible] = useState(false);
 
   const { width: cardWidth, height: cardHeight } = getClampedSize(
     imageData.w / imageData.h, 
@@ -99,7 +105,8 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected })
               tweens.push(gsap.to(hudAnchor.current, {
                 progress: 1,
                 duration: D(0.8),
-                ease: 'power3.inOut'
+                ease: 'power3.inOut',
+                onComplete: () => setCaptionVisible(true),
               }));
               tweens.push(gsap.to(groupRef.current.scale, {
                 x: 1.3, y: 1.3, z: 1.3, // Make HUD card a nice size
@@ -208,7 +215,9 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected })
         materialRef={matRef}
       />
 
-      {/* Simplified Side Label (keep it clean) */}
+      {/* Simplified Side Label (keep it clean). On the HUD card it hands its
+          slot to the mystic caption — fading out as the caption fades in.
+          Floating (unselected) cards keep it untouched. */}
       <Html
         center
         position={[cardWidth / 2 + 0.4, 0, 0]}
@@ -228,10 +237,41 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected })
           borderRadius:   '2px',
           borderLeft:     '1px solid rgba(255,255,255,0.2)',
           whiteSpace:     'nowrap',
+          opacity:        isSelected && captionVisible ? 0 : 1,
+          transition:     'opacity 0.4s ease',
         }}>
           {`IMG #${index + 1}`}
         </div>
       </Html>
+
+      {/* Mystic caption — HUD card only. Mounted invisible from the start so
+          the reveal is a pure opacity fade once the anchor tween completes.
+          Side placement needs landscape room: on portrait or narrow canvases
+          the HUD card's right edge sits past mid-screen and a side caption
+          clips, so it drops below the card instead — still visually attached
+          (styles: .vortex-caption in globals.css). */}
+      {isSelected && caption && (() => {
+        const captionBelow = size.width <= 560 || size.width < size.height;
+        return (
+          <Html
+            center={captionBelow}
+            position={
+              captionBelow
+                ? [0, -(cardHeight / 2 + 0.55), 0]
+                : [cardWidth / 2 + 0.5, 0, 0]
+            }
+            style={{ pointerEvents: 'none', userSelect: 'none' }}
+            zIndexRange={[100, 200]}
+          >
+            <div
+              className={`vortex-caption${captionBelow ? ' vortex-caption--below' : ''}`}
+              style={{ opacity: captionVisible ? 1 : 0 }}
+            >
+              {caption}
+            </div>
+          </Html>
+        );
+      })()}
     </group>
   );
 }
@@ -328,26 +368,8 @@ function generateSlots(count, aspect, rng) {
   return placed;
 }
 
-// ── Backdrop: the clicked image, dimmed, filling the scene behind the cards ──
-function GalleryBackdrop({ image }) {
-  const texture = useLoader(THREE.TextureLoader, image.url);
-  useMemo(() => { texture.colorSpace = THREE.SRGBColorSpace; }, [texture]);
-  return (
-    <mesh position={[0, 0, -6]} renderOrder={-1}>
-      <planeGeometry args={[60, 40]} />
-      <meshBasicMaterial
-        map={texture}
-        transparent
-        opacity={SCENE_CONFIG.gallery.backgroundOpacity}
-        depthWrite={false}
-        toneMapped={false}
-      />
-    </mesh>
-  );
-}
-
 // ── GalleryScene ─────────────────────────────────────────────────
-export function GalleryScene({ phase, backgroundImage, floatingImages }) {
+export function GalleryScene({ phase, backgroundImage, floatingImages, caption }) {
   const { gallery } = SCENE_CONFIG;
   const { size }    = useThree();
   const safeImages  = floatingImages ?? [];
@@ -385,7 +407,8 @@ export function GalleryScene({ phase, backgroundImage, floatingImages }) {
 
   return (
     <group name="GalleryScene">
-      {backgroundImage && <GalleryBackdrop image={backgroundImage} />}
+      {/* No backdrop: the gallery floats on the renderer's plain black clear
+          color. `backgroundImage` is still the selection marker below. */}
       {phase === 'gallery' && safeImages.map((img, i) => (
         <FloatingCard
           key={img.id || `gfloat-${i}`}
@@ -394,6 +417,7 @@ export function GalleryScene({ phase, backgroundImage, floatingImages }) {
           rotation={layouts[i % layouts.length]?.rotation || [0,0,0]}
           index={i}
           isSelected={img.id === backgroundImage?.id}
+          caption={caption}
         />
       ))}
     </group>

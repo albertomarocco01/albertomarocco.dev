@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useCallback, useEffect } from 'react';
-import { useFrame, useLoader } from '@react-three/fiber';
+import { useFrame, useLoader, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { SCENE_CONFIG } from '../config/scene.config.js';
@@ -11,6 +11,12 @@ import { useReducedMotion } from '../utils/reducedMotion.js';
 // no-op raycast is the way to actually take a mesh out of hit-testing (and it
 // must be a function: `raycast={null}` would throw inside the raycaster).
 const NO_RAYCAST = () => null;
+
+// Inline cursor override on the canvas — '' clears it, so the wrapper's
+// `.vortex-immersive { cursor: auto }` shows through again.
+const setCanvasCursor = (canvas, value) => {
+  canvas.style.cursor = value;
+};
 
 /**
  * VortexCard — renders one image card.
@@ -107,6 +113,11 @@ export function VortexCard({
   const hoverGroupRef = useRef();
   const reduceMotion = useReducedMotion();
 
+  // Hover cursor goes on the canvas itself, NOT document.body: `.vortex-immersive
+  // { cursor: auto }` is an ancestor with its own specified value, so the canvas
+  // inherits `auto` from it and never sees an inline override set on <body>.
+  const { gl } = useThree();
+
   useFrame((_, delta) => {
     if (!animGroupRefUsed.current || !floating.enabled || reduceMotion) return;
     // Solo floating attivo durante idle
@@ -127,9 +138,9 @@ export function VortexCard({
   // ── Cursor Cleanup ───────────────────────────────────────────
   useEffect(() => {
     return () => {
-      document.body.style.cursor = ''; // clear inline override → site's cursor:none returns
+      setCanvasCursor(gl.domElement, '');
     };
-  }, []);
+  }, [gl]);
 
   const handlePointerOver = useCallback((e) => {
     // Touch fires pointerover with no matching pointerout → cards would stick at
@@ -139,7 +150,7 @@ export function VortexCard({
     if (!interactive) return;
 
     e.stopPropagation();
-    document.body.style.cursor = 'pointer';
+    setCanvasCursor(gl.domElement, 'pointer');
     if (!hoverGroupRef.current) return;
     
     gsap.killTweensOf(hoverGroupRef.current.scale);
@@ -157,11 +168,11 @@ export function VortexCard({
       duration: hover.duration, 
       ease: hover.ease,
     });
-  }, [interactive, hover]);
+  }, [interactive, hover, gl]);
 
   // Never phase-gated: this must ALWAYS be able to undo a hover.
   const resetHover = useCallback(() => {
-    document.body.style.cursor = ''; // clear inline override → site's cursor:none returns
+    setCanvasCursor(gl.domElement, '');
     if (!hoverGroupRef.current) return;
 
     gsap.killTweensOf(hoverGroupRef.current.scale);
@@ -177,7 +188,7 @@ export function VortexCard({
       duration: hover.duration,
       ease: hover.ease,
     });
-  }, [hover]);
+  }, [hover, gl]);
 
   const handlePointerOut = useCallback(() => resetHover(), [resetHover]);
 
