@@ -36,10 +36,13 @@ void MeltMaterial;
  */
 
 // ---- envelopes ----
-const ENGAGE_UP = 7; // ramp-in lerp rate — the melt answers the hand quickly
-const ENGAGE_DECAY_HOVER = 0.9; // idle decay while the pointer rests on the name
-const ENGAGE_DECAY_AWAY = 3.2; // faster decay once the pointer leaves
-const FRESH_MS = 90; // "still moving" window after the last pointermove
+// Tuned for a fast hand: the impulse peaks hard, so even a ~120ms sweep across
+// the name leaves a clear liquid wake — and the calm returns quickly, resting
+// or gone. The melt is a flourish the hand plays, not a state the name holds.
+const ENGAGE_UP = 10; // ramp-in lerp rate — the melt answers the hand quickly
+const ENGAGE_DECAY_HOVER = 2.6; // idle decay while the pointer rests on the name
+const ENGAGE_DECAY_AWAY = 5.5; // decay once the pointer leaves — settled in ~0.5s
+const FRESH_MS = 120; // "still moving" window after the last pointermove
 const MOUSE_SMOOTH = 9; // pointer-follow lerp rate (light lag = liquid trail)
 // JS mirror of the shader's own `u_engage > 0.004` melt branch: below it the
 // cursor melt contributes nothing and only the idle tremble is moving.
@@ -244,7 +247,7 @@ export function NameMeltView() {
     let debounce: number | null = null;
 
     // Rasterize the h1 into the texture. Draws every visible run (the two .nw
-    // text nodes and the amber italic em) at its live DOM rect, DPR-aware.
+    // text nodes) at its live DOM rect, DPR-aware.
     const raster = () => {
       const rect = wrap.getBoundingClientRect();
       if (rect.width < 2 || rect.height < 2) return;

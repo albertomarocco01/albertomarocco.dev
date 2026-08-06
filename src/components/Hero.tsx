@@ -37,9 +37,7 @@ export function Hero({ hero }: { hero: Dictionary["hero"] }) {
       <h1 className="name">
         <span className="nw">Alberto</span>
         <br />
-        <span className="nw">
-          Marocco<em>.</em>
-        </span>
+        <span className="nw">Marocco</span>
         {/* Client overlay for the cursor liquid-melt. Renders nothing on the
             server and nothing at all until the shared field is ready, so the
             h1 above stays the untouched LCP element. */}

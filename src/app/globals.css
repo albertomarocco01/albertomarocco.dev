@@ -521,10 +521,6 @@ html.home-live body {
 .name.is-melting {
   opacity: 0;
 }
-.name em {
-  font-style: italic;
-  color: #b07846; /* amber period — the brand mark, matches loader/OG/favicon */
-}
 .lede {
   max-width: 34ch;
   margin-top: 2.2rem;
@@ -582,7 +578,7 @@ html.home-live body {
     --from-y: 8px;
   }
 
-  /* Movement 1 — the authored beat: eyebrow, then "Alberto", then "Marocco.".
+  /* Movement 1 — the authored beat: eyebrow, then "Alberto", then "Marocco".
      Deliberately an *animation* and not a transition. `hero-in` also retires the
      fail-safe animation above, and a property whose value changes in the same
      style change that cancels an animation does not start a transition (the name
@@ -599,17 +595,24 @@ html.home-live body {
     animation: hero-reveal 0.95s var(--ease) 0.12s both;
   }
   html.hero-in .hero .name .nw:nth-of-type(2) {
-    /* "Marocco." trails "Alberto" by 240ms. */
+    /* "Marocco" trails "Alberto" by 240ms. */
     animation-delay: 0.36s;
   }
 
   /* Movement 2 — the lede, scrubbed word by word by consumed scroll input (see
-     HomeSequence.tsx). These stay *transitions*: the scrub is reversible, and the
-     fail-safe was already retired one style change earlier (at `hero-in`), so
-     unlike the name above they do animate. */
+     HomeSequence.tsx). These stay *transitions*: the scrub is reversible, so
+     unlike the name above each `.is-in` crossing animates in either direction.
+     `animation: none` retires the fail-safe here the way the animation *swap*
+     does for the eyebrow and the name — without it the fail-safe keeps running
+     through its 6.5s delay, and a delayed animation's backwards fill beats any
+     normal declaration, pinning every word at opacity 0 no matter what `.is-in`
+     says. Cancelling it cannot snap anything: when `hero-in` lands no word is
+     revealed yet, so the computed values are identical on both sides of the
+     style change, and the per-word transitions run in later style changes. */
   html.hero-in .hero .lede .w {
-    transition: opacity 0.55s var(--ease), filter 0.55s var(--ease),
-      transform 0.55s var(--ease);
+    animation: none;
+    transition: opacity 0.32s var(--ease), filter 0.32s var(--ease),
+      transform 0.32s var(--ease);
   }
   html.hero-in .hero .lede .w.is-in {
     opacity: 1;
@@ -693,14 +696,19 @@ html.home-live body {
 
    Scoped to `home-live` (lands at hydration, so first paint and LCP are
    untouched) and to no-preference: under reduced motion, with JS off or a
-   broken chunk, none of this exists and the text sits static. */
+   broken chunk, none of this exists and the text sits static. The hero rows
+   additionally wait for `lede-in` (HomeSequence: the lede's first full
+   composition, or any skip path) — words wobbling while they are still
+   composing reads as noise, so the hero holds still until the sentence is
+   whole and then breathes. Teasers and footer drift from hydration as before:
+   they enter later than the class ever lands. */
 @media (prefers-reduced-motion: no-preference) {
   html.home-live .hero .eyebrow .ew,
   html.home-live .hero .lede .wv {
     display: inline-block; /* transforms don't apply to inline boxes */
   }
-  html.home-live .hero .eyebrow .ew,
-  html.home-live .hero .lede .wv,
+  html.home-live.lede-in .hero .eyebrow .ew,
+  html.home-live.lede-in .hero .lede .wv,
   html.home-live .teasers .teaser-idx,
   html.home-live .teasers .teaser-cue,
   html.home-live .teasers .teaser-line,

@@ -15,9 +15,8 @@ import { useApp } from "@/components/providers/AppProvider";
  *   p 0 → 1     movement 1 fires alongside it — the bubble field detonates
  *               (Aura.tsx) and `html.hero-in` plays the eyebrow + the two name
  *               words, an authored beat that needs no input, so the LCP element
- *               never depends on the visitor. Meanwhile p composes the lede word
- *               by word, in a shuffled order, so it reads as a sentence
- *               assembling rather than a line typing.
+ *               never depends on the visitor. Meanwhile p composes the lede
+ *               word by word, left to right, a quick sweep along the lines.
  *   p 1 → 2     the teaser column enters one tile at a time — three small
  *               curtains in a row (in past TEASER_IN[i], out past
  *               TEASER_OUT[i], ~one wheel notch apart), so scrubbing in either
@@ -91,12 +90,11 @@ const TOUCH_MULT = 0.9;
 const LINE_PX = 40;
 const KEY_STEP = 0.12; // ArrowDown / ArrowUp
 const KEY_PAGE = 0.3; // Space / PageDown / PageUp
-const AUTO_S = 2.6; // auto-advance: seconds to cover one movement
 // Compose if the sequence never got going, ~1.6× the slowest honest path to
-// P_COMPOSED: the veil (~1.4s) plus two idle beats and two movements is ~10.4s
-// unattended, so this must sit well clear of it or it would cut the teasers in
-// halfway through composing.
-const HARD_MS = 17000;
+// P_COMPOSED: the veil (~1.4s) plus two idle beats (0.9 + 1.2) and two
+// movements (0.8 + 2.6) is ~6.9s unattended, so this must sit well clear of
+// it or it would cut the teasers in halfway through composing.
+const HARD_MS = 11000;
 
 /** Movement boundaries on the shared accumulator. */
 const P_LEDE = 1; // lede fully composed
@@ -121,11 +119,16 @@ const CURTAIN_UP = 2.5;
 const CURTAIN_DOWN = 2.3;
 const P_MAX = 2.6; // nothing past the raised curtain, so reversing is immediate
 
-/** What the clock scrubs towards, and the idle beat it waits out first. The
- *  curtain's is longer: composing the page is the show, but drawing the footer
- *  over it is an interruption, and 1.9s of stillness would feel pushy. */
+/** What the clock scrubs towards, the idle beat it waits out first, and the
+ *  scrub's own pace (seconds to cover the movement) — all indexed like GATES.
+ *  The opening is brisk: a short beat once the title is landing, then the lede
+ *  sweeps in well under a second and the teasers follow on a tightened beat at
+ *  their original stride, so the 01 → 02 → 03 stagger stays legible. The
+ *  curtain waits longest: composing the page is the show, but drawing the
+ *  footer over it is an interruption, and rushing it would feel pushy. */
 const GATES = [P_LEDE, P_COMPOSED, P_MAX];
-const IDLE_MS = [1900, 1900, 3200];
+const IDLE_MS = [900, 1200, 2600];
+const AUTO_S = [0.8, 2.6, 2.6];
 /** Index of the first gate above `v`, or -1 with nothing left to compose. */
 const gateAbove = (v: number) => GATES.findIndex((g) => v < g - 1e-3);
 
@@ -184,7 +187,7 @@ export function HomeSequence() {
       if (!composed) compose();
     }, HARD_MS);
     return () => {
-      root.classList.remove("home-live", "hero-in", "hero-done");
+      root.classList.remove("home-live", "hero-in", "hero-done", "lede-in");
       document.body.removeAttribute("data-lenis-prevent");
       history.scrollRestoration = "auto";
       if (hard.current != null) window.clearTimeout(hard.current);
@@ -205,8 +208,8 @@ export function HomeSequence() {
       document.querySelectorAll<HTMLElement>(".teasers .teaser"),
     );
     // A remount (StrictMode, a locale switch) hands back nodes that may still
-    // carry `is-in` from the previous run — and that run drew a different order,
-    // so leftovers would read as words stuck at random.
+    // carry `is-in` from the previous run, and this run's bookkeeping starts
+    // from zero — leftovers would read as words stuck on.
     [...lede, ...teasers].forEach((el) => el.classList.remove("is-in"));
     foot?.classList.remove("is-up");
     words.current = 0;
@@ -220,21 +223,16 @@ export function HomeSequence() {
     p.current = replay ? 0 : P_COMPOSED;
     floor.current = replay ? 0 : P_REST;
     if (replay) root.classList.add("hero-in");
-    else root.classList.add("hero-done");
+    else root.classList.add("hero-done", "lede-in");
 
-    // The order the lede composes in: a Fisher–Yates shuffle of the word
-    // indices, drawn once and then fixed. Random *order*, not random *timing* —
-    // progress still maps 1:1 onto a position in this list, which is what keeps
-    // the scrub reversible: scrolling back folds the words away along the same
-    // order, reversed, with no incoherent in-between states. Drawn here in an
-    // effect and never at render, so the server HTML and the hydrated markup
-    // stay identical (and the count follows the locale for free — en and it
-    // don't have the same number of words).
+    // The order the lede composes in: document order — the sentence assembles
+    // left to right, line by line, and scrolling back folds it away right to
+    // left. Kept as an explicit index list (not inlined into `apply`) so
+    // progress still maps 1:1 onto a position in this list and the reversible
+    // scrub bookkeeping stays untouched; built here in the effect alongside the
+    // node list it indexes (and the count follows the locale for free — en and
+    // it don't have the same number of words).
     const order = lede.map((_, i) => i);
-    for (let i = order.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [order[i], order[j]] = [order[j], order[i]];
-    }
 
     // Map the accumulator onto the three movements; only what changed is
     // touched. Every branch is symmetric — the same crossing that reveals a node
@@ -252,6 +250,12 @@ export function HomeSequence() {
           lede[order[i]].classList.toggle("is-in", i < nw);
         }
         words.current = nw;
+        // The hero's water drift (globals.css) waits for the sentence: words
+        // wobbling while they are still composing reads as noise. Latched, not
+        // toggled — a mid-loop scrub back folds words out with the breathing
+        // kept on, the same live water every recompose after the first plays
+        // over; stopping it would snap every mid-cycle word to rest.
+        if (nw === lede.length) root.classList.add("lede-in");
       }
 
       // The teasers, one tile per step — each with its own hysteresis, so a
@@ -298,15 +302,17 @@ export function HomeSequence() {
     // curtain) keeps answering upward intent after a hatch. Forward-only — a
     // hatch must never yank a raised curtain back down.
     const latch = (to: number) => {
-      root.classList.add("hero-done");
+      // `lede-in` alongside: a skip must land settled AND breathing — the
+      // water drift gates on it (globals.css) and every hatch ends composed.
+      root.classList.add("hero-done", "lede-in");
       set(Math.max(to, p.current));
       arm();
     };
     jump.current = latch;
 
-    // Auto-composition. An idle beat, then a scrub to the next gate at AUTO_S
-    // pace, then the same again for the gate after it — the whole sequence
-    // plays itself, unattended, all the way to the raised curtain.
+    // Auto-composition. An idle beat, then a scrub to the next gate at that
+    // gate's AUTO_S pace, then the same again for the gate after it — the whole
+    // sequence plays itself, unattended, all the way to the raised curtain.
     //
     // Forward input is *not* an idle window: it neither cancels the clock nor
     // re-arms it, the listeners add to `p` directly, so a gesture simply adds to
@@ -338,7 +344,7 @@ export function HomeSequence() {
     const tick = (t: number) => {
       const dt = last ? (t - last) / 1000 : 0;
       last = t;
-      step(dt / AUTO_S);
+      step(dt / AUTO_S[goal]);
       if (p.current < GATES[goal]) {
         raf.current = requestAnimationFrame(tick);
         return;
