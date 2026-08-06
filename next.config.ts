@@ -1,6 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Pin the workspace root to this app. Left to inference, Turbopack walks up
+  // looking for a lockfile and can adopt a stray one (an accidental
+  // `npm install` in the user profile left a package-lock.json there), after
+  // which server-external packages stop resolving — `next dev` died with
+  // "Cannot find module '@vercel/analytics/next'" despite the package sitting
+  // in this project's node_modules. Under `npm run …` the cwd is always this
+  // app, so this pins the root regardless of what lives above it.
+  turbopack: {
+    root: process.cwd(),
+  },
   async headers() {
     return [
       {

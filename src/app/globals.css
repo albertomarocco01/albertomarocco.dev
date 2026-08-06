@@ -9,7 +9,7 @@
   --void: #0a0a0c; /* near-black, faintly cool background */
   --void-2: #0c0c10;
   --ink: #c7c4bc; /* low-contrast off-white body */
-  --ink-dim: #6d6a64; /* meta / secondary */
+  --ink-dim: #85827b; /* meta / secondary — lifted from #6d6a64 (3.7:1) to ~5.2:1 on the void */
   --ink-ghost: #393833; /* collapsed titles, almost gone */
   --hairline: rgba(199, 196, 188, 0.09);
   --hairline-hot: rgba(199, 196, 188, 0.22);
@@ -884,8 +884,10 @@ html.home-live .teaser.is-in {
   letter-spacing: 0.24em;
   text-transform: lowercase;
   color: var(--ink-dim);
-  /* Legible without hover — touch never gets one — and lifts on pointer. */
-  opacity: 0.55;
+  /* Legible without hover — touch never gets one — and lifts on pointer.
+     0.8, not 0.55: stacked on --ink-dim the old value bottomed out near 1.9:1
+     and the cue all but vanished at rest. */
+  opacity: 0.8;
   transition: opacity 0.5s var(--ease);
 }
 .teaser:hover .teaser-cue,
@@ -978,7 +980,8 @@ html.home-live .teaser.is-in {
 }
 .ticker-track span {
   padding: 0 1.4rem;
-  opacity: 0.7;
+  /* No extra opacity: --ink-dim is already the "quiet" register, and stacking
+     0.7 on it dragged the strip to ~2.3:1. The token is the one dial. */
 }
 @keyframes scrollx {
   from {
