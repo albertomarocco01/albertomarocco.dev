@@ -269,6 +269,15 @@ html.home-live body {
     display: none;
   }
 }
+/* The chrome's links get the native hand back on top of the ring: the topbar
+   and footer are small mono targets, and the familiar affordance says "link"
+   faster than the ring growth alone (`body` hides the native cursor site-wide,
+   and `cursor` inherits — so links need their own say). The en/it switch
+   carries the same value inside its own button reset, further down. */
+.topbar a,
+footer.foot a {
+  cursor: pointer;
+}
 
 /* ---- shell ---- */
 .wrap {
@@ -391,7 +400,7 @@ html.home-live body {
   border: 0;
   padding: 0;
   margin: 0;
-  cursor: none;
+  cursor: pointer; /* the native hand, like the chrome's links — see the cursor section */
   color: var(--ink-dim);
   transition: color 0.5s var(--ease);
 }
@@ -402,11 +411,6 @@ html.home-live body {
 .locale-opt:focus-visible {
   color: var(--ink);
   outline: none;
-}
-@media (hover: none) {
-  .locale-opt {
-    cursor: pointer;
-  }
 }
 
 /* Topbar on phones. Four routes plus the wordmark and the EN/IT switch cannot

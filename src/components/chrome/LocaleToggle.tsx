@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import type { Dictionary, Locale } from "@/lib/i18n";
 
 const LOCALES: Locale[] = ["en", "it"];
@@ -15,9 +14,11 @@ function persistLocale(locale: Locale) {
  * EN/IT switch for the topbar's left cluster. Two real buttons in the topbar's
  * mono/lowercase register: the active locale reads in `--ink`, the inactive in
  * `--ink-dim` (lifting toward `--ink` on hover/focus). Selecting the inactive
- * locale writes the `locale` cookie and calls `router.refresh()`, which
- * re-renders the server tree (and its dictionary) in the new language without a
- * full navigation. The current locale comes down from the server as a prop.
+ * locale writes the `locale` cookie and reloads the document — deliberately not
+ * `router.refresh()`: a full load re-evaluates the Loader module (resetting its
+ * `veilPlayed` flag), so the switch replays the whole first-load ceremony —
+ * veil, fill, field bloom, entrance — in the new language, instead of swapping
+ * the words in place. The current locale comes down from the server as a prop.
  */
 export function LocaleToggle({
   locale,
@@ -26,12 +27,10 @@ export function LocaleToggle({
   locale: Locale;
   labels: Dictionary["locale"];
 }) {
-  const router = useRouter();
-
   const select = (next: Locale) => {
     if (next === locale) return;
     persistLocale(next);
-    router.refresh();
+    window.location.reload();
   };
 
   return (
