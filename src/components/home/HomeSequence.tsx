@@ -165,8 +165,21 @@ export function HomeSequence() {
   // breath leaves no frame in which a wheel tick could move the page.
   useEffect(() => {
     if (reducedMotion) return;
+    const isMobile = window.innerWidth <= 860 || window.innerHeight <= 620;
     const root = document.documentElement;
     root.classList.add("home-live");
+
+    if (isMobile) {
+      root.classList.add("hero-done", "lede-in");
+      document
+        .querySelectorAll<HTMLElement>(".hero .lede .w, .teasers .teaser")
+        .forEach((el) => el.classList.add("is-in"));
+      composed = true;
+      return () => {
+        root.classList.remove("home-live", "hero-in", "hero-done", "lede-in");
+      };
+    }
+
     // On <body>, not <html>: Lenis slices its own root element (html) out of
     // the composedPath before running the prevent checks, so an attribute on
     // html is invisible to it. body is the highest node it still honours.
@@ -198,6 +211,8 @@ export function HomeSequence() {
   // The scrub itself — armed once the veil lifts.
   useEffect(() => {
     if (!entered || reducedMotion) return;
+    const isMobile = window.innerWidth <= 860 || window.innerHeight <= 620;
+    if (isMobile) return;
     const root = document.documentElement;
     const hero = document.querySelector<HTMLElement>(".hero");
     const foot = document.querySelector<HTMLElement>(".foot.curtain");

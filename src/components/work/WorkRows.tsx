@@ -84,11 +84,21 @@ export function WorkRows({
   );
 
   const handleClick = useCallback((work: Work, e: MouseEvent) => {
-    // Desktop: hover/focus already drive the reveal. Touch: tap toggles gen
-    // rows (no navigation); web rows fall through to their link.
-    if (touch.current && work.type === "gen") {
-      e.preventDefault();
-      setOpenId((cur) => (cur === work.id ? null : work.id));
+    // Desktop: hover/focus already drive the reveal.
+    // Touch: first tap opens the row to reveal the preview & description; second tap follows the link.
+    if (touch.current) {
+      if (work.type === "gen") {
+        e.preventDefault();
+        setOpenId((cur) => (cur === work.id ? null : work.id));
+      } else if (work.type === "web") {
+        setOpenId((cur) => {
+          if (cur !== work.id) {
+            e.preventDefault();
+            return work.id;
+          }
+          return cur;
+        });
+      }
     }
   }, []);
 
