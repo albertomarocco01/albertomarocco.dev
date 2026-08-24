@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { Ticker } from "@/components/Ticker";
 import { Footer } from "@/components/Footer";
 import { getDictionary, getLocale } from "@/lib/i18n";
 
@@ -18,9 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // About + contact, on its own route rather than folded into the footer: the
 // footer is now a curtain on the home page and appears on every other one, and
-// a 50ch bio does not belong in a one-line mono strip. The ticker closes the
-// page — it is the capability list, which reads as the natural companion to the
-// bio now that the home page carries nothing but the hero.
+// a 50ch bio does not belong in a one-line mono strip.
 export default async function About() {
   const dict = getDictionary(await getLocale());
   const { about } = dict;
@@ -52,7 +49,6 @@ export default async function About() {
             </li>
           </ul>
         </section>
-        <Ticker items={dict.ticker} />
       </main>
       <Footer footer={dict.footer} />
     </>

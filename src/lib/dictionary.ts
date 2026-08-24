@@ -93,7 +93,6 @@ export interface Dictionary {
       xperiments: string;
     };
   };
-  ticker: string[];
   work: {
     /** section landmark label */
     aria: string;
@@ -179,16 +178,6 @@ const en: Dictionary = {
       xperiments: "XPERIMENTS",
     },
   },
-  ticker: [
-    "generative visuals",
-    "full-stack web",
-    "led walls",
-    "webgl / webgpu",
-    "touchdesigner",
-    "based in turin",
-    "available 2026",
-    "open to collaborations",
-  ],
   work: {
     aria: "Work",
     sections: {
@@ -333,16 +322,6 @@ const it: Dictionary = {
       xperiments: "XPERIMENTS",
     },
   },
-  ticker: [
-    "visual generative",
-    "web full-stack",
-    "led wall",
-    "webgl / webgpu",
-    "touchdesigner",
-    "con base a torino",
-    "disponibile dal 2026",
-    "aperto a collaborazioni",
-  ],
   work: {
     aria: "Lavori",
     sections: {

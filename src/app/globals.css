@@ -959,39 +959,6 @@ html.home-live .teaser.is-in {
   }
 }
 
-/* ---- ticker ---- */
-.ticker {
-  border-top: 1px solid var(--hairline);
-  border-bottom: 1px solid var(--hairline);
-  overflow: hidden;
-  white-space: nowrap;
-  padding: 1rem 0;
-  margin: 2rem 0 4rem;
-}
-.ticker-track {
-  display: inline-block;
-  will-change: transform;
-  animation: scrollx 38s linear infinite;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.24em;
-  text-transform: lowercase;
-  color: var(--ink-dim);
-}
-.ticker-track span {
-  padding: 0 1.4rem;
-  /* No extra opacity: --ink-dim is already the "quiet" register, and stacking
-     0.7 on it dragged the strip to ~2.3:1. The token is the one dial. */
-}
-@keyframes scrollx {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
 /* ---- work rows ---- */
 .work-section + .work-section {
   margin-top: 4.5rem;
@@ -1466,10 +1433,6 @@ html.home-live .teaser.is-in {
   color: var(--ink);
   outline: none;
 }
-/* The capability strip closes the page rather than dividing it. */
-.page .ticker {
-  margin: 6rem 0 0;
-}
 .a-label {
   display: block;
   font-family: var(--mono);
@@ -1721,9 +1684,6 @@ html.home-live .foot.curtain.is-up {
     transition-duration: 0.001ms !important;
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
-  }
-  .ticker-track {
-    animation: none;
   }
   .field-canvas,
   .ambient-track {
