@@ -193,7 +193,7 @@ export function useWindPhysics({
     const initMediaPipe = async () => {
       try {
         // Self-hosted from /public/mediapipe (the wasm folder copied from the
-        // pinned @mediapipe/tasks-vision@0.10.17 package + the float16 model).
+        // pinned @mediapipe/tasks-vision@1.0.1 package + the float16 model).
         // No third-party CDN at runtime: kills the @latest version-drift trap
         // and the per-visit IP leak to jsdelivr/Google.
         const vision = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
