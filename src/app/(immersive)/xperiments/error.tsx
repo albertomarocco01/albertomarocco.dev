@@ -1,7 +1,7 @@
 "use client"; // Error boundaries must be Client Components
 
 import Link from "next/link";
-import { getDictionary } from "@/lib/dictionary";
+import { ERROR_COPY } from "@/lib/boundary-copy";
 import { useLocale } from "@/lib/use-locale";
 
 /**
@@ -11,8 +11,9 @@ import { useLocale } from "@/lib/use-locale";
  *
  * Copy that is specific to this boundary lives here (the demos' own copy.ts
  * files are per-demo and this boundary covers both); the retry/ref labels come
- * from the shared dictionary. See (site)/error.tsx for why the locale is read
- * off `<html lang>` rather than passed in.
+ * from boundary-copy.ts, the shared dictionary's own strings. See
+ * (site)/error.tsx for why the locale is read off `<html lang>` rather than
+ * passed in.
  */
 const COPY = {
   en: {
@@ -34,7 +35,7 @@ export default function XperimentsError({
 }) {
   const locale = useLocale();
   const copy = COPY[locale];
-  const shared = getDictionary(locale).error;
+  const shared = ERROR_COPY[locale];
   return (
     <main
       style={{

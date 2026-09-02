@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/components/providers/AppProvider";
 
 /**
@@ -72,6 +72,19 @@ import { useApp } from "@/components/providers/AppProvider";
  *
  * None of the hatches can move `p` backwards, so none of them can yank a raised
  * curtain back down.
+ *
+ * Flow mode (phones, tablets, narrow windows — FLOW_MQ, mirrored in
+ * globals.css): there is no curtain. On these layouts the teaser column runs to
+ * the bottom edge, so a footer drawn *over* the page covered two of the three
+ * doors. Instead the footer sits in normal flow under the home and the third
+ * movement is replaced by a scroll: the lock holds while the opening composes
+ * (p 0 → 2, exactly as above), then at P_COMPOSED the driver *unlocks* the
+ * document (`html.home-scroll` releases the overflow lock and puts the footer
+ * back in flow, `data-lenis-prevent` comes off body) and, after a beat, eases
+ * the page down to the footer on its own. From there the page is an ordinary
+ * scrollable document: the loop is over, every listener below is inert, native
+ * scroll (and Lenis, where it runs) owns the viewport. Any real input before
+ * the slide fires cancels it — the visitor's hand always wins.
  */
 
 /** Consumed scroll mapped onto one movement, as a fraction of the viewport. */
@@ -119,6 +132,18 @@ const CURTAIN_UP = 2.5;
 const CURTAIN_DOWN = 2.3;
 const P_MAX = 2.6; // nothing past the raised curtain, so reversing is immediate
 
+/** Flow mode (see the header): any coarse pointer, or a window narrow enough
+ *  for the single-column home. The same query, verbatim, gates the CSS side in
+ *  globals.css (`.home` height, the `home-scroll` release, the footer in flow) —
+ *  the two must agree or the footer ends up static with the lock still on. */
+const FLOW_MQ = "(pointer: coarse), (max-width: 860px)";
+/** Flow mode's third movement: the beat after the teasers land before the page
+ *  eases down to the footer, and how long the ease takes. The beat is a touch
+ *  longer than the tiles' 0.9s transition, so the column has settled before
+ *  anything moves under it; the ease matches the site's own 0.85s transitions. */
+const SLIDE_WAIT_MS = 1200;
+const SLIDE_S = 1.1;
+
 /** What the clock scrubs towards, the idle beat it waits out first, and the
  *  scrub's own pace (seconds to cover the movement) — all indexed like GATES.
  *  The opening is brisk: a short beat once the title is landing, then the lede
@@ -157,6 +182,10 @@ export function HomeSequence() {
   // Set by the driver effect; the hard timeout below is armed at mount, before
   // the driver exists, and reaches it through here.
   const jump = useRef<((to: number) => void) | null>(null);
+  // Bumped when FLOW_MQ flips (a desktop window dragged across 860px) so the
+  // driver below re-runs and picks the other mode up; it re-syncs from
+  // `composed`, so nothing replays.
+  const [mode, setMode] = useState(0);
 
   const compose = useCallback(() => jump.current?.(P_COMPOSED), []);
 
@@ -187,7 +216,13 @@ export function HomeSequence() {
       if (!composed) compose();
     }, HARD_MS);
     return () => {
-      root.classList.remove("home-live", "hero-in", "hero-done", "lede-in");
+      root.classList.remove(
+        "home-live",
+        "hero-in",
+        "hero-done",
+        "lede-in",
+        "home-scroll",
+      );
       document.body.removeAttribute("data-lenis-prevent");
       history.scrollRestoration = "auto";
       if (hard.current != null) window.clearTimeout(hard.current);
@@ -215,6 +250,25 @@ export function HomeSequence() {
     words.current = 0;
     tiles.current = [];
     curtain.current = false;
+
+    // Which mode this run is in (FLOW_MQ, see the header). Read once per run;
+    // a flip re-runs the effect through `mode`.
+    const mq = window.matchMedia(FLOW_MQ);
+    const flow = mq.matches;
+    const bump = () => setMode((n) => n + 1);
+    mq.addEventListener("change", bump);
+    // Where `p` tops out: flow mode has no curtain movement, so the
+    // accumulator ends where the teasers do and the scroll takes over.
+    const pTop = flow ? P_COMPOSED : P_MAX;
+    // A previous run may have unlocked the document (flow mode, or the mode
+    // just flipped). Every run starts locked and at the top — on a fresh load
+    // the mount effect already did both, so this is a no-op there.
+    root.classList.remove("home-scroll");
+    document.body.setAttribute("data-lenis-prevent", "");
+    window.scrollTo(0, 0);
+    let unlocked = false;
+    let slideTimer: number | null = null;
+    let slideRaf: number | null = null;
 
     // Returning to `/` inside the same page load: skip the show, keep the
     // chrome live. Everything starts composed, with the floor at P_REST so
@@ -285,11 +339,57 @@ export function HomeSequence() {
       if (v >= P_COMPOSED) {
         composed = true;
         if (floor.current < P_REST) floor.current = P_REST;
+        // Flow mode: composing the teasers ends the loop and hands the
+        // viewport over — every path to P_COMPOSED (clock, gesture, hatch)
+        // comes through here, so this is the one place it can happen.
+        if (flow && !unlocked) unlock();
       }
     };
 
+    // Flow mode's hand-over (see the header). Once per run — from here on the
+    // page is an ordinary document: the lock is released, the footer drops
+    // into flow under the home, Lenis gets the gesture back, and `input`
+    // below is inert. `floor` pins `p` so nothing can fold the chrome again.
+    function unlock() {
+      unlocked = true;
+      floor.current = P_COMPOSED;
+      root.classList.add("home-scroll");
+      document.body.removeAttribute("data-lenis-prevent");
+      slideTimer = window.setTimeout(() => {
+        slideTimer = null;
+        slide();
+      }, SLIDE_WAIT_MS);
+    }
+    const stopSlide = () => {
+      if (slideTimer != null) window.clearTimeout(slideTimer);
+      if (slideRaf != null) cancelAnimationFrame(slideRaf);
+      slideTimer = null;
+      slideRaf = null;
+    };
+    // The page eases down to the footer on its own — scrollTo per frame rather
+    // than `behavior: "smooth"`, so the pace is authored (SLIDE_S, the same on
+    // every browser) instead of the UA's. The end point is re-read each frame:
+    // on a phone the URL bar collapses as the page starts to move, and the
+    // scrollable range grows under the tween. Lenis, where it runs, re-syncs
+    // from the native scroll events this emits, like any native scroll.
+    const slide = () => {
+      const from = window.scrollY;
+      const bottom = () =>
+        document.documentElement.scrollHeight - window.innerHeight;
+      if (bottom() - from < 1) return;
+      let t0 = 0;
+      const frame = (t: number) => {
+        if (!t0) t0 = t;
+        const k = Math.min(1, (t - t0) / 1000 / SLIDE_S);
+        const e = 1 - Math.pow(1 - k, 3); // ease-out cubic
+        window.scrollTo(0, from + (bottom() - from) * e);
+        slideRaf = k < 1 ? requestAnimationFrame(frame) : null;
+      };
+      slideRaf = requestAnimationFrame(frame);
+    };
+
     const set = (to: number) => {
-      p.current = Math.min(P_MAX, Math.max(floor.current, to));
+      p.current = Math.min(pTop, Math.max(floor.current, to));
       apply();
     };
     const step = (dp: number) => set(p.current + dp);
@@ -323,16 +423,10 @@ export function HomeSequence() {
     // Backward input is: it stops the scrub (a clock pushing down while the hand
     // pulls up is a fight, and the hand wins nothing) and re-arms from where the
     // scrub-back landed, so the beat is always the *last* thing that happened.
-    // How far the *clock* is allowed to drive on its own. Coarse pointers stop
-    // at P_COMPOSED: the curtain is the one movement that draws something over
-    // the page, and on a phone the teaser column runs to within ~30px of the
-    // bottom edge, so an unattended raise leaves the resting home with two of
-    // its three doors under an opaque panel — and nothing lowers it again. It
-    // still rises on real forward intent (swipe on past the teasers, End, focus
-    // into the footer), exactly as on desktop; only the clock stops pushing.
-    const autoTop = window.matchMedia("(pointer: coarse)").matches
-      ? P_COMPOSED
-      : P_MAX;
+    // How far the *clock* is allowed to drive on its own: the whole way, to the
+    // raised curtain, on desktop; to the composed teasers in flow mode, where
+    // the third movement is the slide `unlock` schedules instead.
+    const autoTop = pTop;
     let goal = 0; // index in GATES the running scrub is heading for
     let last = 0;
     const stopAuto = () => {
@@ -378,6 +472,12 @@ export function HomeSequence() {
     // (its hysteresis sits highest), then each further notch peels one tile,
     // and the floor at P_REST is where the peeling stops.
     const input = (dp: number) => {
+      // Flow mode, unlocked: the gesture is a real scroll now, not intent for
+      // `p` — and a hand on the page cancels the pending slide.
+      if (unlocked) {
+        stopSlide();
+        return;
+      }
       step(dp);
       if (dp < 0) arm();
     };
@@ -409,6 +509,12 @@ export function HomeSequence() {
     };
 
     const onKey = (e: KeyboardEvent) => {
+      // Unlocked (flow mode): the keys scroll the document natively, and a
+      // keypress cancels the pending slide like any other input.
+      if (unlocked) {
+        stopSlide();
+        return;
+      }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       switch (e.key) {
         case " ":
@@ -447,8 +553,16 @@ export function HomeSequence() {
     const onFocusIn = (e: FocusEvent) => {
       const t = e.target;
       if (!(t instanceof Node)) return;
-      if (foot?.contains(t)) latch(P_MAX);
-      else if (!hero?.contains(t)) latch(P_COMPOSED);
+      if (foot?.contains(t)) {
+        latch(pTop);
+        // Flow mode: the footer is below the fold rather than behind a
+        // transform, so bring it up now instead of after the beat — focus
+        // must never sit on something off-screen.
+        if (unlocked) {
+          stopSlide();
+          slide();
+        }
+      } else if (!hero?.contains(t)) latch(P_COMPOSED);
     };
     // A pointer on the topbar: the visitor wants the site, not the show.
     const topbar = document.querySelector<HTMLElement>(".topbar");
@@ -467,11 +581,15 @@ export function HomeSequence() {
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("focusin", onFocusIn);
       topbar?.removeEventListener("pointerdown", compose);
+      mq.removeEventListener("change", bump);
       stopAuto();
+      stopSlide();
       jump.current = null;
-      root.classList.remove("hero-in");
+      // `home-scroll` goes with the run that set it; the lenis attribute is
+      // the mount effect's to remove (a re-run re-asserts it at the top).
+      root.classList.remove("hero-in", "home-scroll");
     };
-  }, [entered, reducedMotion, compose]);
+  }, [entered, reducedMotion, compose, mode]);
 
   return null;
 }

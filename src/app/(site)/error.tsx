@@ -1,6 +1,6 @@
 "use client"; // Error boundaries must be Client Components
 
-import { getDictionary } from "@/lib/dictionary";
+import { ERROR_COPY } from "@/lib/boundary-copy";
 import { useLocale } from "@/lib/use-locale";
 
 /**
@@ -10,9 +10,9 @@ import { useLocale } from "@/lib/use-locale";
  * The site chrome in (site)/layout.tsx stays mounted around this.
  *
  * Next passes an error boundary no props, so the locale can't come down from the
- * server here: it's read off `<html lang>` (see useLocale) and the copy from the
- * same dictionary every other component uses — imported from ./dictionary, not
- * ./i18n, since that one pulls in `next/headers`.
+ * server here: it's read off `<html lang>` (see useLocale) and the copy from
+ * boundary-copy.ts — the same strings the dictionary carries, on their own, so
+ * this always-loaded boundary doesn't ship both full dictionaries in its chunk.
  */
 export default function SiteError({
   error,
@@ -21,7 +21,7 @@ export default function SiteError({
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
-  const copy = getDictionary(useLocale()).error;
+  const copy = ERROR_COPY[useLocale()];
   return (
     <main className="wrap" style={{ paddingBlock: "28vh 12vh" }}>
       <span className="sect-label">

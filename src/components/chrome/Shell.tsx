@@ -38,11 +38,15 @@ const NAV = [
 
 export function Shell({
   children,
-  dict,
+  nav,
+  localeLabels,
   locale,
 }: {
   children: React.ReactNode;
-  dict: Dictionary;
+  /** the topbar's own strings — not the whole dictionary: props to a client
+   *  component are serialised into every page's RSC payload */
+  nav: Dictionary["nav"];
+  localeLabels: Dictionary["locale"];
   locale: Locale;
 }) {
   const { entered, reducedMotion } = useApp();
@@ -92,7 +96,9 @@ export function Shell({
   // page itself it is swallowed rather than followed — that page owns the
   // viewport and never scrolls (HomeSequence.tsx), so there is nothing to
   // navigate to and a same-page reload would be the only visible effect. The
-  // scrollTo is what makes it a no-op on every other path through this branch.
+  // scrollTo is what makes it a no-op on every other path through this branch —
+  // except the home's flow mode (phones, narrow windows), where the page does
+  // scroll once composed and the wordmark eases it back to the top.
   const onWordmarkClick = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>) => {
       if (pathname !== "/" || reducedMotion || !lenis) return;
@@ -148,16 +154,16 @@ export function Shell({
           being viewed, on every route — there is nothing to route to, and Lenis
           re-syncs from the native scroll the jump produces. */}
       <a href="#main" className="sr-only">
-        {dict.nav.skip}
+        {nav.skip}
       </a>
       <div ref={topbarRef} className={`topbar${entered ? " in" : ""}`}>
         <div className="topbar-left">
           <Link href="/" className="wordmark" onClick={onWordmarkClick}>
             alberto marocco
           </Link>
-          <LocaleToggle locale={locale} labels={dict.locale} />
+          <LocaleToggle locale={locale} labels={localeLabels} />
         </div>
-        <nav aria-label={dict.nav.primary}>
+        <nav aria-label={nav.primary}>
           {NAV.map((item) => {
             // Exact match is enough: the only deeper /xperiments/* routes are the
             // immersive demos, which render outside this shell entirely.
@@ -169,7 +175,7 @@ export function Shell({
                 className={current ? "is-current" : undefined}
                 aria-current={current ? "page" : undefined}
               >
-                {dict.nav[item.key]}
+                {nav[item.key]}
               </Link>
             );
           })}

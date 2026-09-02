@@ -195,7 +195,13 @@ html.loading body {
    <body> alongside this class — Lenis slices <html>, its own root, out of the
    prevent check) makes Lenis ignore the input rather than accumulate it. Both go
    away when the component unmounts, which is what hands normal document scroll
-   back to every other route. */
+   back to every other route.
+
+   "Permanent" on desktop. In flow mode (the `home-scroll` rules further down,
+   under the same media query HomeSequence reads as FLOW_MQ) the driver releases
+   it once the teasers have composed: the footer sits in flow below the home
+   there, so there *is* something below the fold, and the page becomes an
+   ordinary scrollable document from that point on. */
 html.home-live,
 html.home-live body {
   overflow: hidden;
@@ -275,7 +281,10 @@ html.home-live body {
    and `cursor` inherits — so links need their own say). The en/it switch
    carries the same value inside its own button reset, further down. */
 .topbar a,
-footer.foot a {
+footer.foot a,
+.contact-val,
+.about-cta,
+.about-pager button {
   cursor: pointer;
 }
 
@@ -758,9 +767,13 @@ footer.foot a {
 /* ---- home: one viewport, name left, teasers right (driven by HomeSequence) ----
    The whole page is a single `100dvh` grid and the document never scrolls, so
    dvh is safe here in a way it is not anywhere else: with no scroll there is no
-   URL-bar collapse to reflow it mid-gesture. Both columns are in normal flow, so
-   the reveal reserves its own space and costs zero layout shift, and Tab runs
-   name → 01 → 02 → 03 → footer with no help.
+   URL-bar collapse to reflow it mid-gesture. (Flow mode — phones, tablets,
+   narrow windows — *does* scroll once composed, so it switches to `svh` below:
+   sized to the viewport with the URL bar showing, it never reflows when the bar
+   collapses mid-scroll, and the footer simply fills the room that opens up.)
+   Both columns are in normal flow, so the reveal reserves its own space and
+   costs zero layout shift, and Tab runs name → 01 → 02 → 03 → footer with no
+   help.
 
    Everything the sequence drives is scoped to `html.home-live`, a class the
    client component adds on mount and removes on unmount. Nothing is hidden
@@ -960,9 +973,6 @@ html.home-live .teaser.is-in {
 }
 
 /* ---- work rows ---- */
-.work-section + .work-section {
-  margin-top: 4.5rem;
-}
 .sect-label {
   font-family: var(--mono);
   font-size: 0.68rem;
@@ -1364,74 +1374,625 @@ html.home-live .teaser.is-in {
   line-height: 1.6;
   color: var(--ink-dim);
 }
-.gd-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
-  gap: 1.2rem;
-}
-.gd-plate {
+/* ---- about: three full-height panels, one gesture per move ----
+   The page is a stage of three viewport-tall panels on a track
+   (AboutSequence.tsx drives it): the degree + tech path beside the graduation
+   cut-out; the athlete + coach beside the calisthenics one (mirrored — figure
+   left); then the contacts, every one of them in plain sight, in place of a
+   footer. Each cut-out is a <figure> the shared WebGL field paints into, so
+   its orbs pass in front of the person as well as behind (AboutFigure.tsx).
+
+   Everything the driver needs is scoped to `html.about-live`, a class it adds
+   on mount and removes on unmount — same stance as the home: with JS off, a
+   broken chunk, or reduced motion the class never lands and these rules
+   collapse to an ordinary document of two tall sections that simply scrolls. */
+.about-stage {
   position: relative;
-  aspect-ratio: 4 / 5;
-  border: 1px solid var(--hairline);
-  border-radius: 2px;
-  background: linear-gradient(135deg, #161020, #0b0a10 55%, #1d1424);
+  /* In flow (the fallback) the stage sits inside `.wrap`, whose gutters the
+     inner grid below re-creates: cancel them here so they are not doubled. */
+  margin: 0 calc(-1 * clamp(1.4rem, 5vw, 5rem));
 }
-.gd-plate-idx {
-  position: absolute;
-  left: 1rem;
-  bottom: 0.9rem;
+.about-track {
+  position: relative;
+}
+.about-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+}
+/* The inner grid re-creates the content wrap: once the stage is fixed it has
+   left `.wrap`'s box and must bring the max-width and gutters itself (the
+   home's footer curtain does the same). Copy left, figure right — the second
+   panel mirrors it, the third has no figure: copy left, the contact list
+   right, both centred in the row. */
+.about-inner {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  /* Less than the section pages' --page-top: the figure is sized off this row
+     and wants the height, and it is the copy (centred in the row) that has to
+     clear the bar, not the row's top. */
+  padding: clamp(5.5rem, 12vh, 8rem) clamp(1.4rem, 5vw, 5rem) 0;
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: clamp(1.5rem, 4vw, 4rem);
+  align-items: end;
+}
+.about-panel--mirror .about-inner {
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+}
+.about-panel--contact .about-inner {
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: center;
+  padding-bottom: clamp(3rem, 8vh, 5rem);
+}
+.about-copy {
+  align-self: center;
+  max-width: 36rem;
+}
+/* The air under the copy is owned by `.about-panel .about-copy` rules — this
+   specificity, everywhere, so the phone and short-viewport overrides below
+   actually win (a bare `.about-copy` never would). Both figured panels close
+   with a link row, so their copy runs long: less air under it, or they
+   overflow a 900px viewport and page inside themselves before the track
+   moves. The second one is the longest of the two. */
+.about-panel .about-copy {
+  padding-bottom: clamp(1.6rem, 5vh, 3rem);
+}
+.about-panel--mirror .about-copy {
+  padding-bottom: clamp(1rem, 3vh, 2rem);
+}
+.about-eyebrow {
+  display: block;
   font-family: var(--mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.2em;
-  color: var(--ink-ghost);
-}
-
-/* ---- about (small, deep) ---- */
-.about {
-  max-width: 52ch;
-  margin: 8rem 0 0;
-  font-size: clamp(1.05rem, 2.2vw, 1.35rem);
-  line-height: 1.6;
-  color: var(--ink);
-  font-weight: 300;
-}
-/* On its own route it opens the page, right under the title — the 8rem above was
-   the gap that separated it from the work rows on the old stacked home. */
-.page .about {
-  margin: 0;
-}
-
-/* Contact block closing /about. */
-.contact {
-  margin: 5rem 0 0;
-}
-.contact-body {
-  max-width: 46ch;
-  margin: 0;
-  font-size: clamp(0.98rem, 1.9vw, 1.1rem);
-  line-height: 1.6;
+  font-size: 0.66rem;
+  letter-spacing: 0.3em;
+  text-transform: lowercase;
   color: var(--ink-dim);
 }
-.contact-links {
-  list-style: none;
+.about-headline {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(2rem, 4.4vw, 4rem);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  margin: 1.1rem 0 0;
+  color: var(--ink);
+  text-wrap: balance;
+}
+/* The one italic run per headline — Fraunces' italic is the accent here, the
+   way the teasers roll to italic on hover. */
+.about-headline em {
+  font-style: italic;
+}
+.about-body {
+  max-width: 46ch;
   margin: 1.6rem 0 0;
-  padding: 0;
+  font-size: clamp(1rem, 1.7vw, 1.2rem);
+  line-height: 1.6;
+  font-weight: 300;
+  color: var(--ink);
+}
+.about-meta {
+  display: block;
+  margin-top: 1.6rem;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+}
+
+/* What the coaching covers (second panel): a mono label, then term / detail
+   rows on hairlines — the site's row register, at the copy's scale. */
+.about-coaching {
+  margin-top: clamp(1.4rem, 3.5vh, 2.2rem);
+  max-width: 36rem;
+}
+.about-coaching .a-label {
+  margin-bottom: 0.4rem;
+}
+.about-list {
+  margin: 0;
+}
+.about-list-row {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  column-gap: 1.2rem;
+  align-items: baseline;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--hairline);
+}
+.about-list-row:last-child {
+  border-bottom: 1px solid var(--hairline);
+}
+.about-list dt {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+}
+.about-list dd {
+  margin: 0;
+  font-size: clamp(0.92rem, 1.3vw, 1rem);
+  line-height: 1.5;
+  font-weight: 300;
+  color: var(--ink);
+}
+/* The panels' outbound row: where each one sends you next — the first panel
+   into the work itself (/websites, /xperiments), the second down to the
+   contacts and out to the team. The cue's register, in the copy's ink, with
+   the arrow sliding on hover the way the work rows' does. */
+.about-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.8rem 2rem;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: lowercase;
+  align-items: baseline;
+  gap: 0.8rem 2.2rem;
+  margin-top: clamp(1.4rem, 3.5vh, 2rem);
 }
-.contact-links a {
-  color: var(--ink-dim);
+.about-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.26em;
+  text-transform: lowercase;
+  color: var(--ink);
   transition: color 0.5s var(--ease);
 }
-.contact-links a:hover,
-.contact-links a:focus-visible {
+.about-cta .arrow {
+  display: inline-block;
+  transition: transform 0.6s var(--ease);
+}
+.about-cta:hover,
+.about-cta:focus-visible {
+  color: var(--ink-dim);
+  outline: none;
+}
+.about-cta:hover .arrow,
+.about-cta:focus-visible .arrow {
+  transform: translateX(0.35em);
+}
+/* Leaving the site (the team's page): the arrow points out, and travels that
+   way — one step dimmer than the calls that stay here. */
+.about-cta--out {
+  color: var(--ink-dim);
+}
+.about-cta--out:hover,
+.about-cta--out:focus-visible {
+  color: var(--ink);
+}
+.about-cta--out:hover .arrow,
+.about-cta--out:focus-visible .arrow {
+  transform: translate(0.3em, -0.3em);
+}
+
+/* The cut-out. `--ar` (the photo's aspect) sizes the box from its height alone
+   (never both axes — that would distort the photo), so the <img> and the GPU
+   plane share its rectangle exactly. In flow the height is a slice of the
+   small viewport; on the live stage (below) it is a share of the panel's row,
+   and the figure stands on the bottom edge of its panel, planted on the page's
+   floor. */
+.about-figure {
+  --fig-dim: 1; /* phones dim it behind the copy; FigureView mirrors this on the GPU */
+  --fig-fade: 8%; /* bottom dissolve — set inline from the panel's `bottom` */
+  position: relative;
+  margin: 0;
+  justify-self: end;
+  align-self: end;
+  width: auto;
+  height: min(78svh, 900px);
+  max-width: 100%;
+  aspect-ratio: var(--ar);
+}
+.about-panel--mirror .about-figure {
+  justify-self: start;
+}
+/* The <img>: the figure until the canvas takes over (`is-live`, set by
+   FigureView once its texture is up), and the figure for good under reduced
+   motion / no WebGL. Toned and bottom-faded to the shader's own values so the
+   crossfade between the two never pops. */
+.about-figure-img {
+  opacity: var(--fig-dim);
+  filter: saturate(0.78) brightness(0.9);
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--fig-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--fig-fade));
+  transition: opacity 0.8s var(--ease);
+}
+.about-figure.is-live .about-figure-img {
+  opacity: 0;
+}
+/* drei <View>'s own div — the scissor tracker, filling the figure box. */
+.figure-view {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* "scroll ↓" at the foot of the first panel, on the copy's left edge. */
+.about-cue {
+  position: absolute;
+  left: max(
+    clamp(1.4rem, 5vw, 5rem),
+    calc((100% - 1280px) / 2 + clamp(1.4rem, 5vw, 5rem))
+  );
+  bottom: clamp(1.4rem, 4vh, 2.4rem);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.28em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+  opacity: 0.75;
+}
+.about-cue .arrow {
+  display: inline-block;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .about-cue .arrow {
+    animation: cue-bob 2.4s ease-in-out infinite;
+  }
+}
+@keyframes cue-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(0.35em);
+  }
+}
+
+/* 01 / 02 pager, fixed on the right edge. Only while the driver owns the page:
+   in flow there is nothing to page. */
+.about-pager {
+  display: none;
+}
+html.about-live .about-pager {
+  position: fixed;
+  right: clamp(1rem, 2.6vw, 2.2rem);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1.2rem;
+}
+.about-pager button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.26em;
+  background: transparent;
+  border: 0;
+  padding: 0.25rem 0;
+  margin: 0;
+  color: var(--ink-ghost);
+  cursor: pointer;
+  transition: color 0.5s var(--ease);
+}
+/* A tick before each index; the current one lengthens and takes the accent,
+   like the topbar's current route. */
+.about-pager button::before {
+  content: "";
+  width: 1.1rem;
+  height: 1px;
+  background: currentColor;
+  transition:
+    width 0.6s var(--ease),
+    background-color 0.6s var(--ease);
+}
+.about-pager button:hover,
+.about-pager button:focus-visible {
+  color: var(--ink-dim);
+  outline: none;
+}
+.about-pager button[aria-current="true"] {
+  color: var(--ink);
+}
+.about-pager button[aria-current="true"]::before {
+  width: 1.9rem;
+  background: var(--accent);
+}
+
+/* The live stage: fixed to the viewport, the document locked (shift-free,
+   thanks to scrollbar-gutter), Lenis told to ignore the input
+   (`data-lenis-prevent` on <body>, set by the driver). The track slides by
+   whole viewports; `--panel` is the driver's one output. */
+html.about-live,
+html.about-live body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+html.about-live .about-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  margin: 0;
+  overflow: hidden;
+}
+html.about-live .about-track {
+  height: 100%;
+  transform: translate3d(0, calc(var(--panel, 0) * -100%), 0);
+  /* The duration is mirrored by MOVE_MS in AboutSequence.tsx. */
+  transition: transform 1.15s var(--ease);
+  will-change: transform;
+}
+html.about-live .about-track.no-motion {
+  transition: none;
+}
+/* Each panel is exactly one viewport. A panel whose content is taller (a
+   short phone in landscape) scrolls inside itself; the driver pages only from
+   its edges. `contain` keeps that inner scroll from chaining to the locked
+   document. */
+html.about-live .about-panel {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  /* Explicit: `overflow-y: auto` alone makes overflow-x `auto` too, and on
+     phones the figure sits past the panel's edge (`right: -4vw`) — that was a
+     sideways scroll / a horizontal scrollbar strip on the stage. */
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+.about-panel:nth-child(1) {
+  --k: 0;
+}
+.about-panel:nth-child(2) {
+  --k: 1;
+}
+.about-panel:nth-child(3) {
+  --k: 2;
+}
+/* On the stage the figure is sized from height (90% of its panel's grid row)
+   and, during a move, lags the track by a little — it is the far layer, the
+   copy the near one — on the same ease, compositor-only. The GPU copy follows
+   the box wherever it goes (track-motion.ts keeps it at full rate meanwhile). */
+html.about-live .about-figure {
+  width: auto;
+  height: min(90%, 960px);
+  transform: translate3d(0, calc((var(--panel, 0) - var(--k, 0)) * 12vh), 0);
+  transition: transform 1.15s var(--ease);
+}
+
+/* The copy composes line by line as its panel arrives — opacity / blur /
+   transform only (no layout, no CLS), a beat after the track starts moving so
+   the words settle as the panel does. Transitions, not animations, so a panel
+   on its way out fades its copy as it goes, and `is-active` can come and go.
+   Scoped to `no-preference`: under reduced motion nothing here is hidden.
+   The fail-safe mirrors the hero's: if the driver never lands (a chunk 404s
+   after a redeploy) the copy reveals itself unaided, past AppProvider's own
+   6s insurance. `html.about-live` cancels it — the driver owns visibility
+   from there — and the noscript rule in the layout shows everything at once. */
+@media (prefers-reduced-motion: no-preference) {
+  .about-panel .rv {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(14px);
+    animation: about-failsafe 0.6s var(--ease) 6.5s both;
+  }
+  html.about-live .about-panel .rv {
+    animation: none;
+    transition:
+      opacity 0.7s var(--ease),
+      filter 0.7s var(--ease),
+      transform 0.7s var(--ease);
+  }
+  html.about-live .about-panel.is-active .rv {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+    transition-delay: calc(0.35s + var(--i, 0) * 0.09s);
+  }
+}
+@keyframes about-failsafe {
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+/* Narrow: the two columns stop fitting, so the copy takes the panel and the
+   figure moves behind it — bottom corner, dimmed, the person as atmosphere
+   rather than a column of its own. In flow (the fallback) it simply follows
+   the copy. */
+@media (max-width: 860px) {
+  .about-inner {
+    display: block;
+    padding-top: clamp(5.5rem, 12vh, 7rem);
+  }
+  .about-panel .about-copy {
+    max-width: none;
+    padding-bottom: 0;
+  }
+  .about-figure {
+    --fig-dim: 0.5;
+    height: min(52svh, 480px);
+    margin-top: 2rem;
+  }
+  /* The second panel's copy runs on to the coaching rows and the CTA, so
+     more of it sits over the figure — dim that one a little further. */
+  .about-panel--mirror .about-figure {
+    --fig-dim: 0.4;
+  }
+  .about-headline {
+    font-size: clamp(1.8rem, 7.5vw, 2.7rem);
+  }
+  .about-body {
+    font-size: clamp(0.95rem, 3.8vw, 1.05rem);
+  }
+  .about-cue {
+    left: clamp(1.1rem, 5vw, 1.6rem);
+  }
+  html.about-live .about-inner {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding-left: clamp(1.1rem, 5vw, 1.6rem);
+    padding-right: clamp(1.1rem, 5vw, 1.6rem);
+  }
+  html.about-live .about-copy {
+    position: relative;
+    z-index: 1;
+  }
+  html.about-live .about-figure {
+    position: absolute;
+    right: -4vw;
+    bottom: 0;
+    height: 56%;
+    width: auto;
+    margin: 0;
+    z-index: 0;
+  }
+  html.about-live .about-panel--mirror .about-figure {
+    right: auto;
+    left: -6vw;
+    height: 50%;
+  }
+  html.about-live .about-pager {
+    top: auto;
+    bottom: 1.1rem;
+    right: clamp(1.1rem, 5vw, 1.6rem);
+    transform: none;
+    flex-direction: row;
+    gap: 1.1rem;
+  }
+  /* The contact panel stacks: copy, then the list, at the copy's width. Each
+     row stacks too — the key over the value — so the value has the full
+     width and the email fits a phone in one line, never broken mid-word. */
+  .about-panel--contact .about-inner {
+    padding-bottom: 3.5rem;
+  }
+  .about-panel--contact .contact-block {
+    margin-top: 2rem;
+    max-width: none;
+  }
+  .about-panel--contact .contact-row {
+    display: block;
+    padding: 0.8rem 0;
+  }
+  .about-panel--contact .contact-key {
+    display: block;
+    margin-bottom: 0.35rem;
+  }
+  .about-panel--contact .contact-val {
+    font-size: clamp(1.15rem, 5.6vw, 1.6rem);
+  }
+  .about-list-row {
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+  }
+}
+/* Short viewport: height is the scarce axis — tighter type, the figure taller
+   relative to its panel. */
+@media (max-height: 620px) {
+  .about-inner {
+    padding-top: clamp(3.5rem, 12vh, 5rem);
+  }
+  .about-panel .about-copy {
+    padding-bottom: 1rem;
+  }
+  .about-headline {
+    font-size: clamp(1.6rem, 7vh, 3rem);
+  }
+  .about-body {
+    margin-top: 1rem;
+    font-size: clamp(0.85rem, 2.6vh, 1rem);
+    line-height: 1.45;
+  }
+  html.about-live .about-figure {
+    height: 90%;
+  }
+  .about-panel--contact .contact-row {
+    padding: 0.7rem 0;
+  }
+  .about-panel--contact .contact-val {
+    font-size: clamp(1.1rem, 3.4vh, 1.7rem);
+  }
+  .about-list-row {
+    padding: 0.45rem 0;
+  }
+}
+
+/* The contact panel closing /about: every contact as a row on a hairline —
+   a mono key, then the value large, in the serif, the way the headlines are
+   set. Links roll to italic on hover, as the home's teasers do. This is the
+   page's close, in place of a footer. */
+.contact-block {
+  align-self: center;
+  justify-self: stretch;
+  max-width: 40rem;
+  width: 100%;
+}
+.contact-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.contact-row {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  column-gap: 1.4rem;
+  align-items: baseline;
+  padding: clamp(0.9rem, 2vh, 1.3rem) 0;
+  border-top: 1px solid var(--hairline);
+}
+.contact-row:last-child {
+  border-bottom: 1px solid var(--hairline);
+}
+.contact-key {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.28em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+}
+.contact-val {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(1.2rem, 2.3vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  transition:
+    color 0.5s var(--ease),
+    font-style 0.5s var(--ease);
+}
+a.contact-val:hover,
+a.contact-val:focus-visible {
+  font-style: italic;
   color: var(--ink);
   outline: none;
+}
+.contact-row:hover .contact-key {
+  color: var(--ink);
+  transition: color 0.5s var(--ease);
+}
+/* The one row that is not a link (the place): the same face, one step dimmer. */
+.contact-val--still {
+  color: var(--ink-dim);
+}
+.contact-list .ig-glyph {
+  width: 0.72em;
+  height: 0.72em;
+  margin-left: 0.45em;
+  transform: translateY(-0.04em);
+}
+.contact-block .about-meta {
+  margin-top: 1.6rem;
 }
 .a-label {
   display: block;
@@ -1471,11 +2032,41 @@ footer.foot a:focus-visible {
   color: var(--ink);
   outline: none;
 }
+/* The way to /about's contact panel — the one call in the row, so it takes the
+   ink the rest reach on hover, and its arrow slides the way the CTAs' do. */
+footer.foot .foot-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  color: var(--ink);
+}
+footer.foot .foot-contact .arrow {
+  display: inline-block;
+  transition: transform 0.6s var(--ease);
+}
+footer.foot .foot-contact:hover .arrow,
+footer.foot .foot-contact:focus-visible .arrow {
+  transform: translateX(0.35em);
+}
 .foot .spacer {
   flex: 1;
 }
 .foot .vat {
   color: var(--ink-ghost);
+}
+/* Instagram's glyph after its link text (footer + /about contacts), in place
+   of the old "↗": inherits the link's colour and transition, sized to the
+   mono beside it (the contact panel re-sizes it to its serif). */
+.ig-link {
+  display: inline-flex;
+  align-items: center;
+}
+.ig-glyph {
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  margin-left: 0.5em;
+  flex: none;
 }
 
 /* The home page's curtain: the same footer, parked just under the bottom edge of
@@ -1509,14 +2100,8 @@ html.home-live .foot.curtain .foot-inner {
 html.home-live .foot.curtain.is-up {
   transform: none;
 }
-/* On a phone the four footer items wrap to three rows and the curtain becomes a
-   152px opaque panel — over a page whose teaser column already runs to within
-   ~30px of the bottom edge. It cannot be made to clear the column at these
-   heights (there is no room), so it is made as small as the content allows:
-   tighter padding, tighter row gap, and no elastic spacer holding the domain on
-   a line of its own. Roughly a third of the height comes back. The other half
-   of this is in HomeSequence — the clock no longer raises the curtain unasked on
-   coarse pointers, so this only ever covers content the visitor swiped for. */
+/* On a phone the four footer items wrap to three rows: tighter padding, tighter
+   row gap, and no elastic spacer holding the domain on a line of its own. */
 @media (max-width: 560px) {
   html.home-live .foot.curtain {
     padding: 1.1rem clamp(1.1rem, 5vw, 1.6rem) 1.2rem;
@@ -1526,6 +2111,52 @@ html.home-live .foot.curtain.is-up {
   }
   html.home-live .foot.curtain .spacer {
     display: none;
+  }
+}
+
+/* ---- flow mode: phones, tablets, narrow windows — no curtain ----
+   On these layouts the teaser column runs to the bottom edge of the viewport,
+   so a footer drawn *over* the page covered two of the three doors. Here the
+   footer is not a curtain at all. The sequence still owns the opening — the
+   lock above holds and the footer waits off-screen exactly as on desktop, so
+   the document is one viewport tall and there is nothing for a finger to
+   scroll — but once the teasers have composed HomeSequence adds `home-scroll`:
+   the lock comes off, the footer drops into normal flow under the home, and
+   the driver eases the page down to it. From there it is an ordinary
+   scrollable page.
+
+   The query is HomeSequence's FLOW_MQ, verbatim — the two sides must agree. */
+@media (pointer: coarse), (max-width: 860px) {
+  .home {
+    min-height: 100svh;
+  }
+  /* Release the lock: back to the document's own defaults (the root is
+     `visible`, body clips only sideways — see `body` at the top). */
+  html.home-live.home-scroll,
+  html.home-live.home-scroll body {
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
+  html.home-live.home-scroll body {
+    overflow-x: hidden;
+  }
+  /* The footer, in flow: it is inside `.wrap`, so the wrap's own gutters line
+     it up with the hero and its horizontal padding goes. `transition: none`
+     so the transform doesn't animate from `translateY(100%)` as the position
+     switches — that would slide it into place below the fold, unseen but a
+     wasted frame budget. The home's bottom padding is the gap above the rule. */
+  html.home-live.home-scroll .foot.curtain {
+    position: static;
+    z-index: auto;
+    padding: 1.4rem 0 calc(1.6rem + env(safe-area-inset-bottom, 0px));
+    background: transparent;
+    transform: none;
+    will-change: auto;
+    transition: none;
+  }
+  html.home-live.home-scroll .foot.curtain .foot-inner {
+    max-width: none;
+    margin: 0;
   }
 }
 

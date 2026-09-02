@@ -26,11 +26,19 @@ src/
   components/
     chrome/       glow, grain, cursor, gate, shell (topbar + fade-in wrap)
     work/         WorkRows (open-state, hover-intent) + Row
+    about/        AboutFigure (cut-out <img> + GPU view) + AboutSequence (3-panel paged driver)
     canvas/       Field (the shared canvas) + FieldMount (lazy gate),
                   Aura (shader mesh), GenAura / WashView (drei Views),
-                  aura-material (GLSL → shaderMaterial)
+                  aura-material (GLSL → shaderMaterial), field-glsl (orb count +
+                  the GLSL both field shaders share), FigureView +
+                  figure-material (the /about cut-outs, orbs in front),
+                  field-state (Aura's published frame)
     providers/    AppProvider (entered / reduced-motion / fieldReady), SmoothScroll
-  lib/            work (content) + motion (easing, timings)
+  lib/            work (content) + contact (tokens) + motion (easing, timings)
+                  + track-motion, dictionary (+ i18n server side; locale +
+                  boundary-copy are the client-safe slices the route fallbacks
+                  import)
+  assets/about/   the /about cut-outs (regenerate: reference/AboutPhotos/cutout.py)
 ```
 
 ## Develop

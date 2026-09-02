@@ -1,6 +1,6 @@
 "use client";
 
-import { getDictionary } from "@/lib/dictionary";
+import { LOADER_TAG } from "@/lib/boundary-copy";
 import { useLocale } from "@/lib/use-locale";
 
 /**
@@ -11,8 +11,8 @@ import { useLocale } from "@/lib/use-locale";
  *
  * A Client Component, deliberately: reading the cookie with `getLocale()` would
  * make this fallback request-dependent and forfeit the prefetch it exists for.
- * `useLocale` reads the locale off `<html lang>` after hydration instead — the
- * same tag the site veil uses, so the word matches `dict.loader.tag`.
+ * `useLocale` reads the locale off `<html lang>` after hydration instead, and
+ * the word is the veil's own (`dict.loader.tag` is composed from LOADER_TAG).
  */
 export default function XperimentsLoading() {
   return (
@@ -32,7 +32,7 @@ export default function XperimentsLoading() {
         opacity: 0.5,
       }}
     >
-      {getDictionary(useLocale()).loader.tag}
+      {LOADER_TAG[useLocale()]}
     </div>
   );
 }

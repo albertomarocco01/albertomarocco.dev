@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 import { getDictionary, getLocale, OG_LOCALE } from "@/lib/i18n";
+import { CONTACT } from "@/lib/contact";
 
 // Distinctive display serif — variable, with italic + optical size. Not Inter.
 const fraunces = Fraunces({
@@ -87,13 +88,14 @@ const personLd = {
   name: "Alberto Marocco",
   url: SITE,
   jobTitle: "Creative Technologist",
-  email: "mailto:albertomarocco.dev@gmail.com",
+  email: `mailto:${CONTACT.email}`,
+  telephone: CONTACT.telDisplay,
   address: {
     "@type": "PostalAddress",
     addressLocality: "Turin",
     addressCountry: "IT",
   },
-  sameAs: ["https://www.instagram.com/alberto.marocco/"],
+  sameAs: [CONTACT.instagram],
 };
 
 // Root layout holds only the document shell (html/body), fonts, metadata and

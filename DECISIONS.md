@@ -18,9 +18,11 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
 
 - **Display serif: Fraunces** via `next/font/google` (variable, italic, optical
   size), the spec's default. Not Inter.
-- **Mono utility is a system stack** (`ui-monospace, "SF Mono", "JetBrains Mono",
-  Menlo, monospace`) — no webfont loaded. Matches the prototype and avoids a
-  second font download on the LCP path.
+- **Mono is JetBrains Mono** via `next/font/google` (variable weight,
+  self-hosted, `display: swap`). The earlier system stack (`ui-monospace, "SF
+  Mono", Menlo…`) rendered the meta/nav/ticker/loader register differently on
+  every OS; one real mono buys identical rendering for a second font file on
+  the load path.
 - **One stylesheet (`globals.css`)** with semantic classes rather than per-
   component CSS Modules. For a single hand-crafted page, one authored stylesheet
   is the craft and keeps 1:1 fidelity with the prototype at lowest risk. Design
@@ -173,8 +175,98 @@ the look was reasoned from the shader math, not machine-verified visually.)
   final/no-motion state). Under reduced motion the timeline is skipped entirely —
   the gate isn't rendered and CSS shows the content instantly.
 
+## /about — three panels, one gesture each, the person inside the field
+
+- **Paged, not scrolled.** The page is three viewport-tall panels on a track
+  (`AboutSequence.tsx`): the degree + tech path beside the graduation cut-out
+  (copy left, figure right); the calisthenics athlete + coach beside the
+  competition cut-out (mirrored: figure left, copy right, with the coaching
+  rows and a CTA down to the contacts); then the contacts, every one in plain
+  sight. `html.about-live` fixes the stage and locks the document (the home's
+  shift-free idiom, `data-lenis-prevent` included); the track translates by
+  whole viewports on the signature ease, and scroll intent — a wheel notch, a
+  swipe, a key — maps to exactly one move. Not CSS scroll-snap: it fights
+  Lenis and a trackpad's inertia would skip panels. The driver instead
+  swallows everything while a move runs and, once it settles, the inertia
+  tail (deltas that only shrink, arriving within 320ms) until a fresh gesture
+  starts. A panel taller than its viewport scrolls itself first and pages only
+  from its edge — so every panel's copy is sized to clear a 900px-tall
+  desktop viewport without an inner scroll (the second panel's is the longest
+  and gets less air under it). Focus into a panel brings it up (Tab through
+  the contacts never lands off-screen); `#contact` opens on the third panel;
+  reduced motion / no JS get three ordinary tall sections that scroll.
+- **The stage is pinned.** An `overflow: hidden` box still scrolls when focus
+  or a hash jump lands inside it, and the fixed stage holds three viewports
+  of track — so a Tab into a lower panel, or the CTA's `#contact`, shoved the
+  stage by whole viewports underneath the track's own transform. The driver
+  resets the stage's scroll on `focusin`, on `hashchange`, on the stage's
+  own `scroll` and in every `apply`; the transform is the only thing that
+  pages. (Caught headlessly: `stage.scrollTop` read 900 after a focus.)
+- **Every panel says where it sends you next.** The first closes with a link
+  row into the work the copy just claimed (`/websites`, `/xperiments`) — the
+  topbar carries the same two routes, but a claim should be checkable from
+  where it is made; the second with the way down to the contacts and the one
+  outbound link on the page, to the calisthenics team (`baldisthenics ↗`, at
+  `baldisport.com/baldisthenics`, kept in `CONTACT` with the other brand
+  URLs). Outbound gets the diagonal arrow and starts one step dimmer, so
+  leaving the site never looks like moving inside it. Both rows cost the
+  panels height: their copy's bottom padding is trimmed so each still clears
+  a 900px-tall viewport without paging inside itself.
+- **No footer on /about; the footer points at /about.** The contact panel
+  *is* the page's close — email, phone, Instagram and the place as large serif
+  rows on hairlines, plus a mono note — so a footer under it would repeat
+  every token one line lower. Every other page's footer (both variants)
+  carries a `contact →` link to `/about#contact` (`CONTACT.contactHref`)
+  instead; the driver lands it on the third panel with no slide, the in-flow
+  fallback jumps to the section's `id`.
+- **The calisthenics copy is placeholder.** Bio, the three coaching rows and
+  the contact note are plausible stand-ins in both languages (see "NEED REAL
+  VALUES" below).
+- **The canvas paints the cut-outs, so the orbs pass in front of the person.**
+  The field is one fixed layer under the page, so a DOM `<img>` could only ever
+  sit in front of every orb. Each `<figure>` hosts a drei `<View>` (index 2 —
+  after the field) whose shader draws the photo and re-draws the field's *near*
+  orbs over it (`figure-material.ts`): the silhouette occludes the far orbs, the
+  near ones (the per-orb parallax depth the field already has, above
+  `FRONT_DEPTH`) are summed again on top with the field's own gaussian, gain,
+  vignette and fade — handed over each frame through `field-state.ts`, a
+  singleton Aura publishes (same idiom as `excite.ts`). Outside the silhouette
+  the view writes alpha 0, so the two layers meet seamlessly. The `<img>` stays
+  as the LCP element / SEO / a11y and the no-WebGL figure; once the texture is
+  up the GPU copy fades in and CSS fades the `<img>` out (`is-live`), both toned
+  and bottom-dissolved to the same values so the handover never pops. Both load
+  the *same* WebP (`unoptimized`), one download. The canvas is not clipped by
+  the DOM, so the panel's box is passed as `u_clip` (the figure lags its track a
+  little during a move — a parallax the DOM clips at the panel edge).
+  `track-motion.ts` (three-free) lets the driver hold the tracking views at full
+  frame rate for the move; at rest the figures ride the field's ~30fps.
+- **Cut-outs are authored, not runtime.** `reference/AboutPhotos/cutout.py`
+  (rembg `isnet-general-use` + hand masks for the rig/plate in the calisthenics
+  shot, largest-component filter, bbox crop, ≤1800px WebP-with-alpha) writes
+  `src/assets/about/*.webp` (~30–70 KB each). The graduation source is a phone
+  shot at 1536×2048, so that figure tops out at ~1340px tall — soft only at
+  very large viewports, hidden by the toning.
+- **Contact tokens live in one place** (`CONTACT` in `lib/contact.ts`): email,
+  the dial-form phone (`tel:+393896605643`, displayed `+39 389 660 5643`) and
+  the Instagram URL, used by the footer (both variants), the /about contact
+  block, the dictionaries' phone line and the root layout's Person JSON-LD — a
+  data module, so the server layout never imports a component for a string.
+  Instagram's own glyph (`InstagramGlyph.tsx`, inline stroke SVG at the mono's
+  weight) replaces the old "↗" after the link text.
+
 ## Content / placeholders — NEED REAL VALUES
 
+- **/about, second panel (calisthenics):** the bio, the meta line, the three
+  coaching rows (endurance / foundations / programming) and the CTA are
+  placeholder copy in `dictionary.ts` (`about.panels.discipline`), EN and IT.
+- **/about, third panel (contacts):** the note under the rows ("replies within
+  a couple of days · en / it") and the availability line in the body are
+  placeholders (`about.panels.contact`).
+- **Baldisthenics link** (`CONTACT.baldisthenics`) points at
+  `baldisport.com/baldisthenics`, which as of 2026-09-02 serves Baldisport's
+  "sito in costruzione" placeholder — the deep link may not exist yet. The
+  page states no relationship (it is a bare link); if he competes or coaches
+  *for* the team, say so in the panel's copy.
 - **P.IVA `00000000000`** in the footer is a placeholder.
 - **Instagram** links to `instagram.com/albertomarocco` (guessed handle).
 - **"Studio — next"** is a coming-soon row; its link points to `#work` until the
@@ -243,6 +335,105 @@ the look was reasoned from the shader math, not machine-verified visually.)
   this run scored Accessibility 100. The spec's explicit a11y requirements
   (keyboard operation, focus-visible, reduced-motion, real `<a>`/`<button>`
   semantics) are all met.
+
+## Bundle / payload hygiene (review pass, 2026-09-02)
+
+A code-review + optimisation pass over the /about work. Nothing visual moved;
+all of it is what ships, and when.
+
+- **The dictionaries never reach the client.** `(site)/error.tsx`,
+  `(immersive)/xperiments/error.tsx` and `loading.tsx` are Client Components
+  that Next loads with their segment on every page, and each imported
+  `getDictionary` — so both full dictionaries (~13 KB minified, three times
+  over) were in every visitor's bundle for five strings. The locale
+  primitives now live in `lib/locale.ts` and the boundaries' copy in
+  `lib/boundary-copy.ts`; `dictionary.ts` composes both back in and re-exports
+  them, so every word still has one source and `@/lib/i18n` stays the single
+  server import. The three boundary chunks went 13.5 + 22.7 + 13.1 KB →
+  1.3 + 1.7 + 10.9 KB.
+- **`Shell` takes `nav` + `localeLabels`, not `dict`.** Props handed to a
+  Client Component are serialised into the RSC payload of every page, so the
+  whole dictionary — /about's three panels included — was inlined in every HTML
+  response. The topbar only ever read two blocks.
+- **The bubble tuner is a lazy chunk.** `BubbleControls` is now just the opt-in
+  gate (`next dev`, `?tune`, `#tune`); the panel itself (`BubblePanel.tsx`:
+  sliders, copy, reset) is `next/dynamic` and visitors never download it.
+- **The `/#work` → `/websites` hash redirect is a raw `<script>`.** It was a
+  `next/script` with no strategy, and the default `afterInteractive` injects
+  inline scripts client-side *after* hydration — the redirect waited for the
+  whole app (veil included) to boot before reloading, the exact wait the
+  comment said it existed to skip. A plain tag runs while the document parses;
+  React renders it in place, never re-runs it on hydration, and one it creates
+  on a client-side navigation is inert (where the hash can't be stale anyway).
+- **`poweredByHeader: false`**, and three dead rule blocks dropped from
+  `globals.css` (`.work-section`, `.gd-grid` / `.gd-plate` / `.gd-plate-idx` —
+  leftovers of the old plate grid; a class-by-class scan against `src/` found
+  nothing else unreferenced).
+- **Checked and left alone:** drei is already tree-shaken (no OrbitControls /
+  loaders / Html in the 3D chunk — the ~890 KB is three + r3f core, inherent to
+  the field); `next/image` already gets `sizes` + `preload` where it matters
+  (Next 16 ships those hints as an HTTP `Link` header on dynamic routes, not
+  as `<link>` tags — look there before assuming a preload is missing); the
+  React Compiler is not worth enabling over a ref-driven, setState-free
+  codebase whose hot paths it would bail out of anyway (the ~26 pre-existing
+  `react-hooks` compiler-rule findings are exactly those files).
+
+### Review findings (`/code-review high`, same pass)
+
+Fixed:
+
+- **/about's `#contact` CTA paged only through `hashchange`**, which the
+  browser doesn't fire when the hash is already `#contact` (arrive from a
+  footer link, wheel back up, click) — the driver now pages on the click
+  itself; the hash update and any hashchange land on the same panel.
+- **Paging under the veil was undone when it lifted**: the driver effect
+  re-runs on `entered` and rebuilt its panel index from the hash, sliding a
+  visitor who had already scrolled back to panel 1. The index is carried in a
+  ref across re-runs, and a resumed run doesn't re-snap the track.
+- **A panel move couldn't start frames, only prolong them** (`holdTracking`
+  never invalidated): with the field static (software WebGL) or idle, the GPU
+  figure stayed at its old box while the panel slid away. Holds now wake the
+  canvas through `onTrackingHold`.
+- **The off-screen figure drove the whole canvas**: the second panel's figure
+  ran its per-frame work and, for the ~1.5 s of its own fade-in, requested a
+  frame every rAF — forcing the fullscreen field past its 33 ms throttle for
+  pixels nobody could see. Off-viewport figures now skip the uniform work and
+  never ask for frames (the fade still advances, so the figure is ready on
+  arrival).
+- **Dark fringe on the GPU cut-out**: straight-alpha WebP + mipmaps averaged
+  the black under transparent texels into the silhouette edge. The texture is
+  uploaded premultiplied and the shader un-premultiplies before toning.
+- **The figure shader duplicated the field's GLSL** under a "keep in step"
+  comment: hash + the nine look `#define`s are one block (`FIELD_GLSL`, in
+  `field-glsl.ts` with `BLOB_COUNT`) compiled into both. A three-free module,
+  because importing a constant from `aura-material.ts` made the figure's lazy
+  chunk carry the whole field material just to share a number.
+- **Two dead `.about-copy` overrides** (phones `padding-bottom: 0`, short
+  viewports `1rem`) lost on specificity to `.about-panel .about-copy` and never
+  applied; the base rule's padding was dead the same way. One selector now.
+- **Sideways scroll on the phone stage**: `overflow-y: auto` on the live panel
+  made overflow-x `auto` too, and the figure sits at `right: -4vw` there.
+  `overflow-x: hidden`.
+- **Canvas death after the handover** left the `<img>` at opacity 0: the scene
+  hands `is-live` back on its own unmount, not only the view's.
+- **Contact tokens** — see the /about section above.
+
+Considered and left as designed (so the next pass doesn't re-open them):
+
+- **Flow-mode return to `/` eases to the footer on its own** after the beat.
+  It mirrors the desktop curtain, which also rises on its own on a return
+  visit; a hand on the page cancels it.
+- **The topbar tucks during that ease** (the slide is a downward scroll and
+  the tuck has no programmatic-scroll guard). Any scroll-up reveals it, and the
+  flow-mode home is one short page; guarding it would couple the home driver
+  to the shell for a beat that ends where the teasers still are.
+- **A resize across 860px mid-opening replays the opening** (`mode` re-runs
+  the home driver with `replay = !composed`). A deliberate re-sync; the window
+  is the first ~7 s, dragging the edge through it.
+- **Steady notched-wheel spins read as an inertia tail** on /about right after
+  a page turn (equal deltas inside the 320 ms gap). Real mice pause between
+  notches far longer than that; loosening the tail check would let trackpad
+  plateaus skip panels, which is the bug the tail exists for.
 
 ## Deferred
 

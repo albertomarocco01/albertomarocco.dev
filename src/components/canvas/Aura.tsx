@@ -13,6 +13,7 @@ import {
 import { useApp } from "@/components/providers/AppProvider";
 import { getBubbleParams } from "./bubble-params";
 import { excite, type ExciteState } from "./excite";
+import { publishField } from "./field-state";
 
 // AuraMaterial must be extended once; importing for its side effect.
 void AuraMaterial;
@@ -498,7 +499,10 @@ export function Aura({
       // Single static frame: snap fade, hold time, never re-invalidate. The orbs
       // sit at their seeded arrangement — no physics, no per-frame work.
       m.uniforms.u_fade.value = target;
-      if (white) writeBlobs(blobVecs, orbs.current);
+      if (white) {
+        writeBlobs(blobVecs, orbs.current);
+        publishField(orbs.current, target, 0, 0);
+      }
       return;
     }
 
@@ -523,6 +527,14 @@ export function Aura({
       m.uniforms.u_disp.value.set(
         (mSmooth.current.x - 0.5) * mEngage.current,
         (mSmooth.current.y - 0.5) * mEngage.current,
+      );
+      // Hand this frame's orbs, fade and parallax to whoever else paints them
+      // (the /about figure draws the near orbs over itself — field-state.ts).
+      publishField(
+        orbs.current,
+        m.uniforms.u_fade.value,
+        m.uniforms.u_disp.value.x,
+        m.uniforms.u_disp.value.y,
       );
     }
 

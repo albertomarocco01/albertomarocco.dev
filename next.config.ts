@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // No `X-Powered-By: Next.js` on every response — a header nobody reads.
+  poweredByHeader: false,
   // Pin the workspace root to this app. Left to inference, Turbopack walks up
   // looking for a lockfile and can adopt a stray one (an accidental
   // `npm install` in the user profile left a package-lock.json there), after

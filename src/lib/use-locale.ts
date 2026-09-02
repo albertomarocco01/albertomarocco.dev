@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { DEFAULT_LOCALE, isLocale, type Locale } from "./dictionary";
+import { DEFAULT_LOCALE, isLocale, type Locale } from "./locale";
 
 const noopSubscribe = () => () => {};
 

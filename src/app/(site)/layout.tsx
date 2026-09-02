@@ -26,7 +26,7 @@ export default async function SiteLayout({
           the hero entrance would never be played, so hide the one and settle
           the other on its revealed state. */}
       <noscript>
-        <style>{`.loader{display:none!important}.hero .eyebrow,.hero .name .nw,.hero .lede .w{opacity:1!important;filter:none!important;transform:none!important;animation:none!important}`}</style>
+        <style>{`.loader{display:none!important}.hero .eyebrow,.hero .name .nw,.hero .lede .w,.about-panel .rv{opacity:1!important;filter:none!important;transform:none!important;animation:none!important}`}</style>
       </noscript>
       <AppProvider>
         <Glow />
@@ -34,7 +34,7 @@ export default async function SiteLayout({
         <BubbleControls />
         <Loader tag={dict.loader.tag} />
         <SmoothScroll>
-          <Shell dict={dict} locale={locale}>
+          <Shell nav={dict.nav} localeLabels={dict.locale} locale={locale}>
             {children}
           </Shell>
         </SmoothScroll>

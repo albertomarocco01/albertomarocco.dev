@@ -5,24 +5,26 @@
 // tokens (names, "webgl", "touchdesigner", "led", years, the email, the domain,
 // "P.IVA") stay untranslated on purpose.
 //
-// This module is deliberately free of `next/headers` so client components (the
-// two error boundaries) can import the dictionaries too. `getLocale()`, which
+// This module is deliberately free of `next/headers`. `getLocale()`, which
 // reads the cookie and is server-only, lives in ./i18n.ts — which re-exports
 // everything here, so `@/lib/i18n` stays the single import for server code.
+// The locale primitives (./locale.ts) and the few strings the client-only
+// route fallbacks need (./boundary-copy.ts) are split out and re-exported: an
+// error boundary loads with its segment on every page, and importing the
+// dictionaries there shipped both of them, in full, to every visitor.
 //
 // The two immersive demos under /xperiments keep their copy next to themselves
 // (see xperiments/*/copy.ts) — same cookie + dictionary approach, typed against
 // `Locale` so parity is still compiler-enforced, but their vocabulary is their
 // own and doesn't belong in the site dictionary.
 
-export type Locale = "en" | "it";
-export const DEFAULT_LOCALE: Locale = "it";
+import type { Locale } from "./locale";
+import { ERROR_COPY, LOADER_TAG, type ErrorText } from "./boundary-copy";
+import { CONTACT } from "./contact";
 
-/** Open Graph `og:locale` value per locale. */
-export const OG_LOCALE: Record<Locale, string> = {
-  en: "en_US",
-  it: "it_IT",
-};
+export { DEFAULT_LOCALE, OG_LOCALE, isLocale } from "./locale";
+export type { Locale } from "./locale";
+export type { ErrorText } from "./boundary-copy";
 
 /** Translatable text for one work row, keyed by the work `id`. */
 export interface WorkText {
@@ -47,6 +49,48 @@ export interface PageText {
   metaDescription: string;
   title: string;
   lede: string;
+}
+
+/** One of the full-height panels of /about (see about/page.tsx). */
+export interface AboutPanelText {
+  /** mono eyebrow above the headline — "01 — …" */
+  eyebrow: string;
+  /** the serif headline, split so the middle run can be set in italic */
+  headline: { pre: string; em: string; post: string };
+  body: string;
+  /** mono meta line under the body (discipline · place · tools) */
+  meta?: string;
+  /** alt text for the panel's cut-out photo */
+  figureAlt: string;
+}
+
+/** The tech panel: the copy, plus the two links into the site's own work. */
+export interface AboutPathText extends AboutPanelText {
+  /** the link row under the copy — into /websites and /xperiments */
+  links: { websites: string; xperiments: string };
+}
+
+/** The calisthenics panel: the bio, what the coaching covers, a way to the contacts. */
+export interface AboutDisciplineText extends AboutPanelText {
+  /** mono label over the coaching list */
+  coachingLabel: string;
+  /** one row per specialty: the term, then a one-line detail */
+  coaching: { term: string; detail: string }[];
+  /** the link down to the contact panel (`#contact`) */
+  cta: string;
+}
+
+/** The contact panel that closes /about — every way to reach out, in one list. */
+export interface AboutContactText {
+  eyebrow: string;
+  headline: { pre: string; em: string; post: string };
+  body: string;
+  /** mono row labels; the values themselves are brand tokens (CONTACT) */
+  labels: { email: string; phone: string; instagram: string; where: string };
+  /** the place, spelled out — the one row that is not a link */
+  where: string;
+  /** mono note under the rows (response time · languages) */
+  note: string;
 }
 
 export interface Dictionary {
@@ -102,13 +146,19 @@ export interface Dictionary {
   };
   about: {
     label: string;
-    body: string;
     metaTitle: string;
     metaDescription: string;
     title: string;
-    /** the contact block that closes /about */
-    contactLabel: string;
-    contactBody: string;
+    /** aria-label for the 01 / 02 / 03 panel pager */
+    pagerAria: string;
+    /** mono cue at the foot of the first panel */
+    scrollCue: string;
+    /** the three full-height panels: the degree + tech path, the discipline + coaching, the contacts */
+    panels: {
+      path: AboutPathText;
+      discipline: AboutDisciplineText;
+      contact: AboutContactText;
+    };
   };
   /** the /websites index */
   websites: PageText;
@@ -116,17 +166,17 @@ export interface Dictionary {
   xperiments: PageText;
   footer: {
     vat: string;
+    /** the link to /about's contact panel — its text, an arrow follows it */
+    contact: string;
+    /** the Instagram link's text — the app's glyph follows it (no arrow) */
     instagram: string;
+    /** the phone link's display form; the number itself is a brand token */
+    phone: string;
+    /** aria-label for the phone link ("call" / "chiama") */
+    phoneLabel: string;
   };
-  /** route-level error boundary for the main site */
-  error: {
-    label: string;
-    title: string;
-    body: string;
-    retry: string;
-    /** label before the error digest */
-    ref: string;
-  };
+  /** route-level error boundary for the main site (boundary-copy.ts) */
+  error: ErrorText;
   /** the /graphic-designs index */
   gd: {
     metaTitle: string;
@@ -166,9 +216,7 @@ const en: Dictionary = {
     eyebrow: "full-stack developer & creative technologist based in Turin",
     lede: "I build high-performance web interfaces and generative visuals — where robust code meets real-time graphics, for screens and LED walls alike.",
   },
-  loader: {
-    tag: "loading",
-  },
+  loader: { tag: LOADER_TAG.en },
   home: {
     aria: "Sections",
     cue: "open",
@@ -228,14 +276,72 @@ const en: Dictionary = {
   },
   about: {
     label: "about",
-    body: "Computer Science graduate (University of Turin, 2025) working at the seam between web engineering and immersive visuals. I make sites that perform and installations that breathe — and this one runs my own generative work, live, as the proof.",
     metaTitle: "About",
     metaDescription:
-      "Creative technologist and full-stack developer in Turin — web engineering, real-time visuals, and how to get in touch.",
+      "Creative technologist and full-stack developer in Turin, calisthenics endurance athlete and coach — and every way to get in touch.",
     title: "About",
-    contactLabel: "contact",
-    contactBody:
-      "Open to collaborations and commissions from 2026 — web, installations, LED. Write, or find me on Instagram.",
+    pagerAria: "Page sections",
+    scrollCue: "scroll",
+    panels: {
+      path: {
+        eyebrow: "01 — path",
+        headline: {
+          pre: "Computer Science graduate, ",
+          em: "creative technologist",
+          post: " by vocation.",
+        },
+        body: "University of Turin, 2025. I work at the seam between web engineering and immersive visuals: full-stack sites that perform, real-time interfaces, generative loops for LED walls. I make sites that perform and installations that breathe — and this one runs my own generative work, live, as the proof.",
+        meta: "turin · full-stack · webgl · touchdesigner",
+        figureAlt:
+          "Alberto Marocco on graduation day — laurel wreath, thesis in hand",
+        links: { websites: "the websites", xperiments: "the experiments" },
+      },
+      discipline: {
+        eyebrow: "02 — calisthenics",
+        headline: {
+          pre: "Endurance athlete, ",
+          em: "coach",
+          post: " by conviction.",
+        },
+        body: "Off the screen I compete in calisthenics, Endurance discipline: max-rep sets and timed rounds, won with pacing and a technique that never slips. I train, I compete, and I coach a small group of athletes at every level — from the first clean pull-up to a competition prep.",
+        meta: "endurance · turin · athlete & coach",
+        figureAlt:
+          "Alberto Marocco holding a planche on the parallettes at a calisthenics competition",
+        coachingLabel: "coaching",
+        coaching: [
+          {
+            term: "endurance",
+            detail: "Competition prep, pacing, rep density.",
+          },
+          {
+            term: "foundations",
+            detail: "First pull-up, first dip: technique before volume.",
+          },
+          {
+            term: "programming",
+            detail: "Tailored plans, in Turin or online.",
+          },
+        ],
+        cta: "get in touch",
+      },
+      contact: {
+        eyebrow: "03 — contact",
+        headline: {
+          pre: "Write, call, ",
+          em: "find me",
+          post: ".",
+        },
+        body: "Open to collaborations and commissions from 2026 — web, installations, LED — and to new athletes to coach. One message is enough.",
+        labels: {
+          email: "email",
+          phone: "phone",
+          instagram: "instagram",
+          where: "based in",
+        },
+        where: "Turin, Italy",
+        note: "replies within a couple of days · en / it",
+      },
+    },
   },
   websites: {
     metaTitle: "Websites",
@@ -253,15 +359,12 @@ const en: Dictionary = {
   },
   footer: {
     vat: "P.IVA — placeholder",
-    instagram: "instagram ↗",
+    contact: "contact",
+    instagram: "instagram",
+    phone: CONTACT.telDisplay,
+    phoneLabel: "call",
   },
-  error: {
-    label: "error",
-    title: "Something broke on the way here.",
-    body: "The page failed to render. Trying again usually fixes it — the cause is most often a stale script from a previous version of the site.",
-    retry: "↻ try again",
-    ref: "ref",
-  },
+  error: ERROR_COPY.en,
   gd: {
     metaTitle: "Merge — Graphic Designs",
     metaDescription:
@@ -310,9 +413,7 @@ const it: Dictionary = {
     eyebrow: "full-stack developer & creative technologist, da torino",
     lede: "Costruisco interfacce web ad alte prestazioni e visual generative — dove il codice solido incontra la grafica in tempo reale, per schermi e led wall.",
   },
-  loader: {
-    tag: "caricamento",
-  },
+  loader: { tag: LOADER_TAG.it },
   home: {
     aria: "Sezioni",
     cue: "apri",
@@ -372,14 +473,72 @@ const it: Dictionary = {
   },
   about: {
     label: "about",
-    body: "Laureato in Informatica (Università di Torino, 2025), lavoro nel punto d'incontro tra ingegneria web e visual immersive. Realizzo siti che rendono e installazioni che respirano — e questo sito manda in scena dal vivo il mio lavoro generativo: è la prova.",
     metaTitle: "About",
     metaDescription:
-      "Creative technologist e full-stack developer a Torino — ingegneria web, visual in tempo reale, e come mettersi in contatto.",
+      "Creative technologist e full-stack developer a Torino, atleta di calisthenics endurance e coach — e tutti i modi per mettersi in contatto.",
     title: "About",
-    contactLabel: "contatti",
-    contactBody:
-      "Aperto a collaborazioni e commissioni dal 2026 — web, installazioni, led. Scrivimi, oppure trovami su Instagram.",
+    pagerAria: "Sezioni della pagina",
+    scrollCue: "scorri",
+    panels: {
+      path: {
+        eyebrow: "01 — percorso",
+        headline: {
+          pre: "Laureato in Informatica, ",
+          em: "creative technologist",
+          post: " per vocazione.",
+        },
+        body: "Università di Torino, 2025. Lavoro nel punto d'incontro tra ingegneria web e visual immersive: siti full-stack che rendono, interfacce in tempo reale, loop generativi per led wall. Realizzo siti che rendono e installazioni che respirano — e questo sito manda in scena dal vivo il mio lavoro generativo: è la prova.",
+        meta: "torino · full-stack · webgl · touchdesigner",
+        figureAlt:
+          "Alberto Marocco il giorno della laurea — corona d'alloro, tesi in mano",
+        links: { websites: "i siti web", xperiments: "gli xperiments" },
+      },
+      discipline: {
+        eyebrow: "02 — calisthenics",
+        headline: {
+          pre: "Atleta di endurance, ",
+          em: "coach",
+          post: " per convinzione.",
+        },
+        body: "Fuori dallo schermo gareggio nel calisthenics, disciplina Endurance: serie massimali e round a tempo, vinti con il ritmo e con una tecnica che non cede. Mi alleno, gareggio e seguo un piccolo gruppo di atleti di ogni livello — dalla prima trazione pulita alla preparazione di una gara.",
+        meta: "endurance · torino · atleta & coach",
+        figureAlt:
+          "Alberto Marocco in planche sulle parallele, durante una gara di calisthenics",
+        coachingLabel: "coaching",
+        coaching: [
+          {
+            term: "endurance",
+            detail: "Preparazione gare, ritmo, densità di ripetizioni.",
+          },
+          {
+            term: "basi",
+            detail: "Prima trazione, primo dip: tecnica prima del volume.",
+          },
+          {
+            term: "programmazione",
+            detail: "Piani su misura, a Torino oppure online.",
+          },
+        ],
+        cta: "parliamone",
+      },
+      contact: {
+        eyebrow: "03 — contatti",
+        headline: {
+          pre: "Scrivimi, chiamami, ",
+          em: "trovami",
+          post: ".",
+        },
+        body: "Aperto a collaborazioni e commissioni dal 2026 — web, installazioni, led — e a nuovi atleti da seguire. Basta un messaggio.",
+        labels: {
+          email: "email",
+          phone: "telefono",
+          instagram: "instagram",
+          where: "dove",
+        },
+        where: "Torino, Italia",
+        note: "rispondo entro un paio di giorni · it / en",
+      },
+    },
   },
   websites: {
     metaTitle: "Siti web",
@@ -397,15 +556,12 @@ const it: Dictionary = {
   },
   footer: {
     vat: "P.IVA — placeholder",
-    instagram: "instagram ↗",
+    contact: "contatti",
+    instagram: "instagram",
+    phone: CONTACT.telDisplay,
+    phoneLabel: "chiama",
   },
-  error: {
-    label: "errore",
-    title: "Qualcosa si è rotto lungo la strada.",
-    body: "La pagina non è riuscita a caricarsi. Riprovare in genere basta — di solito la causa è uno script rimasto da una versione precedente del sito.",
-    retry: "↻ riprova",
-    ref: "rif",
-  },
+  error: ERROR_COPY.it,
   gd: {
     metaTitle: "Merge — Graphic Designs",
     metaDescription:
@@ -434,9 +590,4 @@ const dictionaries: Record<Locale, Dictionary> = { en, it };
 
 export function getDictionary(locale: Locale): Dictionary {
   return dictionaries[locale];
-}
-
-/** Narrow an arbitrary cookie / `lang` attribute value to a supported locale. */
-export function isLocale(value: string | undefined | null): value is Locale {
-  return value === "en" || value === "it";
 }

@@ -29,17 +29,16 @@ import { extend, type ThreeElement } from "@react-three/fiber";
  * and decaying back to rest (computed in Aura.tsx). The work reveals never set
  * it, so they are unaffected. Tunables for the blob look live as #defines below.
  *
- * BLOB_COUNT is the single compile-time orb count: exported from here (Aura.tsx
- * imports it to size the physics array) and interpolated into the GLSL #define
- * and u_blobs[] length below — one source of truth, mirrored in both places.
+ * BLOB_COUNT is the single compile-time orb count (field-glsl.ts, re-exported
+ * here): Aura.tsx sizes the physics array from it and it is interpolated into
+ * the GLSL #define and u_blobs[] length below — one source of truth.
  */
 
-// Number of soft orbs. Single source of truth: exported for the JS physics sim
-// (Aura.tsx) and interpolated into the fragment shader so the u_blobs[] length
-// and the loop bound always match. Keep small — the loop runs per pixel.
-// 14: dense enough to cover the field without dark gaps between orbs, while
-// keeping regular visible collisions. Keep small — the loop runs per pixel.
-export const BLOB_COUNT = 14;
+// BLOB_COUNT and the shared GLSL block live in field-glsl.ts (no three in it,
+// so the /about figure's chunk can share them without carrying this material);
+// re-exported here so the physics sim and the views keep their single import.
+import { BLOB_COUNT, FIELD_GLSL } from "./field-glsl";
+export { BLOB_COUNT, FIELD_GLSL };
 
 /**
  * Work-reveal colour families. Each `gen` row picks one by name (see
@@ -86,26 +85,16 @@ const fragmentShader = /* glsl */ `
   uniform float u_soft;     // BLOB_SOFT: gaussian softness
   uniform vec3  u_blobs[${BLOB_COUNT}]; // white field only: xy = orb centre (aspect-corrected, centred at 0), z = collision-core radius
 
-  float hash(vec2 p){ p=fract(p*vec2(123.34,456.21)); p+=dot(p,p+45.32); return fract(p.x*p.y); }
+  ${FIELD_GLSL}
   float noise(vec2 p){ vec2 i=floor(p),f=fract(p);
     float a=hash(i),b=hash(i+vec2(1.,0.)),c=hash(i+vec2(0.,1.)),d=hash(i+vec2(1.,1.));
     vec2 u=f*f*(3.-2.*f); return mix(mix(a,b,u.x),mix(c,d,u.x),u.y); }
   float fbm(vec2 p){ float v=0.,a=.5; for(int i=0;i<5;i++){ v+=a*noise(p); p*=2.0; a*=.5; } return v; }
 
-  // ---- white ambient field tunables (soft luminous orbs; motion lives in JS) ----
-  // BLOB_SIZE / BLOB_SOFT / FIELD_GAIN / FIELD_OPACITY are now the u_blobSize /
-  // u_soft / u_gain / u_opacity uniforms above (live-tunable). The rest stay
-  // compile-time #defines — structural, not aesthetic knobs.
+  // ---- white ambient field: the shared hash + look #defines are FIELD_GLSL
+  // above (compiled into the /about figure shader too); only the orb count
+  // lives here ----
   #define BLOB_COUNT ${BLOB_COUNT} // orb count — mirrors the exported TS const above (single source of truth)
-  #define DISP_STRENGTH 0.11   // cursor parallax max (fraction of normalized space)
-  #define BLOB_DENOM_EPS 1e-4  // floor on the gaussian denominator so a degenerate (zero/NaN) orb radius can't divide-by-zero -> NaN field -> nothing paints. Far below any valid denom (min ~0.021), so it never affects real orbs.
-  #define DEPTH_BASE 0.55      // per-orb parallax depth floor (each orb leans a touch differently for a hint of depth)
-  #define DEPTH_VARY 0.9       // per-orb parallax depth spread added on top of DEPTH_BASE via the per-orb hash
-  #define DIM_COLOR vec3(0.10, 0.11, 0.14) // gap/halo colour — just above the void (#0a0a0c ~ 0.04) so low-presence regions read true-dark, not a milky grey wash
-  #define ORB_COLOR vec3(0.85, 0.87, 0.93) // orb core colour — cold white
-  #define VIG_XSQUASH 0.45 // horizontal squash of the vignette ellipse. Small enough that wide-screen (16:9+) side orbs survive the falloff instead of being clipped to black, while portrait p.x is tiny either way → the mobile look is untouched. (was 0.8 — which killed every landscape side orb.)
-  #define VIG_OUT 0.55     // vignette outer radius: vig = 0 beyond this (soft screen corners stay dark)
-  #define VIG_IN  0.35     // vignette inner radius: vig = 1 within this (full-presence core over the hero)
 
   void main(){
     vec2 uv = vUv;

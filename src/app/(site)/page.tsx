@@ -1,4 +1,3 @@
-import Script from "next/script";
 import { Hero } from "@/components/Hero";
 import { Teasers } from "@/components/home/Teasers";
 import { HomeSequence } from "@/components/home/HomeSequence";
@@ -23,10 +22,15 @@ export default async function Home() {
           effect, so it runs while the document is still parsing — before React
           loads, before the veil animates, and with no dependency on when the
           router becomes usable (a `router.replace()` from a mount effect turned
-          out not to navigate here at all). `location.replace`, so the dead
-          anchor doesn't end up in the back history. */}
-      <Script
-        id="hash-redirect"
+          out not to navigate here at all). A raw <script>, not `next/script`:
+          the Script component's default `afterInteractive` strategy injects
+          inline scripts client-side *after* hydration, which is exactly the
+          wait this exists to skip. React renders the plain tag in place in the
+          server HTML, never re-runs it on hydration, and a script it creates on
+          a client-side navigation is inert — where the hash can't be stale
+          anyway. `location.replace`, so the dead anchor doesn't end up in the
+          back history. */}
+      <script
         dangerouslySetInnerHTML={{
           __html:
             'var t={"#work":"/websites","#about":"/about"}[location.hash];if(t)location.replace(t);',
