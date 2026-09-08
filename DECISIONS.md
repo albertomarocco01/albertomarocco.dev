@@ -482,6 +482,9 @@ Conventions that came out of the three at once:
 - **Keys are guarded.** Escape and the arrows ignore `altKey`/`ctrlKey`/
   `metaKey` and auto-repeat: Alt+← is browser back, and a held arrow would
   restart a crossfade thirty times a second.
+- **Escape leaves every demo.** Tarassaco was the one exception — its only
+  way out was the corner link — so it now carries the same guarded handler
+  as the other four. Five pieces in one section should answer the same key.
 
 ## Payload (measured on the production build, 2026-09-07)
 

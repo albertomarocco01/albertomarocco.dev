@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWindPhysics } from './hooks/useWindPhysics';
 import { GateScene } from './components/GateScene';
@@ -100,6 +101,19 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Esc leaves the demo, as in the four sibling experiments. Space is the only
+  // other key this piece listens for, so Escape is free at every scene.
+  const router = useRouter();
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      // browser shortcuts (Alt+←, Ctrl/⌘ combos) are not ours
+      if (e.altKey || e.metaKey || e.ctrlKey || e.repeat) return;
+      if (e.key === 'Escape') router.push('/graphic-designs');
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center overflow-hidden relative selection:bg-white selection:text-black">
