@@ -34,6 +34,12 @@ src/
                   figure-material (the /about cut-outs, orbs in front),
                   field-state (Aura's published frame)
     providers/    AppProvider (entered / reduced-motion / fieldReady), SmoothScroll
+  app/(immersive)/xperiments/
+                  the five Merge demos — vortex, tarassaco, darkroom (Camera
+                  Oscura), hands (Mani), wall (Parete). One folder each:
+                  page → client (ssr:false) → App + components/, hooks/,
+                  <id>.config.ts (every tunable), <id>.css (scoped). Briefs and
+                  build reports in reference/briefs/
   lib/            work (content) + contact (tokens) + motion (easing, timings)
                   + track-motion, dictionary (+ i18n server side; locale +
                   boundary-copy are the client-safe slices the route fallbacks

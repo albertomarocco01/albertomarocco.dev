@@ -435,6 +435,71 @@ Considered and left as designed (so the next pass doesn't re-open them):
   notches far longer than that; loosening the tail check would let trackpad
   plateaus skip panels, which is the bug the tail exists for.
 
+## Merge — three new demos (2026-09-07)
+
+`/graphic-designs` now holds five pieces: Image Vortex and Tarassaco as they
+were, plus **Camera Oscura** (`/xperiments/darkroom`), **Mani**
+(`/xperiments/hands`) and **Parete** (`/xperiments/wall`). They were built in
+parallel by three sessions against briefs in `reference/briefs/`, each owning
+only its own route folder and `public/<id>/`; every shared file was the
+director's. Per-demo build reports (what was built, every tunable, the known
+limits, how to test it in two minutes) are in `reference/briefs/reports/`.
+
+- **Camera Oscura** — a developing tray: a stable-fluids sim on ping-pong
+  half-float targets, an exposure buffer the pointer develops directly, a
+  print fixed at 85 % mean coverage measured on the GPU. Falls back to a
+  brush path (no fluid) under reduced motion, without renderable half-float
+  targets, or on a CPU rasteriser.
+- **Mani** — MediaPipe `HandLandmarker` (self-hosted wasm + float16 model)
+  reading two hands: pinch to hold, two hands to tear, open palm to push.
+  The camera feed is never shown and never leaves the browser. A denied or
+  absent camera falls through to pointer mode, and everything is also
+  keyboard-drivable.
+- **Parete** — a 6 × 3 m LED wall in a dark room running the site's own
+  `AuraMaterial`, imported read-only and rendered into an FBO (it is a
+  fullscreen-triangle material and cannot be hung on a wall directly). The
+  physical layer — 2.6 mm pitch, cabinet seams, per-lamp jitter — dissolves
+  on an `fwidth` guard before it can alias.
+
+Conventions that came out of the three at once:
+
+- **Shared WebGL/motion primitives, one copy each.** `src/lib/webgl-caps.ts`
+  (`hasWebGL2`, `isSoftwareRenderer`), `src/lib/use-reduced-motion.ts` and
+  `src/lib/use-tab-visible.ts`. Each demo had grown its own; the two
+  software-renderer regexes had already diverged, so a GPU-less VM got the
+  cheap path on the site field and the full chain in a demo. `Field.tsx` uses
+  the shared probe too.
+- **The immersive route group has a layout.** `(immersive)/layout.tsx` wraps
+  it in `.immersive` (`display: contents`), which lets `globals.css` release
+  the scrollbar gutter (`html { scrollbar-gutter: stable }` was shrinking every
+  `position: fixed; inset: 0` stage to 1425 px on a 1440 px window, off-centre,
+  with a dead band on the right — Vortex and Tarassaco had shipped with it) and
+  restore `cursor: auto` once for the group instead of per demo.
+- **A demo is a bus, not a prop tree.** Each has one mutable object the DOM
+  writes and the frame loop reads (`TrayBus`, `HandsInput`, `WallBus`), mutated
+  only through its own methods — the React compiler rules forbid writing to a
+  prop object's fields. Nothing at frame rate touches React.
+- **Keys are guarded.** Escape and the arrows ignore `altKey`/`ctrlKey`/
+  `metaKey` and auto-repeat: Alt+← is browser back, and a held arrow would
+  restart a crossfade thirty times a second.
+
+## Payload (measured on the production build, 2026-09-07)
+
+Per route, cold: `/` 433 KB JS · LCP 392 ms; `/graphic-designs` 436 KB ·
+196 ms; `/about` 439 KB · 124 ms; `/xperiments/darkroom` 440 KB;
+`/xperiments/hands` 486 KB; `/xperiments/wall` 632 KB. The three demo chunks
+are per-route — three/R3F stays shared, the reflector, composer and MediaPipe
+do not leak into the site bundle. Fonts are 195–229 KB on every route (Fraunces
+roman + italic, JetBrains Mono, all variable) and are the largest fixed cost;
+they are left alone deliberately, since the display serif *is* the site.
+
+- **The index's covers are eager, not lazy.** Five cards, every optimised cover
+  a few KB: lazy-loading the ones below the fold only bought a visible pop-in
+  on the way down. The first keeps its `preload` (it is the LCP element).
+- **`public/darkroom|hands|wall` are `immutable`**, like `/vortex/images` and
+  `/mediapipe`: content-addressed by filename, so they should not be
+  revalidated on every visit to the index.
+
 ## Deferred
 
 - **WebGPU** (TSL/`WebGPURenderer`) is intentionally not attempted; WebGL2 ships.

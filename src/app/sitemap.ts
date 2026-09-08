@@ -42,5 +42,23 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "yearly",
       priority: 0.6,
     },
+    {
+      url: `${SITE}/xperiments/darkroom`,
+      lastModified,
+      changeFrequency: "yearly",
+      priority: 0.6,
+    },
+    {
+      url: `${SITE}/xperiments/hands`,
+      lastModified,
+      changeFrequency: "yearly",
+      priority: 0.6,
+    },
+    {
+      url: `${SITE}/xperiments/wall`,
+      lastModified,
+      changeFrequency: "yearly",
+      priority: 0.6,
+    },
   ];
 }

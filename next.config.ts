@@ -30,6 +30,11 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Mani — Hands reads the webcam only (no microphone). Same scoping.
+        source: "/xperiments/hands",
+        headers: [{ key: "Permissions-Policy", value: "camera=(self)" }],
+      },
       // Content-addressed static payloads that never change without a rename:
       // the MediaPipe wasm + face model (~13MB) and the vortex image set (~3MB).
       // Without this they ship as `public, max-age=0` and get revalidated on
@@ -42,6 +47,26 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/vortex/images/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      // The 2026 demo covers, same contract: the file never changes without a
+      // rename, so it should not be revalidated on every visit to the index.
+      {
+        source: "/darkroom/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
+        source: "/hands/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
+        source: "/wall/:path*",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
         ],

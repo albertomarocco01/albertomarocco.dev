@@ -32,6 +32,24 @@ const DEMOS = [
     href: "/xperiments/tarassaco",
     cover: "/tarassaco/cover.svg",
   },
+  // The three 2026 demos (briefs in reference/briefs/). Each owns its route
+  // folder and public/<id>/; the cover path is fixed here so the build sessions
+  // only ever replace the file, never this list.
+  {
+    id: "darkroom",
+    href: "/xperiments/darkroom",
+    cover: "/darkroom/cover.webp",
+  },
+  {
+    id: "hands",
+    href: "/xperiments/hands",
+    cover: "/hands/cover.webp",
+  },
+  {
+    id: "wall",
+    href: "/xperiments/wall",
+    cover: "/wall/cover.webp",
+  },
 ];
 
 export default async function GraphicDesigns() {
@@ -71,6 +89,11 @@ export default async function GraphicDesigns() {
                       fill
                       sizes="(max-width: 720px) 40vw, 220px"
                       preload={i === 0}
+                      // Five cards now, and every optimised cover is a few KB:
+                      // lazy-loading the ones below the fold only buys a visible
+                      // pop-in as the index is scrolled. The first is preloaded
+                      // (it is the LCP element), the rest merely eager.
+                      loading={i === 0 ? undefined : "eager"}
                       unoptimized={d.cover.endsWith(".svg")}
                       style={{ objectFit: "cover" }}
                     />

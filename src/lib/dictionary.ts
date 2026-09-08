@@ -385,6 +385,21 @@ const en: Dictionary = {
         meta: "interactive · breath + face · 2026",
         desc: "Blow into your microphone and an editorial poem scatters like dandelion seeds — breath and face tracked live, entirely in your browser.",
       },
+      darkroom: {
+        title: "Camera Oscura — Darkroom",
+        meta: "interactive · fluid + shader · 2026",
+        desc: "A developing tray in the dark. Stir the liquid with your pointer and the prints surface where it has passed — a GPU fluid simulation developing photographs, live in your browser.",
+      },
+      hands: {
+        title: "Mani — Hands",
+        meta: "interactive · hand tracking · 2026",
+        desc: "Your hands, read by the webcam. Pinch a print out of the drift, carry it, tear it in two with both hands — nothing leaves your browser.",
+      },
+      wall: {
+        title: "Parete — LED Wall",
+        meta: "3d preview · led wall · 2026",
+        desc: "A 6 × 3 m LED wall in a dark room, running the generative loops live. Walk around it, switch loops, get close enough to see the pixel pitch.",
+      },
     },
   },
 };
@@ -581,6 +596,21 @@ const it: Dictionary = {
         title: "Tarassaco — Dandelion Wind",
         meta: "interattivo · fiato + volto · 2026",
         desc: "Soffia nel microfono e una poesia editoriale si disperde come i semi di un tarassaco — fiato e volto tracciati dal vivo, tutto nel tuo browser.",
+      },
+      darkroom: {
+        title: "Camera Oscura — Darkroom",
+        meta: "interattivo · fluido + shader · 2026",
+        desc: "Una bacinella di sviluppo al buio. Muovi il liquido con il puntatore e le stampe affiorano dove è passato — una simulazione di fluido su GPU che sviluppa fotografie, dal vivo nel tuo browser.",
+      },
+      hands: {
+        title: "Mani — Hands",
+        meta: "interattivo · tracciamento mani · 2026",
+        desc: "Le tue mani, lette dalla webcam. Pizzica una stampa dalla deriva, portala con te, strappala in due con entrambe le mani — niente esce dal tuo browser.",
+      },
+      wall: {
+        title: "Parete — LED Wall",
+        meta: "anteprima 3d · led wall · 2026",
+        desc: "Un led wall di 6 × 3 m in una stanza buia, con i loop generativi che girano dal vivo. Giraci intorno, cambia loop, avvicinati fino a vedere il pixel pitch.",
       },
     },
   },

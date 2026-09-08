@@ -1,0 +1,282 @@
+/*
+  Parete — LED Wall: scoped stylesheet.
+
+  Everything here lives under `.wall` so nothing leaks into the site's single
+  hand-authored design system (globals.css). The tokens come from :root there
+  (--ink, --ink-dim, --ink-ghost, --hairline, --accent, --serif, --mono, --ease).
+  The exit link mirrors `.vortex-exit` / `.tara-exit` so the demos share one
+  chrome. The scrollbar gutter is released for the whole immersive group in
+  globals.css — nothing to do here.
+*/
+
+/* ---- scope base ---- */
+.wall {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  color: var(--ink);
+  isolation: isolate;
+  overflow: hidden;
+}
+.wall-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none; /* the room owns drag and pinch */
+  /* camera-controls deliberately does not preventDefault on pointerdown, so a
+     drag that crosses the HUD would start a text selection (and raise the
+     copy/look-up callout on iOS). */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.wall-canvas {
+  display: block;
+}
+
+/* ---- persistent chrome ---- */
+.wall-exit {
+  position: fixed;
+  top: 1.4rem;
+  left: 1.4rem;
+  z-index: 60;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+  text-decoration: none;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  padding: 0.5rem 0.9rem;
+  transition:
+    color 0.4s var(--ease),
+    border-color 0.4s var(--ease);
+}
+.wall-exit:hover,
+.wall-exit:focus-visible {
+  color: var(--ink);
+  border-color: var(--ink-dim);
+  outline: none;
+}
+
+/* ---- title cover (idle only — it must not survive into the running demo) ---- */
+.wall-title {
+  position: fixed;
+  top: 1.55rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 1.4s var(--ease);
+}
+.wall-title.is-hidden {
+  opacity: 0;
+}
+.wall-title-main {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: 1.15rem;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+.wall-title-sub {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em; /* offset the trailing tracking so it stays optically centred */
+  text-transform: lowercase;
+  color: var(--ink-dim);
+}
+.wall-title-keys {
+  margin-top: 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+  text-transform: lowercase;
+  color: var(--ink-ghost);
+}
+
+/* ---- the spec sheet, bottom-left ---- */
+.wall-spec {
+  position: absolute;
+  left: 1.6rem;
+  bottom: calc(1.6rem + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  /* one line where there is room for one, and never under the controls: the
+     second term reserves the width the pager and the loop switcher occupy */
+  max-width: min(50rem, calc(100vw - 24rem));
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.18em;
+  line-height: 1.9;
+  text-transform: lowercase;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+  pointer-events: none;
+}
+.wall-spec > span + span::before {
+  content: "·";
+  padding: 0 0.55em;
+  color: var(--ink-ghost);
+}
+/* the live distance holds its width so the line never twitches as it counts */
+.wall-spec-value {
+  display: inline-block;
+  min-width: 2.4em;
+  text-align: right;
+  color: var(--ink);
+}
+
+/* ---- the two controls, bottom-right ---- */
+.wall-controls {
+  position: absolute;
+  right: 1.6rem;
+  bottom: calc(1.6rem + env(safe-area-inset-bottom, 0px));
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 1.6rem;
+}
+.wall-pager,
+.wall-loop {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+.wall-key {
+  appearance: none;
+  margin: 0;
+  padding: 0.42rem 0.6rem;
+  border: 0;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.18em;
+  text-transform: lowercase;
+  color: var(--ink-ghost);
+  cursor: pointer;
+  transition: color 0.5s var(--ease);
+}
+.wall-key:hover,
+.wall-key:focus-visible {
+  color: var(--ink);
+  outline: none;
+}
+.wall-key:focus-visible {
+  box-shadow: inset 0 -1px 0 0 var(--accent);
+}
+.wall-key.is-on {
+  color: var(--ink);
+}
+.wall-arrow {
+  padding: 0.42rem 0.45rem;
+  font-size: 0.72rem;
+  letter-spacing: 0;
+}
+.wall-loop-name {
+  min-width: 4.2em;
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.18em;
+  text-transform: lowercase;
+  text-align: center;
+  color: var(--ink);
+}
+.wall-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- fallbacks: no WebGL, context lost ---- */
+.wall-msg {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 2rem;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  line-height: 1.9;
+  color: var(--ink-dim);
+}
+.wall-msg::before {
+  /* keeps the line measure short without a wrapper */
+  content: "";
+  display: block;
+  width: min(34rem, 80vw);
+  grid-area: 1 / 1;
+}
+
+/* ---- motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .wall-title,
+  .wall-exit,
+  .wall-key {
+    transition: none;
+  }
+}
+
+/* ---- phones ---- */
+@media (max-width: 720px) {
+  /* the cabinet count and the loop line are the first to go: the switcher
+     already names the loop, and the pitch is the number that matters */
+  .wall-spec-wide {
+    display: none;
+  }
+}
+@media (max-width: 560px) {
+  .wall-title {
+    top: 4.3rem;
+  }
+  .wall-title-keys {
+    display: none;
+  }
+  .wall-exit {
+    top: 1rem;
+    left: 1rem;
+  }
+  .wall-spec {
+    left: 1rem;
+    bottom: calc(3.6rem + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100vw - 2rem);
+    font-size: 0.58rem;
+  }
+  .wall-controls {
+    right: 1rem;
+    left: 1rem;
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    justify-content: space-between;
+    gap: 0.6rem;
+  }
+  .wall-key,
+  .wall-loop-name {
+    font-size: 0.58rem;
+  }
+  .wall-key {
+    padding: 0.55rem 0.4rem; /* a 44 px tap target without growing the type */
+  }
+}
+@media (hover: none) and (pointer: coarse) {
+  .wall-title-keys {
+    display: none;
+  }
+}

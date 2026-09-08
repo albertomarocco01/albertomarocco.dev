@@ -38,6 +38,23 @@ html {
      scrollbar appears or disappears. */
   scrollbar-gutter: stable;
 }
+/* The immersive demos ((immersive)/layout.tsx wraps them in `.immersive`) own
+   the whole viewport and never scroll: release the reserved gutter there, or a
+   `position: fixed; inset: 0` stage is a gutter narrower than the viewport,
+   off-centre by half of it, with a dead band on the right (measured 1425 px on
+   a 1440 px window). `display: contents` keeps the wrapper out of the box tree. */
+html:has(.immersive) {
+  scrollbar-gutter: auto;
+}
+.immersive {
+  display: contents;
+}
+/* The demos have no custom Cursor, so the pointer comes back for the whole
+   group here (body, because `.immersive` has no box of its own) instead of a
+   `cursor: auto` in every demo stylesheet. */
+body:has(.immersive) {
+  cursor: auto;
+}
 
 body {
   margin: 0;
