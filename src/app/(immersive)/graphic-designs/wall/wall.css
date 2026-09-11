@@ -30,6 +30,11 @@
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+/* focusable only by script: where focus lands when the tour closes and its
+   label is not showing (closed within arm's reach of the wall) */
+.wall-stage:focus {
+  outline: none;
+}
 .wall-canvas {
   display: block;
 }
@@ -208,6 +213,155 @@
   white-space: nowrap;
 }
 
+/* ---- the tour's entry label: a button standing in the room beside the wall.
+        The camera rig writes its transform every frame (wall-bus.ts); it is
+        fixed-positioned so the DOM can keep it after the pager in the Tab
+        order while it shows wherever its point in the room projects. ---- */
+.wall-tour-label {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 44;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.5rem 0.7rem 0.5rem 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+  white-space: nowrap;
+  color: var(--ink-dim);
+  cursor: pointer;
+  will-change: transform;
+  transition:
+    color 0.5s var(--ease),
+    opacity 0.6s var(--ease),
+    visibility 0s linear 0s;
+}
+/* a leader back toward the wall: a callout standing in the room, not a key in a bar */
+.wall-tour-label::before {
+  content: "";
+  flex: none;
+  width: 1.4rem;
+  height: 1px;
+  background: var(--hairline-hot);
+  transition: background-color 0.5s var(--ease);
+}
+.wall-tour-label:hover,
+.wall-tour-label:focus-visible {
+  color: var(--ink);
+  outline: none;
+}
+.wall-tour-label:hover::before,
+.wall-tour-label:focus-visible::before {
+  background: var(--ink-dim);
+}
+.wall-tour-label:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.45em;
+  text-decoration-color: var(--accent);
+}
+/* hidden while the tour runs, within arm's reach of the wall, or behind it */
+.wall-tour-label.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    color 0.5s var(--ease),
+    opacity 0.6s var(--ease),
+    visibility 0s linear 0.6s;
+}
+
+/* ---- the tour card: bottom-left, over the spec line ---- */
+.wall-tour {
+  position: absolute;
+  left: 1.6rem;
+  bottom: calc(5.8rem + env(safe-area-inset-bottom, 0px));
+  z-index: 46;
+  width: min(27rem, calc(100vw - 3.2rem));
+  padding: 1.6rem 1.8rem 1rem 1.6rem;
+  outline: none;
+  opacity: 0;
+  /* a soft dark pool under the words, so the floor's glow cannot take them */
+  background: radial-gradient(ellipse 100% 120% at 0% 100%, rgba(0, 0, 0, 0.82), transparent 100%);
+  /* off quickly when a step is taken; on slowly once the camera has landed */
+  transition: opacity 0.25s var(--ease);
+}
+.wall-tour.is-on {
+  opacity: 1;
+  transition-duration: 0.7s;
+}
+.wall-tour-index {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.32em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+}
+.wall-tour-title {
+  margin: 0.45rem 0 0.7rem;
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: 1.45rem;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+.wall-tour-text {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  line-height: 1.95;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+.wall-tour-text > span {
+  display: block;
+}
+/* the last station's call — the same register as /about's links */
+.wall-tour-cta {
+  display: inline-block;
+  margin-top: 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.26em;
+  text-transform: lowercase;
+  color: var(--ink);
+  text-decoration: none;
+  transition: color 0.5s var(--ease);
+}
+.wall-tour-cta:hover,
+.wall-tour-cta:focus-visible {
+  color: var(--ink-dim);
+  outline: none;
+}
+.wall-tour-cta:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.45em;
+  text-decoration-color: var(--accent);
+}
+/* the pager: the same keys as the HUD's, a step brighter — they are the way on */
+.wall-tour-nav {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  margin: 1rem 0 0 -0.6rem;
+}
+.wall-tour-nav .wall-key {
+  color: var(--ink-dim);
+}
+.wall-tour-nav .wall-key:hover,
+.wall-tour-nav .wall-key:focus-visible {
+  color: var(--ink);
+}
+
 /* ---- fallbacks: no WebGL, context lost ---- */
 .wall-msg {
   position: absolute;
@@ -237,7 +391,11 @@
   .wall-title,
   .wall-exit,
   .wall-key,
-  .wall-swatch-lamp {
+  .wall-swatch-lamp,
+  .wall-tour,
+  .wall-tour-label,
+  .wall-tour-label::before,
+  .wall-tour-cta {
     transition: none;
   }
 }
@@ -253,6 +411,10 @@
   }
   .wall-spec {
     max-width: calc(100vw - 26rem);
+  }
+  /* the spec line runs to three lines here: the card stands clear of it */
+  .wall-tour {
+    bottom: calc(6.8rem + env(safe-area-inset-bottom, 0px));
   }
 }
 @media (max-width: 720px) {
@@ -297,10 +459,54 @@
     padding: 0.55rem 0.2rem;
     font-size: 0.58rem;
   }
+  /* the card is centred over the spec line and the two rows of keys */
+  .wall-tour {
+    left: 1rem;
+    right: 1rem;
+    width: auto;
+    bottom: calc(10.6rem + env(safe-area-inset-bottom, 0px));
+    padding: 1.4rem 1.2rem 0.6rem;
+    text-align: center;
+    background: radial-gradient(ellipse 80% 120% at 50% 100%, rgba(0, 0, 0, 0.88), transparent 100%);
+  }
+  .wall-tour-title {
+    font-size: 1.3rem;
+  }
+  .wall-tour-text {
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+  }
+  .wall-tour-nav {
+    justify-content: center;
+    margin-left: 0;
+  }
+  .wall-tour-nav .wall-key {
+    padding: 0.55rem 0.7rem;
+  }
+  .wall-tour-label {
+    font-size: 0.6rem;
+  }
+  /* docked (the rig stops placing it below `TOUR.labelDockBelowPx`): centred
+     under the wall, where the card opens — the leader turns into a tick above */
+  .wall-tour-label.is-docked {
+    left: 50%;
+    top: auto;
+    bottom: calc(10.6rem + env(safe-area-inset-bottom, 0px));
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.5rem 0.7rem;
+    transform: translateX(-50%);
+    will-change: auto;
+  }
+  .wall-tour-label.is-docked::before {
+    width: 1px;
+    height: 1.2rem;
+  }
 }
 /* a finger needs 44 px, whatever the viewport */
 @media (pointer: coarse) {
-  .wall-key {
+  .wall-key,
+  .wall-tour-label {
     min-width: 44px;
     min-height: 44px;
   }

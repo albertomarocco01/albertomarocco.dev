@@ -99,8 +99,12 @@ export const LED_CABINETS: readonly [number, number] = [
  * wall from brightening as you back away from it.
  */
 const DOT_COVERAGE = (Math.PI * LED.fill * LED.fill) / 4;
-export const LED_OFF_FLOOR = 1 + (LED.offMin - 1) * LED.contrast;
-export const LED_DOT_GAIN = (1 - LED_OFF_FLOOR * (1 - DOT_COVERAGE)) / DOT_COVERAGE;
+/** The two levels for any contrast — the tour pulses it, so it is solved as a function. */
+export function ledDotLevels(contrast: number): readonly [offFloor: number, dotGain: number] {
+  const off = 1 + (LED.offMin - 1) * contrast;
+  return [off, (1 - off * (1 - DOT_COVERAGE)) / DOT_COVERAGE];
+}
+export const [LED_OFF_FLOOR, LED_DOT_GAIN] = ledDotLevels(LED.contrast);
 
 /**
  * The content: the site's own aura shader, rendered into a render target and
@@ -397,6 +401,85 @@ export const PRESETS: readonly CameraPreset[] = [
     fit: true,
   },
 ];
+
+/**
+ * The guided tour — "what is a LED wall", in six stations. Each station is a
+ * camera pose in the same shape as a preset; the copy for it lives in
+ * `copy.ts` under the same id. Staging that belongs to one station is keyed
+ * on its index here so nothing else has to know the order.
+ */
+export type TourStationId = "what" | "pitch" | "cabinets" | "behind" | "where" | "commission";
+
+export interface TourStation extends Omit<CameraPreset, "id"> {
+  readonly id: TourStationId;
+}
+
+/** the "where" station stands wide and a little high, off the axis so the room reads */
+const WIDE_DEG = -17;
+const WIDE_R = 12;
+const WIDE_Y = 3.4;
+
+export const TOUR = {
+  /** the flight between two stations, seconds, on the signature ease (a cut under reduced motion) */
+  flightSeconds: 1.4,
+  /** the card fades in this long after the camera has settled */
+  cardDelayMs: 300,
+  /**
+   * The entry label stands to the right of the wall at eye height, this far
+   * from its edge. 0.6 m, not the brief's 1.5: at the front preset a 16:9
+   * frame holds the wall with little to spare, and at 1.5 m the label ran off
+   * the right edge at 1600 px. It is also kept this far inside the viewport …
+   */
+  labelGap: 0.6,
+  labelEdgePx: 16,
+  /** … and on a viewport this narrow (a phone) it docks under the wall instead — see wall.css */
+  labelDockBelowPx: 560,
+  /** it hides while the camera is within this of the wall, metres */
+  labelHideWithin: 1.5,
+  /** the wheel: this much accumulated deltaY (px) is one step … */
+  wheelStep: 40,
+  /** … and after a step, nothing counts for this long (a trackpad's inertia) */
+  stepCooldownMs: 900,
+  /** a vertical one-finger swipe of at least this many px is one step */
+  swipePx: 48,
+  /** station 2 (index 1): once settled, the lamps dissolve and resolve again — one beat */
+  pulseStation: 1,
+  pulse: { seconds: 2, contrastLow: 0.1 },
+  /** station 4 (index 3): the service light at this multiple of its usual intensity, eased at this rate */
+  backLightStation: 3,
+  backLight: { boost: 2, lambda: 6 },
+  /** station 5 (index 4): the loop steps to the next palette on arrival */
+  paletteStation: 4,
+  stations: [
+    { id: "what", position: PRESETS[0].position, target: PRESETS[0].target, fit: true },
+    { id: "pitch", position: PRESETS[2].position, target: PRESETS[2].target, fit: false },
+    {
+      // an oblique from the right, nearer than the preset: the seams converge, the near end is cropped on purpose
+      id: "cabinets",
+      position: [3.0, CAMERA.eye, 2.6],
+      target: [0.6, CAMERA.eye, 0],
+      fit: true,
+    },
+    {
+      // behind, a touch off the axis so the uprights and the looms have depth
+      id: "behind",
+      position: [1.2, CAMERA.eye, -4.85],
+      target: [0, CAMERA.eye, 0],
+      fit: true,
+    },
+    {
+      id: "where",
+      position: [
+        WIDE_R * Math.sin((WIDE_DEG * Math.PI) / 180),
+        WIDE_Y,
+        WIDE_R * Math.cos((WIDE_DEG * Math.PI) / 180),
+      ],
+      target: [0, WALL_CENTRE_Y, 0],
+      fit: true,
+    },
+    { id: "commission", position: PRESETS[0].position, target: PRESETS[0].target, fit: true },
+  ] as const satisfies readonly TourStation[],
+} as const;
 
 /** HUD cadence: the distance readout is a spec, not an animation. */
 export const HUD = {

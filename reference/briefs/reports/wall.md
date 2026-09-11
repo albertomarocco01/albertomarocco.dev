@@ -700,3 +700,232 @@ stated.
 - For 06: the palette row now follows the pager in the Tab order, so the tour
   label "after the pager" lands after the four swatches unless it is placed
   between the two groups.
+
+## Round 2c — "what is a LED wall": the guided tour
+
+Brief `round2/06-wall-tour.md`, built 2026-09-11 on the same AMD Radeon
+integrated GPU as 2a and 2b (`ANGLE (AMD, AMD Radeon(TM) Graphics, D3D11)`).
+One commit: `feat(wall): guided "what is a led wall" tour`. No shared file
+touched, nothing installed; `CONTACT` is imported read-only from
+`@/lib/contact` (a data module, no component) for the last station's link.
+
+### Audit
+
+`npx tsc --noEmit` clean and eslint zero findings before any change. Driven
+with agent-browser on the real GPU, console captured: front, oblique, close,
+back, four palette switches by key, the Tab order (exit → four views → four
+swatches), Esc to the index, exit / re-enter ×3 (heap 34.8 / 38.1 / 34.8 MB,
+one canvas each, a fresh WebGL2 context after), reduced motion (0 draws and 0
+frames at rest, `4` cuts in two frames, a switch settles to 0 draws), and a
+390 × 844 phone in Italian (the pager 88 × 30, the swatches 88 × 46, the spec
+line 23 px clear of the controls — as 2b measured). **No defect found**, so
+there is no fix commit this round.
+
+### What was built
+
+1. **The entry point.** A real `<button>` — `what is a led wall? →` /
+   `cos'è un led wall? →`, mono, `--ink-dim` → `--ink` on hover and focus, a
+   short hairline leader pointing back at the wall — standing in the room to
+   the right of the wall at eye height. It is DOM, not drei `<Html>`: it sits
+   in the HUD between the pager and the palette row, so it is literally after
+   the pager in the Tab order (the note 2b left), and the camera rig places it
+   every frame through the bus, the way the live distance is written — a
+   projected point, half-pixel dead-banded, no React render. It hides while the
+   tour runs, while the camera is within 1.5 m of the wall (`TOUR.labelHideWithin`),
+   when the wall itself is in the line of sight (a ray against the wall's box),
+   and behind the camera. Key `i` opens the tour too.
+2. **Six stations** (`TOUR.stations`, poses in the presets' own shape): front
+   7 m · close 0.9 m lower-left · an oblique from the right, nearer than the
+   preset, the near end cropped on purpose so the seams converge · behind at
+   5 m, a touch off the axis for depth · wide at 12 m and 3.4 m up, 17° off
+   the axis · front 7 m again. `flyTo(pose, animate)` in `CameraRig.tsx` is the
+   rig's own tween — `TOUR.flightSeconds` 1.4 s on `cubic-bezier(0.22, 1, 0.36, 1)`,
+   evaluated by a small Newton solver rather than importing `src/lib/motion.ts`,
+   which would pull GSAP into this chunk — written to the controls without a
+   transition so their damping adds no lag. A step mid-flight starts a new
+   flight from wherever the camera is. When the camera already stands on the
+   pose (the tour opened from the front preset) there is nothing to fly and
+   the station counts as reached at once.
+3. **The card.** DOM, bottom-left above the spec line: a mono index `03 / 06`,
+   a serif title, two or three mono lines in `--ink` on a soft dark pool, then
+   `next →` · `← back` · `× close` in the `wall-key` register, and on the last
+   station `commission a loop →` / `commissiona un loop →` — a `<Link>` to
+   `CONTACT.contactHref`, in `/about`'s CTA register. `next` is absent on the
+   last station and `back` on the first. The card goes off the moment a step
+   is taken (the old words fade out in 0.25 s) and comes back with the new
+   station's text 300 ms after the camera has landed (`TOUR.cardDelayMs`),
+   fading in over 0.7 s. "Landed" is reported by the rig through
+   `bus.settle(station)` when its flight ends, not guessed by a timer, so the
+   words always follow the room.
+4. **Staging.** Station 2: once settled, the lamps dissolve to a flat surface
+   and resolve again over 2 s (`LedWallMaterial.setContrast`, both levels
+   re-solved so the wall's brightness never changes — `ledDotLevels()` in the
+   config). Station 4: the service light at ×2, eased in at `damp` λ 6 and
+   back on leaving. Station 5: the loop steps to the next palette on arrival —
+   the wipe from 2b, so the colour change is the wall's own event. None of it
+   on the still paths.
+5. **Navigation.** Wheel or a vertical one-finger swipe → next / previous —
+   one step per gesture, then a 0.9 s cooldown that swallows a trackpad's
+   inertia (`TOUR.wheelStep` 40 px, `TOUR.stepCooldownMs`, `TOUR.swipePx` 48).
+   `↓` `Space` → next, `↑` → previous; `Esc` closes the tour and a second `Esc`
+   exits the demo (in the stage `aria` and on the close button's label);
+   `← →` and the swatches keep switching the loop mid-tour. While touring the
+   rig takes the wheel and both touch gestures off camera-controls
+   (`setTouring`), a mouse drag still orbits, and the idle drift is held off.
+   Choosing a view (a key or the pager) or pressing a walk key is taking the
+   wheel: it closes the tour and does what it says.
+6. **Focus and the live region.** Focus lands on the card when the tour opens
+   (`tabIndex` −1) and goes back to the label on Esc or the close button —
+   the label reappears on the rig's next frame, so the return waits one; if
+   it is hidden there (closed within 1.5 m of the wall) the stage takes the
+   focus instead. A polite live region reads `station 3 of 6 · Cabinets` /
+   `tappa 3 di 6 · Cabinet` when each card comes on. Space on a focused
+   button is left to the button, so `next →` never double-steps.
+7. **A phone.** At the framed presets the point beside the wall projects
+   off-screen on a 390 px viewport, so at or under `TOUR.labelDockBelowPx`
+   (560) the rig stops placing the label and the CSS docks it centred under
+   the wall — a tick above, the same spot the card opens in. The card is
+   centred there too, over the spec line and the two rows of keys; every
+   key is 44 px under `pointer: coarse`.
+8. **Reduced motion and the software path.** A station is a cut, the card
+   comes on at once with no fade, the pulse does not run and the service
+   light is set outright; on the demand frameloop nothing draws at rest.
+
+### Deviations, and why
+
+- **The label stands 0.6 m from the wall's edge, not 1.5**, and is kept 16 px
+  inside the viewport (`TOUR.labelGap`, `TOUR.labelEdgePx`). At the front
+  preset a 16:9 frame holds the wall with little to spare: at 1.5 m the label
+  ran off the right edge of a 1600 px window (`— cos'è un`). At 0.6 m it
+  ends 24 px short of the edge at 1600 px; on anything narrower the clamp
+  slides it left, over the wall's last cabinet at 1280 px.
+- **On a phone the label is docked, not in the room** — see 7 above.
+- **The "cabinets" station is 3.5 m from its target, not 4 m** — the target
+  is 0.6 m right of centre so the near cabinets fill the right of the frame
+  and the seams run off to the left; at 4 m from the centre the view lost
+  the near end and the seams read as a texture again.
+- **The card's timing follows the rig, not a timer** — `bus.settle`, so the
+  fade-in is 300 ms after the actual landing, and there is no 1.7 s wait
+  when the tour opens from the front preset, where there is nothing to fly.
+- **Presets and the walk close the tour; a drag does not.** Looking around
+  a station is part of it; taking a view or walking is leaving it.
+- **On touch, one-finger orbit and pinch are off inside the tour.** A vertical
+  swipe has to mean one thing; with the orbit on, every swipe would also
+  tilt the camera off the station before the flight corrected it.
+- **Station 5 steps the palette on every arrival**, coming back from 6 too:
+  "on arrival" taken literally, and it keeps the colours easy to try.
+
+### New tunables
+
+- `wall.config.ts` — `TOUR`: `flightSeconds` 1.4 · `cardDelayMs` 300 ·
+  `labelGap` 0.6 · `labelEdgePx` 16 · `labelDockBelowPx` 560 ·
+  `labelHideWithin` 1.5 · `wheelStep` 40 · `stepCooldownMs` 900 · `swipePx` 48 ·
+  `pulseStation` 1, `pulse` `{ seconds 2, contrastLow 0.1 }` ·
+  `backLightStation` 3, `backLight` `{ boost 2, lambda 6 }` ·
+  `paletteStation` 4 · `stations` (six poses; `WIDE_DEG` −17, `WIDE_R` 12,
+  `WIDE_Y` 3.4 above them). `ledDotLevels(contrast)` now derives
+  `LED_OFF_FLOOR` / `LED_DOT_GAIN` and serves the pulse.
+- `wall.css` — the card's bottom offset (5.8 rem; 6.8 rem at ≤ 1280 px where
+  the spec line runs to three lines; 10.6 rem centred at ≤ 560 px), its width
+  (27 rem) and pool; the docked label's position (the same 10.6 rem).
+- `copy.ts` — `tour.*`: the label, the card's `aria`, `next` / `back` /
+  `close` / `closeAria`, `station` / `of` for the live region, `cta`, and
+  the six stations' `title` + `lines`, EN and IT.
+
+### Known limits (new)
+
+- **A trackpad flick with more than 0.9 s of inertia can add a second
+  step.** `TOUR.stepCooldownMs` is the knob; the keys are never affected.
+- **The 44 px targets and the docked label were checked by geometry**, as in
+  2b: the emulated phone reports no `pointer: coarse` and no touch points,
+  so the swipe was driven with synthetic touch pointer events on the canvas.
+- **Closing the tour within 1.5 m of the wall leaves focus on the stage**,
+  not the label, because the label does not show there (station 2 is at
+  0.9 m). `i` reopens from anywhere.
+- **The stations are not addressable** — no deep link, and the tour always
+  starts at 1. The wheel and the swipe stop at the ends rather than wrapping.
+- **On a phone the wide stations land at 20 m** (the presets' aspect fit,
+  capped at `maxDistance`), so the wall is small under the centred card;
+  stations 2 and 3 are the ones that fill the screen.
+- **The drift is held off for the whole tour**, however long a station is
+  left open; it resumes 8 s after the tour closes.
+
+### Verification
+
+agent-browser on the real GPU (AMD Radeon iGPU), 1600 × 900, Italian unless
+stated; the software path on a headless Chrome launched with SwiftShader and
+attached over CDP.
+
+- **Open by click, by `i`, by keyboard** (Tab to the label, Enter): the card
+  comes on with focus on it (`activeElement` = the card), `01 / 06`, live
+  region `tappa 1 di 6 · Cos'è`. The label reads `hidden` while the tour runs.
+- **All six stations forward and back**: by `↓` the distance reads 7.0 →
+  0.9 → 3.5 → 5.0 → 12.1 → 7.0 m and the index, title and live region follow;
+  station 5 lands on ember (the palette stepped on arrival); station 6 shows
+  `commissiona un loop →` → `/about#contact` and no `next`. By wheel: +120
+  steps forward, −120 back, and a burst of five +50 ticks is exactly one step.
+  By swipe (phone, synthetic touch pointers on the canvas): 140 px up → next,
+  140 px down → back, 20 px → nothing. `next →` and `← back` by mouse and by
+  Enter; Space on the focused `next →` steps once, not twice.
+- **The pitch station's pulse**: 0.6 s after landing the wall reads as a flat
+  surface, 2.2 s after landing the lamps are crisp again (two captures).
+- **A loop switch mid-tour**: `→` from station 3 lands on ember with the card
+  still on `03 / 06`; a click on the teal swatch at station 1 does the same
+  and the spec line reads `loop: Liminal Field / teal`.
+- **Esc closes, then exits**: after the first Esc the card is gone and
+  `activeElement` is the label (shown again); the second Esc lands on
+  `/graphic-designs`. Enter on `× close` does the same as the first Esc.
+- **Taking the wheel**: `3` closes the tour and frames the close view (the
+  label hidden at 0.9 m); `1` brings the label back; a click on it reopens.
+- **Tab order**: exit → front · oblique · close · back → the label → amber ·
+  ember · teal · violet; inside the tour the card's keys follow the swatches.
+- **The label in the room**: front x 1359 (217 px wide in Italian, 225 in
+  English — the English one is what the clamp holds at 1359), oblique 1367,
+  back 147 (left of the wall from behind, its leader pointing at it).
+- **The drift is off while touring**: with the tour open from the back and
+  the room left alone, the wall's left edge (row 400) sat at x 334 at 10.5 s
+  and at 13.5 s; after closing, 340 at 9.5 s and 348 at 12.5 s — the drift
+  back.
+- **Frame pacing during a flight** (station 3 → 4, the oblique to the back,
+  sampled on `requestAnimationFrame`): 48 fps, p50 16.7 ms, p95 33.4 ms, max
+  33.6 ms on this iGPU — the back's own cost on it (2a measured the back
+  preset at 36–49 fps here), not the tween's.
+- **Reduced motion**: `i` shows the card within 150 ms; `↓` reads 0.9 m
+  within 250 ms (a cut); 0 draws in the following 1.5 s at station 2 and at
+  station 4 (no pulse, the service light set outright).
+- **Software** (`ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))`):
+  0 draws at rest; `i` opens; `↓` cuts to 0.9 m and 0 draws follow; three
+  more reach station 5 with the palette on ember; Esc, Esc leaves; 0 errors.
+- **Phone, 390 × 844 at DPR 3**: the docked label centred under the wall at
+  [103, 617, 183 × 58], hidden while the card shows; a tap opens; the card
+  at station 2 is [16, 412, 358 × 263], the spec line at 711 and the keys at
+  752 below it.
+- **Exit / re-enter ×3** from the index, opening the tour and stepping to
+  station 2 each time: heap 39.1 / 39.6 / 37.3 MB, one canvas on each entry,
+  no card left in the DOM after each exit, a fresh WebGL2 context after; 0
+  page errors; the console carries nothing but R3F's `THREE.Clock` notice and
+  its own `Context Lost` on unmount.
+- `npx tsc --noEmit` clean; `npx eslint` on the folder zero findings;
+  `npm run build` (allowed this round — no sibling session) passes, all
+  fifteen routes.
+
+### How to test it in two minutes (round 2c)
+
+1. Open the demo. To the right of the wall, at eye height: **cos'è un led
+   wall? →**. Click it, or press **i**. The card sits bottom-left.
+2. **Scroll the wheel once**: the camera goes to 0.9 m and, once there, the
+   lamps dissolve and come back. Again: the cabinets from the right. Again:
+   the back, lit brighter than usual. Again: the room from wide and high, and
+   the palette changes as you arrive. Again: **commissiona un loop →**.
+3. **← →** at any station switches the loop. Press **3** to take over; press
+   **i** to come back.
+4. **Esc** closes the tour; **Esc** again leaves the demo.
+5. On a phone the label sits under the wall; a swipe up or down pages.
+6. DevTools → Rendering → `prefers-reduced-motion: reduce`: every station is
+   a cut and the card just appears.
+
+### For the director (07-release)
+
+- Nothing to change in a shared file.
+- The cover is unchanged; it is 07's to re-capture. If the tour should be in
+  it, station 3 (the cabinets from the right, card on) is the frame.

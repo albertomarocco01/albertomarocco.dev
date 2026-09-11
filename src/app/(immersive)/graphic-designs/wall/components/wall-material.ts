@@ -6,6 +6,7 @@ import {
   LED_OFF_FLOOR,
   LED_PIXELS,
   LOOP,
+  ledDotLevels,
 } from "../wall.config";
 
 /**
@@ -176,5 +177,16 @@ export class LedWallMaterial extends THREE.ShaderMaterial {
     u.uSnapshot.value = snapshot;
     u.uWipe.value = wipe;
     u.uWipeDir.value = direction;
+  }
+
+  /**
+   * How hard the lamps read, 0 … 1 — the tour's pitch station pulses it. Both
+   * levels are re-solved so the cell average stays 1 at any setting: the wall
+   * never changes brightness, only whether you can see the lamps.
+   */
+  setContrast(contrast: number): void {
+    const [offFloor, dotGain] = ledDotLevels(contrast);
+    this.uniforms.uOffFloor.value = offFloor;
+    this.uniforms.uDotGain.value = dotGain;
   }
 }

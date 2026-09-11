@@ -17,9 +17,12 @@ const SWATCH = Object.fromEntries(
 
 /**
  * Everything written over the room: the title cover and its key line (the first
- * idle state only), the spec sheet bottom-left, and the two controls
+ * idle state only), the spec sheet bottom-left, the two controls
  * bottom-right — the view pager and the palette row, which are the same four
- * keys and the same two arrows, made visible and tappable.
+ * keys and the same two arrows, made visible and tappable — and the tour's
+ * entry label, a button that stands in the room beside the wall: the camera
+ * rig places it every frame through the bus, and hides it while the tour runs
+ * or the camera is within arm's reach of the wall.
  *
  * The spec line is a spec sheet on purpose: pitch and viewing distance are the
  * pair a client actually asks about, so the distance is live. It is written
@@ -34,6 +37,7 @@ export function Hud({
   started,
   onPreset,
   onLoop,
+  onTour,
 }: {
   copy: WallCopy;
   bus: WallBus;
@@ -43,11 +47,14 @@ export function Hud({
   onPreset: (index: number) => void;
   /** a palette by index, and which way the wipe should run to reach it */
   onLoop: (index: number, sweep: number) => void;
+  /** the label beside the wall: open the tour */
+  onTour: () => void;
 }) {
   const distanceRef = useCallback(
     (el: HTMLSpanElement | null) => bus.registerDistance(el, copy.decimal),
     [bus, copy.decimal],
   );
+  const labelRef = useCallback((el: HTMLButtonElement | null) => bus.registerLabel(el), [bus]);
 
   const pitch = LED.pitchMm.toFixed(1).replace(".", copy.decimal);
   const current = LOOP.variants.indexOf(variant);
@@ -101,6 +108,18 @@ export function Hud({
             </button>
           ))}
         </div>
+
+        {/* the tour's label: in the DOM here so it follows the pager in the Tab
+            order, on screen wherever the rig puts it (it is fixed-positioned) */}
+        <button
+          ref={labelRef}
+          type="button"
+          className="wall-tour-label is-hidden"
+          aria-keyshortcuts="i"
+          onClick={onTour}
+        >
+          {copy.tour.label}
+        </button>
 
         {/* one lamp per palette, lit in its own accent, its name under it */}
         <div className="wall-palette" role="group" aria-label={copy.loopAria}>

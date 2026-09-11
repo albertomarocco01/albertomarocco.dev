@@ -39,6 +39,7 @@ export function WallCanvas({
   variant,
   preset,
   presetNonce,
+  tour,
   reduced,
   software,
   frameloop,
@@ -49,6 +50,7 @@ export function WallCanvas({
   variant: LoopVariant;
   preset: number;
   presetNonce: number;
+  tour: number | null;
   reduced: boolean;
   software: boolean;
   frameloop: Frameloop;
@@ -85,6 +87,7 @@ export function WallCanvas({
         variant={variant}
         preset={preset}
         presetNonce={presetNonce}
+        tour={tour}
         reduced={reduced}
         software={software}
         bus={bus}

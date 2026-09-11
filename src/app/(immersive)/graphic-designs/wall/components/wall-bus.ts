@@ -1,10 +1,11 @@
-import { HUD } from "../wall.config";
+import { HUD, TOUR } from "../wall.config";
 
 /**
  * What crosses between the chrome and the room without a React render: the
  * live distance (the scene writes it straight into the HUD's span, throttled
- * and dead-banded), the "someone is here" stamp, and the keyboard walk (which
- * keys are held, read by the camera rig every frame).
+ * and dead-banded), the "someone is here" stamp, the keyboard walk (which
+ * keys are held, read by the camera rig every frame), and the tour's entry
+ * label — a DOM button the camera rig places over its point in the room.
  *
  * The same shape as the sibling demos' buses: one mutable object, mutated only
  * through its own methods, so nothing crosses a hook or a prop as a raw field.
@@ -21,6 +22,15 @@ export class WallBus {
   private readonly walking = { orbit: 0, dolly: 0 };
   /** which way the next loop switch wipes: +1 left → right, −1 right → left */
   private sweep = 1;
+  /** App's "the camera has landed on station n" listener — the card and the staging follow it */
+  private settleFn: ((station: number) => void) | null = null;
+  /** the tour label: the button, where it was last put, and whether it shows */
+  private label: HTMLElement | null = null;
+  private labelX = Number.NaN;
+  private labelY = Number.NaN;
+  private labelShown = false;
+  /** on a phone the label is docked by the CSS rather than placed from the room */
+  private labelDocked = false;
 
   /** App sets this just before it changes the loop; the scene reads it when the change lands. */
   setLoopSweep(direction: number): void {
@@ -68,6 +78,79 @@ export class WallBus {
     this.el = el;
     this.decimal = decimal;
     this.last = Number.NaN; // force the next sample to paint
+  }
+
+  /** App registers what happens when a station is reached (and null on unmount). */
+  registerSettle(fn: ((station: number) => void) | null): void {
+    this.settleFn = fn;
+  }
+
+  /** The camera rig: the flight to `station` has landed, or there was nothing to fly. */
+  settle(station: number): void {
+    this.settleFn?.(station);
+  }
+
+  /** The HUD calls this with the tour label (and null on unmount). */
+  registerLabel(el: HTMLElement | null): void {
+    this.label = el;
+    this.labelX = Number.NaN;
+    this.labelShown = false;
+  }
+
+  /**
+   * Called every frame by the camera rig with the label's point projected to
+   * CSS pixels, and whether it should show at all (not while touring, not
+   * within arm's reach of the wall, not through the wall). Only a change is
+   * written: the class when the visibility flips, the transform when the
+   * point has moved by half a pixel. The label is kept inside the viewport:
+   * pushed left when its point projects too near the right edge.
+   */
+  placeLabel(x: number, y: number, visible: boolean): void {
+    const el = this.label;
+    if (!el) return;
+    if (this.labelDocked) {
+      this.labelDocked = false;
+      el.classList.remove("is-docked");
+    }
+    this.showLabel(el, visible);
+    if (!visible) return;
+    const max = window.innerWidth - el.offsetWidth - TOUR.labelEdgePx;
+    if (x > max) x = max;
+    if (x < TOUR.labelEdgePx) x = TOUR.labelEdgePx;
+    if (Math.abs(x - this.labelX) < 0.5 && Math.abs(y - this.labelY) < 0.5) return;
+    this.labelX = x;
+    this.labelY = y;
+    el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translateY(-50%)`;
+  }
+
+  /**
+   * On a phone the point beside the wall projects off-screen at the framed
+   * presets, so the label docks where the CSS puts it — under the wall,
+   * where the card will open — and only its visibility is driven from here.
+   */
+  dockLabel(visible: boolean): void {
+    const el = this.label;
+    if (!el) return;
+    if (!this.labelDocked) {
+      this.labelDocked = true;
+      this.labelX = Number.NaN;
+      el.classList.add("is-docked");
+      el.style.transform = "";
+    }
+    this.showLabel(el, visible);
+  }
+
+  private showLabel(el: HTMLElement, visible: boolean): void {
+    if (visible === this.labelShown) return;
+    this.labelShown = visible;
+    el.classList.toggle("is-hidden", !visible);
+  }
+
+  /** Focus the label if it is showing — where focus returns when the tour closes. */
+  focusLabel(): boolean {
+    if (!this.label || !this.labelShown) return false;
+    this.label.focus({ preventScroll: true });
+    return true;
   }
 
   /**
