@@ -16,7 +16,10 @@ type Scene = '0-gate' | '1-intro' | '2-west' | '3-east' | '4-main';
 export default function App({ copy }: { copy: TarassacoCopy }) {
   const [scene, setScene] = useState<Scene>('0-gate');
   const [sensorsEnabled, setSensorsEnabled] = useState(false);
-  const [canInteract, setCanInteract] = useState(false);
+  // Interaction is unlocked per scene, so a scene change locks it again by
+  // itself — no reset effect needed.
+  const [unlockedScene, setUnlockedScene] = useState<Scene | null>(null);
+  const canInteract = unlockedScene === scene;
   const [sensorsError, setSensorsError] = useState<null | 'denied' | 'timeout'>(null);
   const [keyboardMode, setKeyboardMode] = useState(false);
 
@@ -53,26 +56,11 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
   // unlock it early (or setState after the demo is torn down).
   const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // When scene changes, lock interaction and clear nodes
-  useEffect(() => {
-    setCanInteract(false);
-    clearNodes();
-    if (revealTimerRef.current) { clearTimeout(revealTimerRef.current); revealTimerRef.current = null; }
-
-    // For scenes without a specific reveal callback (like main scene)
-    if (scene === '4-main') {
-      revealTimerRef.current = setTimeout(() => setCanInteract(true), SCENE_TRANSITION_DELAY);
-    }
-    return () => {
-      if (revealTimerRef.current) { clearTimeout(revealTimerRef.current); revealTimerRef.current = null; }
-    };
-  }, [scene]);
-
   const handleRevealComplete = useCallback(() => {
     // Add anti-skip delay after the reveal animation finishes
     if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
-    revealTimerRef.current = setTimeout(() => setCanInteract(true), SCENE_TRANSITION_DELAY);
-  }, []);
+    revealTimerRef.current = setTimeout(() => setUnlockedScene(scene), SCENE_TRANSITION_DELAY);
+  }, [scene]);
 
   // Determine physics constraints based on current scene
   const allowedDirection = scene === '2-west' ? 'left' : scene === '3-east' ? 'right' : 'both';
@@ -93,7 +81,20 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
     micThresholdOverride,
     sceneKey: scene
   });
-  
+
+  // When scene changes, clear nodes and drop any unlock timer armed by the
+  // previous scene. Scenes without a reveal callback (main) arm their own.
+  useEffect(() => {
+    clearNodes();
+    if (revealTimerRef.current) { clearTimeout(revealTimerRef.current); revealTimerRef.current = null; }
+    if (scene === '4-main') {
+      revealTimerRef.current = setTimeout(() => setUnlockedScene('4-main'), SCENE_TRANSITION_DELAY);
+    }
+    return () => {
+      if (revealTimerRef.current) { clearTimeout(revealTimerRef.current); revealTimerRef.current = null; }
+    };
+  }, [scene, clearNodes]);
+
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export const REVEAL_SPEED = 30; // ms per character
 
@@ -28,8 +28,7 @@ export function PretextLayout({
   windowWidth, 
   exclusionWidth = 0, 
   exclusionHeight = 0, 
-  registerNode, 
-  clearNodes,
+  registerNode,
   enableReveal = false,
   revealMode = 'ltr',
   onRevealComplete
@@ -37,10 +36,18 @@ export function PretextLayout({
   const containerRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<WordData[]>([]);
   const [containerHeight, setContainerHeight] = useState(0);
-  const [revealedCharCount, setRevealedCharCount] = useState(0);
-  const [isRevealDone, setIsRevealDone] = useState(false);
 
   const processedText = text; // Keep text normal
+
+  // Typewriter progress, keyed by the text it counts: a text change reads as 0
+  // on the very next render, with no reset effect, and the interval below just
+  // starts counting for the new text. Completion is derived the same way.
+  const [progress, setProgress] = useState({ text: '', count: 0 });
+  const revealedCharCount = !enableReveal
+    ? processedText.length
+    : progress.text === processedText ? progress.count : 0;
+  const isRevealDone =
+    !enableReveal || (processedText.length > 0 && revealedCharCount >= processedText.length);
 
   // The core "Pretext" layout engine
   useEffect(() => {
@@ -113,38 +120,25 @@ export function PretextLayout({
     return () => observer.disconnect();
   }, [processedText, exclusionWidth, exclusionHeight, windowWidth]);
 
-  // Typewriter effect
+  // Typewriter effect. Updater stays pure — advance one char, no-op at the end.
   useEffect(() => {
-    if (!enableReveal) {
-      setRevealedCharCount(processedText.length);
-      setIsRevealDone(true);
-      if (onRevealComplete) onRevealComplete();
-      return;
-    }
-
-    setRevealedCharCount(0);
-    setIsRevealDone(false);
-
-    // Updater stays pure — advance one char, no-op at the end. Completion
-    // side-effects (setIsRevealDone + onRevealComplete) live in the effect
-    // below: firing a parent setState from inside a state updater runs during
-    // render and warns "cannot update a component while rendering another".
+    if (!enableReveal) return;
     const interval = setInterval(() => {
-      setRevealedCharCount(prev => (prev >= processedText.length ? prev : prev + 1));
+      setProgress(p => {
+        const count = p.text === processedText ? p.count : 0;
+        return count >= processedText.length ? p : { text: processedText, count: count + 1 };
+      });
     }, REVEAL_SPEED);
-
     return () => clearInterval(interval);
-  }, [processedText, enableReveal, onRevealComplete]);
+  }, [processedText, enableReveal]);
 
   // Fire completion once the reveal reaches the end — as an effect (post-commit),
-  // not inside the updater. isRevealDone guards against re-firing.
+  // not inside the updater: firing a parent setState from inside a state updater
+  // runs during render and warns "cannot update a component while rendering
+  // another". Fires once per completion, since isRevealDone only flips once.
   useEffect(() => {
-    if (!enableReveal || isRevealDone) return;
-    if (processedText.length > 0 && revealedCharCount >= processedText.length) {
-      setIsRevealDone(true);
-      if (onRevealComplete) onRevealComplete();
-    }
-  }, [enableReveal, isRevealDone, revealedCharCount, processedText, onRevealComplete]);
+    if (isRevealDone && onRevealComplete) onRevealComplete();
+  }, [isRevealDone, onRevealComplete]);
 
   return (
     <div 

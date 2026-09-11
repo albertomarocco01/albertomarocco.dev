@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useCallback, useEffect } from 'react';
+import { useMemo, useRef, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useFrame, useLoader, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import gsap from 'gsap';
@@ -50,22 +50,28 @@ export function VortexCard({
 
   const meshRef = externalMeshRef || internalMeshRef;
   const materialRef = externalMaterialRef || internalMaterialRef;
-  const animGroupRefUsed = animGroupRef || internalAnimGroupRef;
+  // Name ends in `Ref` so the hooks lint knows the useFrame writes below are
+  // ref writes, not render-time mutation.
+  const usedAnimGroupRef = animGroupRef || internalAnimGroupRef;
 
   // ── Load image texture ─────────────────────────────────────────
+  // Sampling setup runs in a layout effect (before r3f's first frame), not in
+  // render: the loader cache hands the same texture to every mount.
   const texture = useLoader(THREE.TextureLoader, imageData.url);
-  useMemo(() => {
-    texture.colorSpace = THREE.SRGBColorSpace;
+  useLayoutEffect(() => {
     // Mipmaps back on. The cards are minified 3-5x for most of the vortex, and
     // sampling a full-res texture at that ratio is what produced the shimmer on
     // rotation as well as a cache-thrashing read pattern. The +33% memory this
     // costs is paid for several times over by the sources now being capped at
     // 640px (see data/images.js) — 99MB of texels down to ~44MB with mipmaps.
     // three clamps anisotropy to the hardware maximum.
-    texture.minFilter = THREE.LinearMipmapLinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.anisotropy = 4;
-    texture.generateMipmaps = true;
+    Object.assign(texture, {
+      colorSpace: THREE.SRGBColorSpace,
+      minFilter: THREE.LinearMipmapLinearFilter,
+      magFilter: THREE.LinearFilter,
+      anisotropy: 4,
+      generateMipmaps: true,
+    });
   }, [texture]);
 
   // ── Curved geometry ────────────────────────────────────────────
@@ -102,12 +108,13 @@ export function VortexCard({
   // ── Modulo Jitter (Floating Continuo) ───────────────────────────
   const { floating } = SCENE_CONFIG.cards;
 
-  const idleParams = useMemo(() => ({
+  // Lazy useState: drawn once per mount, never in render.
+  const [idleParams] = useState(() => ({
     phaseY: Math.random() * Math.PI * 2,
     phaseZ: Math.random() * Math.PI * 2,
     freqY: floating.frequencyY.min + Math.random() * (floating.frequencyY.max - floating.frequencyY.min),
     freqZ: floating.frequencyZ.min + Math.random() * (floating.frequencyZ.max - floating.frequencyZ.min),
-  }), []);
+  }));
 
   const localTimeRef = useRef(0);
   const hoverGroupRef = useRef();
@@ -119,16 +126,16 @@ export function VortexCard({
   const { gl } = useThree();
 
   useFrame((_, delta) => {
-    if (!animGroupRefUsed.current || !floating.enabled || reduceMotion) return;
+    if (!usedAnimGroupRef.current || !floating.enabled || reduceMotion) return;
     // Solo floating attivo durante idle
     if (phase !== 'idle') return;
 
     localTimeRef.current += delta;
     const t = localTimeRef.current;
 
-    animGroupRefUsed.current.position.y =
+    usedAnimGroupRef.current.position.y =
       Math.sin(t * idleParams.freqY + idleParams.phaseY) * floating.amplitudeY;
-    animGroupRefUsed.current.position.z =
+    usedAnimGroupRef.current.position.z =
       Math.sin(t * idleParams.freqZ + idleParams.phaseZ) * floating.amplitudeZ;
   });
 
@@ -214,7 +221,7 @@ export function VortexCard({
       onPointerOver={handlePointerOver}
       onPointerOut={handlePointerOut}
     >
-      <group ref={animGroupRefUsed}>
+      <group ref={usedAnimGroupRef}>
         <group ref={hoverGroupRef}>
           <mesh
             ref={meshRef}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import gsap from 'gsap';
@@ -43,10 +43,9 @@ export function VortexCamera({ phase }) {
   // ── Mount: set camera intrinsics + base position, then breathe ──
   useEffect(() => {
     mounted.current = true;
+    const target = currentTarget.current;
     const { fov, near, far } = SCENE_CONFIG.camera;
-    camera.fov = fov;
-    camera.near = near;
-    camera.far = far;
+    Object.assign(camera, { fov, near, far });
     camera.position.copy(basePosition);
     camera.lookAt(baseTarget);
     camera.updateProjectionMatrix();
@@ -60,7 +59,7 @@ export function VortexCamera({ phase }) {
       mounted.current = false;
       breathingOn.current = false;
       gsap.killTweensOf(camera.position);
-      gsap.killTweensOf(currentTarget.current);
+      gsap.killTweensOf(target);
       gsap.killTweensOf(currentRollAngle);
     };
   }, [camera, basePosition, baseTarget, startBreathing]);

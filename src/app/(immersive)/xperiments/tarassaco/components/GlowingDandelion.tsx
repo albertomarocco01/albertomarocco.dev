@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface GlowingDandelionProps {
   registerNode: (el: HTMLElement | SVGElement | null, x: number, y: number) => void;
@@ -7,8 +7,9 @@ interface GlowingDandelionProps {
 export function GlowingDandelion({ registerNode }: GlowingDandelionProps) {
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Elite "Ethereal" Architecture - More seeds, more organic
-  const seeds = useMemo(() => {
+  // Elite "Ethereal" Architecture - More seeds, more organic. Lazy useState,
+  // not useMemo: the random layout is drawn once per mount, never in render.
+  const [seeds] = useState(() => {
     return Array.from({ length: 140 }).map((_, i) => {
       const angle = (i / 140) * Math.PI * 2 + (Math.random() * 0.1 - 0.05);
       const length = 60 + Math.random() * 70;
@@ -25,7 +26,7 @@ export function GlowingDandelion({ registerNode }: GlowingDandelionProps) {
         opacity: 0.3 + Math.random() * 0.5,
       };
     });
-  }, []);
+  });
 
   useEffect(() => {
     const registerAll = () => {

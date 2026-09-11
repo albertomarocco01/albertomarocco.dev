@@ -104,9 +104,13 @@ function CarouselRing({ images, phase, onCarouselImageClick, ringRef }) {
   const rotationTweenRef = useRef(null);
   const carouselConfig = SCENE_CONFIG.carousel;
 
-  useEffect(() => {
+  // Reset while rendering (React's "adjust state on prop change" pattern), not
+  // in an effect: no extra commit with a stale `autoPaused`.
+  const [seenPhase, setSeenPhase] = React.useState(phase);
+  if (phase !== seenPhase) {
+    setSeenPhase(phase);
     if (phase !== 'carousel') setAutoPaused(false);
-  }, [phase]);
+  }
 
   const selectedCards = useMemo(() => {
     return images.map((img, i) => {
@@ -124,9 +128,9 @@ function CarouselRing({ images, phase, onCarouselImageClick, ringRef }) {
     () => selectedCards.map(() => ({ 
       outerGroupRef: createRef(), 
       animGroupRef:  createRef(),
-      materialRef:   createRef() 
+      materialRef:   createRef()
     })),
-    [selectedCards.length]
+    [selectedCards]
   );
 
   const carouselData = useMemo(() => {

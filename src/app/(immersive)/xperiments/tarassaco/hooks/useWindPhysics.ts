@@ -279,7 +279,8 @@ export function useWindPhysics({
         streamRef.current = stream;
 
         // Audio Setup
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const audioContext = new (window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
         audioContextRef.current = audioContext;
         // iOS Safari / the autoplay policy start the context 'suspended' until a
         // gesture resumes it — without this rms stays 0 and no blow is ever

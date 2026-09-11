@@ -31,7 +31,6 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected, c
   const groupRef   = useRef();
   const matRef     = useRef();
   const flyInDone  = useRef(false);
-  const timeRef    = useRef(0);
   const { gallery } = SCENE_CONFIG;
   const { camera, size } = useThree();
   const reduceMotion = useReducedMotion();
@@ -48,12 +47,12 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected, c
     SCENE_CONFIG.cards
   );
 
-  // Stable random bob params per card
-  const bob = useMemo(() => ({
+  // Stable random bob params per card (lazy useState: drawn once per mount, not in render)
+  const [bob] = useState(() => ({
     speed:     0.28 + Math.random() * 0.25,
     offset:    Math.random() * Math.PI * 2,
     amplitude: 0.08 + Math.random() * 0.06,
-  }), []);
+  }));
 
   // HUD anchor state
   const hudAnchor = useRef({ 
@@ -370,7 +369,6 @@ function generateSlots(count, aspect, rng) {
 
 // ── GalleryScene ─────────────────────────────────────────────────
 export function GalleryScene({ phase, backgroundImage, floatingImages, caption }) {
-  const { gallery } = SCENE_CONFIG;
   const { size }    = useThree();
   const safeImages  = floatingImages ?? [];
   const cardCount   = safeImages.length || 8;
