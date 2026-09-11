@@ -57,9 +57,12 @@ export default function App({ copy }: { copy: HandsCopy }) {
 
   const showLegend = useCallback(
     (withKeys: boolean) => {
+      // The wording follows the running mode, not the last key pressed: `?`
+      // itself makes the keyboard the last device, and in camera mode the
+      // hands must still be the ones explained.
       const d = input.lastDevice;
       setLegendDevice(
-        d === "hand" ? "hand"
+        input.mode === "camera" ? "hand"
         : d === "touch" || (d !== "pointer" && window.matchMedia?.("(hover: none)").matches) ? "touch"
         : "pointer",
       );
