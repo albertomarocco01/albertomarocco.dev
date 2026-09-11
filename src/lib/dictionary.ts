@@ -389,17 +389,17 @@ const en: Dictionary = {
       darkroom: {
         title: "Camera Oscura — Darkroom",
         meta: "interactive · fluid + shader · 2026",
-        desc: "A developing tray in the dark. Stir the liquid with your pointer and the prints surface where it has passed — a GPU fluid simulation developing photographs, live in your browser.",
+        desc: "A developing tray in the dark. Stir the liquid with your pointer and the prints surface where it has passed — or leave it alone and it develops by itself, each print sinking into the next.",
       },
       hands: {
         title: "Mani — Hands",
         meta: "interactive · hand tracking · 2026",
-        desc: "Your hands, read by the webcam. Pinch a print out of the drift, carry it, tear it in two with both hands — nothing leaves your browser.",
+        desc: "Your hands, read by the webcam. Pinch a print out of the drift, tear it in two with both hands, close your hand on one and it opens at the centre — nothing leaves your browser.",
       },
       wall: {
         title: "Parete — LED Wall",
         meta: "3d preview · led wall · 2026",
-        desc: "A 6 × 3 m LED wall in a dark room, running the generative loops live. Walk around it, switch loops, get close enough to see the pixel pitch.",
+        desc: "A 6 × 3 m LED wall in a dark room, running the generative loops live. Walk round the back to the cabinets and the cabling, switch palettes, or take the tour that shows what a LED wall is made of.",
       },
     },
   },
@@ -601,17 +601,17 @@ const it: Dictionary = {
       darkroom: {
         title: "Camera Oscura — Darkroom",
         meta: "interattivo · fluido + shader · 2026",
-        desc: "Una bacinella di sviluppo al buio. Muovi il liquido con il puntatore e le stampe affiorano dove è passato — una simulazione di fluido su GPU che sviluppa fotografie, dal vivo nel tuo browser.",
+        desc: "Una bacinella di sviluppo al buio. Muovi il liquido con il puntatore e le stampe affiorano dove è passato — oppure lascia fare: si sviluppa da sé, e ogni stampa affonda nella successiva.",
       },
       hands: {
         title: "Mani — Hands",
         meta: "interattivo · tracciamento mani · 2026",
-        desc: "Le tue mani, lette dalla webcam. Pizzica una stampa dalla deriva, portala con te, strappala in due con entrambe le mani — niente esce dal tuo browser.",
+        desc: "Le tue mani, lette dalla webcam. Pizzica una stampa dalla deriva, strappala in due con entrambe le mani, chiudi la mano su una e si apre al centro — niente esce dal tuo browser.",
       },
       wall: {
         title: "Parete — LED Wall",
         meta: "anteprima 3d · led wall · 2026",
-        desc: "Un led wall di 6 × 3 m in una stanza buia, con i loop generativi che girano dal vivo. Giraci intorno, cambia loop, avvicinati fino a vedere il pixel pitch.",
+        desc: "Un led wall di 6 × 3 m in una stanza buia, con i loop generativi che girano dal vivo. Passa dietro, tra i cabinet e i cavi, cambia palette, o segui il tour che racconta com’è fatto un led wall.",
       },
     },
   },

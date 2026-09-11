@@ -35,8 +35,9 @@ src/
                   field-state (Aura's published frame)
     providers/    AppProvider (entered / reduced-motion / fieldReady), SmoothScroll
   app/(immersive)/graphic-designs/
-                  the five Merge demos — vortex, tarassaco, darkroom (Camera
-                  Oscura), hands (Mani), wall (Parete). One folder each:
+                  the five Merge demos, each at /graphic-designs/<id> — vortex,
+                  tarassaco, darkroom (Camera Oscura), hands (Mani), wall
+                  (Parete); /xperiments/<id> 308s to them. One folder each:
                   page → client (ssr:false) → App + components/, hooks/,
                   <id>.config.ts (every tunable), <id>.css (scoped). Briefs and
                   build reports in reference/briefs/

@@ -438,8 +438,9 @@ Considered and left as designed (so the next pass doesn't re-open them):
 ## Merge — three new demos (2026-09-07)
 
 `/graphic-designs` now holds five pieces: Image Vortex and Tarassaco as they
-were, plus **Camera Oscura** (`/xperiments/darkroom`), **Mani**
-(`/xperiments/hands`) and **Parete** (`/xperiments/wall`). They were built in
+were, plus **Camera Oscura** (`/graphic-designs/darkroom`), **Mani**
+(`/graphic-designs/hands`) and **Parete** (`/graphic-designs/wall`) — all three
+at `/xperiments/<id>` until round 2 moved them. They were built in
 parallel by three sessions against briefs in `reference/briefs/`, each owning
 only its own route folder and `public/<id>/`; every shared file was the
 director's. Per-demo build reports (what was built, every tunable, the known
@@ -489,8 +490,10 @@ Conventions that came out of the three at once:
 ## Payload (measured on the production build, 2026-09-07)
 
 Per route, cold: `/` 433 KB JS · LCP 392 ms; `/graphic-designs` 436 KB ·
-196 ms; `/about` 439 KB · 124 ms; `/xperiments/darkroom` 440 KB;
-`/xperiments/hands` 486 KB; `/xperiments/wall` 632 KB. The three demo chunks
+196 ms; `/about` 439 KB · 124 ms; `/graphic-designs/darkroom` 440 KB;
+`/graphic-designs/hands` 486 KB; `/graphic-designs/wall` 632 KB (measured
+under their old `/xperiments/<id>` paths; the move renamed the route, not the
+chunk). The three demo chunks
 are per-route — three/R3F stays shared, the reflector, composer and MediaPipe
 do not leak into the site bundle. Fonts are 195–229 KB on every route (Fraunces
 roman + italic, JetBrains Mono, all variable) and are the largest fixed cost;
@@ -502,6 +505,81 @@ they are left alone deliberately, since the display serif *is* the site.
 - **`public/darkroom|hands|wall` are `immutable`**, like `/vortex/images` and
   `/mediapipe`: content-addressed by filename, so they should not be
   revalidated on every visit to the index.
+
+## Merge — round 2 (2026-09-11)
+
+Alberto walked the five pieces and asked for a second pass on three of them.
+Six briefs in `reference/briefs/round2/`, one session each, each owning one
+folder; the per-demo reports carry a **Round 2** section with every tunable and
+every known limit. What follows is only what the briefs did not already decide.
+
+**The demos moved to `/graphic-designs/<id>`.** They opened under
+`/xperiments/<id>`, which filed them beside the generative rows they are not.
+`next.config.ts` answers the old paths with a 308 for the five ids explicitly,
+so `/xperiments` itself still serves the rows and a future `/xperiments/*` page
+is untouched. Canonicals, the sitemap and the camera `Permissions-Policy`
+headers moved with them.
+
+- **Camera Oscura — a print hands over to the next one, and nothing is
+  written over the tray.** A fixed print no longer drains to black: the next is
+  bound into the tray at once and the finished one sinks over it for 1.2 s
+  (0.8 s on ← / →), deeper under the liquid, which keeps its velocity and
+  pressure fields — a handover is not a still tray. The outgoing print is held
+  in its own target and blended on one `u_drain` uniform, so outside a handover
+  the branch costs nothing. Fresh paper wets in over 3 s: without that ramp the
+  incoming print flared up in the previous stir's leftover swirls and read as
+  smoke on black — the fluid-demo look the piece exists to avoid. The two HUD
+  corners are gone; the title and the hint show on the first idle state only,
+  and after that the exit link is the only writing on the page. Left alone the
+  tray now develops by itself in about half a minute — the brief's faster
+  numbers read as a fast-forward. A parked mouse no longer counts as input: the
+  OS emits sub-pixel jitter, which reset the idle clock forever, so a move
+  under 2 px is dropped.
+- **Mani — closing your hand opens a print.** The tracker gained a fist (four
+  consecutive closed detections to enter, six open ones to leave), and because
+  a pinch enters at frame 2 and a fist at frame 4, closing the hand *on* a
+  print reads as pinch → hold → fist → open. While a fist holds, the pinch
+  machine is frozen and the push test is off: a fist must never scatter the
+  prints, and a pinch must never open one. The opened print flies to the centre
+  at 62 % of the viewport height, perspective-corrected at its own z; the other
+  thirteen drift out and fade but are never disposed, so a close puts them back
+  exactly where they were. A 450 ms arm window after the open swallows a
+  double-click's second press. Closing is a sweep of the open palm (at 0.75 ×
+  the push speed, no cooldown), a flick, a double-click, or Escape / Backspace
+  / P — and the same sweep raises no wave outside focus mode. Hover (lift,
+  a touch of scale, up to 5° of tilt toward the fingertip) is the piece's
+  answer to "which print am I about to take"; touch gets none. The legend
+  became an onboarding card that leaves at the first gesture that lands, and an
+  opened print carries a caption from fourteen one-liners in the Vortex voice —
+  English in both locales, like the prints themselves.
+- **Parete — an endless ground, a back, and a tour.** The figure is gone;
+  scale now comes from the riser, the cabinets and the pool of light. The
+  backdrop cylinder went with it: a 400 m floor under a linear fog to black
+  from 10 to 40 m has no edge to find at any distance, and drei's reflector
+  keeps `<fog_fragment>`, so the mirrored floor fades with it. The back is
+  modelled from the same `LED_CABINETS` table as the face — cabinet bodies,
+  lips, a lead drooping between every pair of connectors, a loom per row, the
+  ground support, a processor with its pilot — in six draw calls, laid out from
+  the front's own numbers so the two can never disagree. It is lit at 60 % of
+  the front, not the 10 % the brief asked: a near-black albedo under a dim
+  light is simply black, and the first capture showed nothing but the pilot.
+  The loop arrows became a row of lamps in the palette's own colours, and a
+  switch is a wipe across the cabinets — two render targets trade places rather
+  than blitting, the colour behind the front settles in 0.4 s so the edge
+  carries the change, and the lights follow what the wall shows rather than the
+  live palette. The guided tour (`what is a led wall?`, six stations) is DOM
+  over the rig's own tween; its card waits for the rig to report the landing
+  instead of a timer, so the words always follow the room. Taking a view or a
+  walk key closes the tour; looking around inside a station does not.
+- **The index tells the new story.** `gd.demos.{darkroom,hands,wall}` now lead
+  with what round 2 added — it develops by itself, close your hand on a print,
+  walk round the back and take the tour — and the two covers were re-shot from
+  the demos themselves: Parete at an oblique from the right with the whole wall,
+  the riser and the amber pool in frame (the preset's own 13 m framing leaves
+  the wall a smudge in a 4:5 crop, so the frame is the preset's angle at 9 m),
+  Mani with one print opened, its caption under it and the reticle on it. Camera
+  Oscura keeps its print: nothing the fluid does reads better at 220 px than the
+  photograph it develops.
 
 ## Deferred
 
