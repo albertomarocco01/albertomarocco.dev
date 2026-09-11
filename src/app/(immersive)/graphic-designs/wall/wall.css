@@ -115,7 +115,7 @@
   align-items: baseline;
   /* one line where there is room for one, and never under the controls: the
      second term reserves the width the pager and the loop switcher occupy */
-  max-width: min(50rem, calc(100vw - 24rem));
+  max-width: min(58rem, calc(100vw - 33rem));
   font-family: var(--mono);
   font-size: 0.64rem;
   letter-spacing: 0.18em;

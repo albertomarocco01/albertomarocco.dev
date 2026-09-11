@@ -1,11 +1,10 @@
 import { HUD } from "../wall.config";
 
 /**
- * The one number on the HUD that changes while you move: how far the camera
- * stands from the wall. It belongs on the spec line — pitch and viewing
- * distance are the pair a client actually asks about — but it must not cost a
- * React render per frame, so the scene writes it straight into the DOM node the
- * HUD hands over here, throttled and dead-banded.
+ * What crosses between the chrome and the room without a React render: the
+ * live distance (the scene writes it straight into the HUD's span, throttled
+ * and dead-banded), the "someone is here" stamp, and the keyboard walk (which
+ * keys are held, read by the camera rig every frame).
  *
  * The same shape as the sibling demos' buses: one mutable object, mutated only
  * through its own methods, so nothing crosses a hook or a prop as a raw field.
@@ -18,12 +17,9 @@ export class WallBus {
   /** R3F’s `invalidate`, registered by the scene: on the demand frameloop a
    *  stamp alone changes nothing until a frame runs. */
   private wakeFrame: (() => void) | null = null;
+  /** the held walk keys, as directions: orbit −1 | 0 | 1, dolly −1 | 0 | 1 */
+  private readonly walking = { orbit: 0, dolly: 0 };
 
-  /**
-   * "Someone is here." Every input — a key, a drag, the wheel, a HUD button —
-   * stamps this; the camera rig watches it to know when to stop drifting, and
-   * App uses the first one to retire the title cover.
-   */
   /** The scene hands over R3F’s `invalidate` (and null on unmount). A method
    *  rather than a public field: writing to a prop object is what the React
    *  compiler rules forbid, and the sibling demos take the same shape. */
@@ -31,6 +27,11 @@ export class WallBus {
     this.wakeFrame = fn;
   }
 
+  /**
+   * "Someone is here." Every input — a key, a drag, the wheel, a HUD button —
+   * stamps this; the camera rig watches it to know when to stop drifting, and
+   * App uses the first one to retire the title cover.
+   */
   wake(): void {
     this.wokeAt = performance.now();
     this.wakeFrame?.();
@@ -39,6 +40,16 @@ export class WallBus {
   /** The last stamp, for a consumer that compares it with its own. */
   lastWake(): number {
     return this.wokeAt;
+  }
+
+  /** App keeps this current from keydown / keyup; the rig applies it per frame. */
+  setWalk(orbit: number, dolly: number): void {
+    this.walking.orbit = orbit;
+    this.walking.dolly = dolly;
+  }
+
+  walk(): Readonly<{ orbit: number; dolly: number }> {
+    return this.walking;
   }
 
   /** The HUD calls this with its span (and null on unmount). */

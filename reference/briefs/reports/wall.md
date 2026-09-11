@@ -285,3 +285,218 @@ Nothing to change in a shared file. The route folder, `public/wall/cover.webp`
 and this report are the whole diff. The cover is a real capture of the finished
 piece (oblique, amber, 10.0 m, chrome hidden), 800 × 1000, 31 KB, and it holds up
 at the card's 220 px.
+
+## Round 2 — the room, the back of the wall, the camera
+
+Brief `round2/04-wall-room.md`, built 2026-09-11. Route is now
+`/graphic-designs/wall`, folder `src/app/(immersive)/graphic-designs/wall/`.
+Two commits: `fix(wall): keep the eye above the floor at long dolly` (the audit
+fix) and `feat(wall): endless ground, no figure, the back — cabinets, cabling,
+support`. No shared file touched, nothing installed.
+
+**Measured on a different machine than round 1** — an AMD Radeon integrated GPU
+(`ANGLE (AMD, AMD Radeon(TM) Graphics, D3D11)`), not the GTX 1660 SUPER. The
+absolute frame rates below are that GPU's, and they are compared against the
+same demo's round-1 code on the same GPU, measured in the same session.
+
+### Audit
+
+Every path in "How to test it in two minutes" was driven over CDP in headless
+Chrome on the real GPU before anything changed. Of the brief's four suspects:
+
+- **The idle drift and a HUD click** — not a defect. Tracked the wall's left
+  edge across timed frames: drifting (516 → 526 px over 1.5 s), then after a
+  click on the loop arrow the edge holds at 526 for the next 4.5 s. The click
+  drops the drift and restarts the 8 s count, which is the documented contract.
+- **The `RectAreaLight` lights nothing behind the wall** — true, and it is §3's
+  work, not a fix.
+- **drei's reflector leak** — documented, untouched.
+- **Resize not re-framing** — by design, untouched.
+
+One real defect, fixed in its own commit: **at the far end of the dolly a drag
+to the polar limit put the eye under the floor.** At 14 m and 100° the camera
+sits at y = −0.83 m; the ground plane is single-sided and simply vanishes,
+leaving the room seen from beneath. `CameraRig` now tightens the polar limit
+with distance so the eye keeps `CAMERA.floorClearance` (0.3 m) above the ground,
+and — because camera-controls only clamps when asked — nudges an out-of-range
+polar back with its own damping. Verified at 20 m: a full drag up stops with the
+floor still under the camera.
+
+### What changed, and why
+
+1. **No figure.** `ROOM.figure` and both meshes are gone. Scale now comes from
+   the riser, the cabinets, the cabling, the support and the ground.
+2. **An endless ground.** The floor is 400 m square and the room has no walls:
+   `scene.fog` is a linear fog to black from 10 to 40 m, so every preset (all
+   inside 7 m) keeps the pool of light untouched, and by 40 m the ground is
+   gone. drei's `MeshReflectorMaterial` injects at `emissivemap_fragment` and
+   leaves `<fog_fragment>` in place, so the floor honours the fog in both the
+   main and the mirrored render — verified at 20 m: the horizon is black, no
+   edge anywhere. `LedWallMaterial` and the pilot light are not opted in, so the
+   face stays bright at any distance while the ground under it fades. The
+   backdrop cylinder and `backdrop-material.ts` are deleted. The optional floor
+   grid was **not** added: with the cabinets, the rig and the pool of light the
+   ground does not read as a void, and a grid would have read as a UI.
+3. **The camera goes round the back.** Azimuth is unlimited, polar 55°–100°,
+   dolly 0.6–20 m, truck still off. A keyboard walk: `a` / `d` orbit at 40°/s,
+   `w` / `s` dolly at 70 % of the current distance per second, held keys, fed
+   through camera-controls' own damping so a release glides to a stop. The keys
+   are tracked in `App` (keydown / keyup, cleared on window blur so an alt-tab
+   never leaves a key stuck), cross to the rig through `WallBus.setWalk`, and a
+   held key holds the idle count at zero so the drift never starts under your
+   hand. Under reduced motion the walk still works, without the damping tail.
+4. **A fourth preset, `back` (key `4`, `retro` in Italian):** 6 m behind the
+   wall, eye height, level, `fit: true`. In the pager and in `aria`.
+5. **The back is modelled**, all of it laid out from `LED_CABINETS` so it can
+   never disagree with the front (`components/wall-back.ts`):
+   - the 72 cabinets are now the wall's body — one merged geometry (body, a
+     rear lip standing 12 mm proud, a connector block lower-right, a handle
+     recess upper centre) coloured per part by vertex colour, instanced 72
+     times, one draw call. The bodies are a full pitch wide so they touch —
+     the 4 mm gap lives in the lips, where it is seen. (A first cut left the
+     gap in the bodies too, and from behind the lit floor in front showed
+     through the wall as a bright slit.)
+   - a power and a data lead droop between neighbouring connectors along each
+     row — one quadratic-bezier tube pair, instanced 66 times, one draw;
+   - one loom per row leaves the left-hand cabinet, drops to the riser, runs
+     along it and steps down to the processor — six Catmull-Rom tubes merged,
+     one draw;
+   - ground support: four square-section uprights behind the wall, an
+     outrigger from each to the floor, feet, a bracket bolting each upright to
+     the riser's back, and two horizontal rails — 22 instances of one unit
+     box, one draw;
+   - a processor case on the floor behind the riser at the right, with one
+     amber pilot light on its back (two draws).
+   Six draw calls for the whole back; `dispose()` frees every geometry and
+   material.
+6. **A service light.** A second `RectAreaLight` of the wall's size stands
+   2.4 m behind it and shines at the cabinet backs, tinted by the loop like the
+   front one, at 60 % of the front's intensity. See the deviation below.
+7. **The oblique preset is back on the right** (+35°, as the brief had it) now
+   there is no figure to keep out of the frame; it still holds the whole wall.
+8. **Spec line:** `ground support · daisy-chain` added, in the trade's English
+   in both locales. The line reserves 33 rem for the four-button pager so it
+   never runs under the controls; at 1600 px it wraps to two lines.
+9. **Cover** re-captured: oblique, amber, 13 m, chrome hidden — the figure was
+   in the old one. 800 × 1000, 8 KB.
+
+### Deviations, and why
+
+- **The back is lit at 60 % of the front, not 10 %, and its greys are lifted.**
+  At `#0b0b0d` (linear ≈ 0.003) under a 10 % light the back was black — the
+  first screenshot showed nothing but the pilot light. A near-black albedo
+  under a dim light is simply black; there is no exposure that reads. The
+  cabinets are now die-cast greys (`#1c1c20` body, `#34343a` lip, `#2a2a30`
+  connectors, `#26262b` support) at metalness 0.5, and the light at 0.6. It
+  reads as a dark service side — the front pool is still five stops brighter.
+  `ROOM.backLight.ratio` and `BACK.colors` are the knobs.
+- **The processor is on the floor behind the riser, not on it.** On the riser
+  top a 2U case intersects the bottom row of cabinets; behind the riser it sits
+  where a real one would, and the looms step down to it.
+- **The phone presets now land at 20 m, not 14.** `maxDistance` rose to 20 for
+  the walk, and the aspect fit is capped at it. On a 390 px phone the whole
+  wall is now inside the frame with black either side (78 % of the width),
+  where round 1 filled the width with the outer edges cropped. The composed
+  version is the more honest one; if the larger crop is wanted back, a separate
+  fit cap is a two-line change in `applyPreset`.
+- **The back preset targets eye height, not the wall's geometric centre.** 1.6
+  against 1.8 m — 2° of tilt over 6 m — so the gaze stays level like the other
+  wide views and verticals stay vertical.
+
+### New tunables
+
+All in `wall.config.ts`:
+
+- `ROOM.floorSize` 400 · `ROOM.fog` `{ near 10, far 40 }` ·
+  `ROOM.backLight` `{ ratio 0.6, distance 2.4 }`. `ROOM.backdrop*` and
+  `ROOM.figure` are gone.
+- `WALL.bodyDepth` is now the cabinet depth, 0.12.
+- `BACK` — `gap`, `lipDepth`, `lipWidth`, `connector`, `handle`, `cable`
+  (`powerRadius`, `dataRadius`, `sag`, `dataLift`, `loomRadius`,
+  `loomSpacing`), `support` (`count`, `section`, `height`, `standoff`,
+  `outriggerFrom`, `outriggerReach`, `outriggerSection`, `railY`,
+  `railSection`, `foot`, `bracket`), `processor` (`size`, `x`, `z`, `pilot`),
+  `colors`, `roughness`, `metalness`.
+- `CAMERA` — `minPolar` 55, `azimuthLimit` `Infinity`, `maxDistance` 20,
+  `floorClearance` 0.3, `walkDegrees` 40, `walkRate` 0.7.
+- `PRESETS[3]` (`back`).
+
+### Verification
+
+CDP, headless Chrome on the real GPU (AMD Radeon iGPU), 1600 × 900 at DPR 1.5,
+draw calls counted by wrapping the four `draw*` entry points:
+
+| | fps (round 1 code, same GPU) | fps (now) | draws / frame |
+|---|---|---|---|
+| front | 43 | 43–55 | 41.5 |
+| oblique | 42 | 42–59 | 41.5 |
+| close | 22 | 23–28 | 38 |
+| back | — | 36–49 | 41 |
+| 20 m | — | 61 | — |
+
+Two runs are quoted because the sibling sessions were driving their own
+browsers on the same GPU at the time; in every pair the new build was no
+slower than round 1's on the same view. Draw calls are under the 60 budget
+everywhere (the composer and the reflector's mirror pass are inside the count).
+
+- **A full 360° drag** from the oblique, three screen-widths of it, and a 360°
+  from the back: no edge, no seam, no console error. `wasd`: `a` held 2 s
+  orbits to the wall's end; `w` held 1.5 s dollies 7 → 1.1 m; `d` + `s` land
+  at 12.4 m from the front.
+- **Max dolly, 20 m:** black horizon; a full drag up stops with the floor still
+  under the camera.
+- **Reduced motion:** 0 draws at rest; `4` cuts to the back within 500 ms; a
+  held `a` walks; a loop switch repaints once and goes quiet (0 draws in the
+  following second).
+- **Software (SwiftShader):** 0 draws at rest, the back preset reframes, the
+  back renders without bloom.
+- **Phone, 390 × 844 at DPR 2, touch:** front lands at 20 m with the whole
+  wall in frame; a one-finger swipe orbits to the wall's end; a pinch-open
+  dollies 20 → 15.4 m; a tap on `retro` goes to the back. The spec line drops
+  its wide segments (cabinets, rig, loop) as before.
+- **Exit / re-enter ×3** from `/graphic-designs`: heap 29.9 → 33.9 → 33.6 MB on
+  the three entries (flat after the first), one canvas on each exit, a fresh
+  WebGL2 context obtainable afterwards, no errors, no warnings beyond R3F's
+  `THREE.Clock` notice.
+- `npx tsc --noEmit` clean; `npx eslint` on the folder zero findings.
+  `npm run build` was **not** run — the darkroom and hands sessions were live in
+  the same tree throughout.
+
+### How to test it in two minutes (round 2)
+
+1. Open the demo. Press **4**: the camera swings round to 6 m behind the
+   wall — cabinet backs, lips, the two leads drooping between every pair of
+   connectors, the six looms dropping on the left and running to the processor
+   on the floor at the right with its amber pilot, the uprights, the
+   outriggers, the rails. **Scroll in** to a cabinet back.
+2. Hold **a** or **d** and walk right round; hold **w** / **s** to close in
+   and back off. Let go: the camera glides to a stop.
+3. Press **1**, then **scroll out to 20 m**: the ground fades to black with no
+   edge, the wall the only thing in the world. Drag up as far as it goes — the
+   floor stays under you.
+4. Press **2**: the oblique from the right, the reflection under it, one
+   outrigger foot just showing past the wall's end.
+5. **← / →** with the back in view: the service light changes hue with the loop.
+
+### Known limits (new)
+
+- **At 0.6 m behind the wall the camera is inside the support** — between the
+  rails and the uprights. Nothing clips badly, but the view is two cabinet backs
+  and a lip. It is the visitor's own choice; `CAMERA.minDistance` is the knob.
+- **The handle recess is a dark plate, not a cut** (`ponytail:` in
+  `wall-back.ts`). Past arm's length it reads identically; a real recess would
+  need a hole in the body and a second material.
+- **The looms are one tube per row, not a power and a data lead each.** Two
+  leads run between the connectors; from the row's end down and along the
+  riser they are one loom. Real installs tape them together there.
+- **No collision with the geometry.** The camera can pass through an upright
+  or an outrigger when orbiting close behind the wall.
+
+### For the director (07-release)
+
+- The **hands** session's commit `b36bf6a` swept this folder's
+  `components/backdrop-material.ts` deletion into itself — I had `git rm`'d it
+  and the sessions share one index. At that revision `WallScene.tsx` still
+  imports the file, so `b36bf6a` alone does not compile; the tree is consistent
+  again from `feat(wall): …` onward. Nothing to do unless bisecting.
+- Nothing to change in a shared file.

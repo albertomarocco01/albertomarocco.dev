@@ -21,8 +21,12 @@ export const WALL = {
   riserDepth: 0.6,
   /** the riser overhangs the wall a little on each side */
   riserOverhang: 0.2,
-  /** cabinet body behind the emissive face — the wall has depth, seen obliquely */
-  bodyDepth: 0.16,
+  /**
+   * Depth of one die-cast cabinet, front face to rear lip. The wall's body is
+   * 72 of these (see `BACK`), so this is also how far the back of the wall
+   * sits behind the emissive face.
+   */
+  bodyDepth: 0.12,
   /** the emissive face sits this far proud of the body, to avoid z-fighting */
   faceOffset: 0.002,
 } as const;
@@ -77,7 +81,7 @@ export const LED = {
   angleFalloff: 0.3,
 } as const;
 
-/** Derived LED geometry — one source of truth for the shader and the HUD. */
+/** Derived LED geometry — one source of truth for the shader, the back and the HUD. */
 export const LED_PIXELS: readonly [number, number] = [
   Math.floor((WALL.width * 1000) / LED.pitchMm),
   Math.floor((WALL.height * 1000) / LED.pitchMm),
@@ -118,38 +122,22 @@ export const LOOP = {
 
 export type LoopVariant = (typeof LOOP.variants)[number];
 
-/** The room around it — implied, never described. */
+/**
+ * The room around it — a dark, endless ground and nothing else. There are no
+ * walls: the floor runs out past the camera's far plane and everything on it
+ * fades to black with distance, so the wall is the only object in the world.
+ */
 export const ROOM = {
-  /** floor plane, metres square (large enough to run out of frame at max dolly) */
-  floorSize: 60,
-  /** the backdrop shell: a dark cylinder, unlit, only a gradient */
-  backdropRadius: 26,
-  backdropHeight: 18,
-  /** near-black at the top, a touch lifted where the walls meet the floor */
-  backdropTop: [0.0, 0.0, 0.004] as const,
-  backdropBottom: [0.07, 0.07, 0.082] as const,
-  /** how tightly the lift hugs the floor — below 1 it is a thin band, not a wash */
-  backdropCurve: 0.4,
-  /** 1.8 m matte figure for scale: a capsule and a sphere, off-centre, in front */
-  figure: {
-    /**
-     * 1.5 m in front of the wall rather than the 3 m the brief suggests: at 3 m
-     * the figure is nearer the camera than the panel is, and a 1.8 m person
-     * then renders TALLER on screen than the 3 m wall — true perspective, and
-     * the exact opposite of what a scale figure is for.
-     */
-    position: [2.8, 0, 1.5] as const,
-    /** capsule: radius, straight length, and the centre height of its axis */
-    radius: 0.135,
-    length: 1.25,
-    centreY: 0.81,
-    headRadius: 0.115,
-    headY: 1.685,
-    color: "#111111",
-    roughness: 0.92,
-  },
+  /** floor plane, metres square — far past `CAMERA.far`, so it never shows an edge */
+  floorSize: 400,
+  /**
+   * Linear fog to black, metres from the camera. Nothing inside `near` is
+   * touched — every preset stands closer than that to the wall, so the pool of
+   * light keeps its character — and the ground is fully black by `far`. The
+   * wall's own materials are custom shaders and stay out of it on purpose.
+   */
+  fog: { near: 10, far: 40 },
   riserColor: "#08080a",
-  bodyColor: "#0b0b0d",
   floorColor: "#7c7c80",
   floorRoughness: 0.86,
   /** a flat bounce so the reflector has something to modulate everywhere */
@@ -161,6 +149,88 @@ export const ROOM = {
     /** the light sits just in front of the face so it does not self-shade */
     offset: 0.05,
   },
+  /**
+   * A service light for the back: a second area light of the wall's size,
+   * standing this far behind it and shining at the cabinet backs, at this
+   * fraction of the front light. Tinted by the loop like the front one, so the
+   * back reads as the same room — readable, never bright.
+   */
+  backLight: {
+    ratio: 0.6,
+    distance: 2.4,
+  },
+} as const;
+
+/**
+ * The back of the wall — the physical details a client asks about, all driven
+ * by `LED_CABINETS` so they stay consistent with the front. Metres.
+ */
+export const BACK = {
+  /** air between neighbouring cabinets */
+  gap: 0.004,
+  /** the rear lip: a frame standing proud of the cabinet back, this deep and this wide */
+  lipDepth: 0.012,
+  lipWidth: 0.03,
+  /** power + data connector block, lower-right of each cabinet back; offset from the cabinet centre */
+  connector: { size: [0.06, 0.032, 0.03] as const, offset: [0.17, -0.19] as const },
+  /** handle recess, upper centre */
+  handle: { size: [0.11, 0.022, 0.004] as const, offset: [0, 0.2] as const },
+  /** cabling: a power and a data lead daisy-chained along each row, then one loom per row to the riser */
+  cable: {
+    powerRadius: 0.0045,
+    dataRadius: 0.0028,
+    /** how far a lead droops between two connectors, 500 mm apart */
+    sag: 0.05,
+    /** the data lead runs this much above the power lead */
+    dataLift: 0.022,
+    loomRadius: 0.0065,
+    /** the six looms descend side by side, this far apart */
+    loomSpacing: 0.014,
+  },
+  /** ground support: square-section uprights behind the wall with outriggers to the floor */
+  support: {
+    count: 4,
+    section: 0.05,
+    height: 3.4,
+    /** how far behind the face the uprights stand */
+    standoff: 0.5,
+    /** outriggers leave the upright at this height and reach this far back on the floor */
+    outriggerFrom: 2.3,
+    outriggerReach: 1.6,
+    outriggerSection: 0.04,
+    /** two horizontal rails the cabinets hang from */
+    railY: [0.55, 3.05] as const,
+    railSection: 0.04,
+    foot: [0.2, 0.012, 0.2] as const,
+    /** a bracket bolting each upright to the riser */
+    bracket: [0.06, 0.12, 0.1] as const,
+  },
+  /** the processor: a 2U case on the floor behind the riser, on the right, where the looms end; one amber pilot light on its back */
+  processor: {
+    size: [0.44, 0.09, 0.32] as const,
+    x: 2.55,
+    z: -0.56,
+    pilot: [0.007, 0.007, 0.002] as const,
+  },
+  /**
+   * Die-cast aluminium greys, a few stops above the front body's `#0b0b0d`: the
+   * back is lit at a fraction of the front, and a near-black albedo under a
+   * dim light is simply black. These read as dark metal under the service light.
+   */
+  colors: {
+    cabinet: "#1c1c20",
+    lip: "#34343a",
+    connector: "#2a2a30",
+    handle: "#08080a",
+    cable: "#0a0a0b",
+    support: "#26262b",
+    processor: "#16161a",
+    /** the site's amber, as a lit LED (above 1: it blooms a little) */
+    pilot: [1.4, 0.82, 0.4] as const,
+  },
+  /** dark aluminium: matte, but metal */
+  roughness: 0.72,
+  metalness: 0.5,
 } as const;
 
 /** drei MeshReflectorMaterial — the glow on the floor is the hero detail. */
@@ -215,7 +285,7 @@ export const BLOOM = {
   smaa: true,
 } as const;
 
-/** Camera: three presets, damped orbit inside architectural limits. */
+/** Camera: four presets, a damped orbit that goes all the way round, and a walk. */
 export const CAMERA = {
   fov: 45,
   near: 0.05,
@@ -226,27 +296,25 @@ export const CAMERA = {
   smoothTime: 0.6,
   draggingSmoothTime: 0.18,
   dollySpeed: 0.42,
-  /** orbit limits, degrees: polar from +Y, azimuth from the wall normal */
-  minPolar: 70,
+  /** orbit limits, degrees: polar from +Y; the azimuth is free — walk right round */
+  minPolar: 55,
   maxPolar: 100,
-  azimuthLimit: 60,
+  azimuthLimit: Infinity,
   minDistance: 0.6,
+  maxDistance: 20,
   /**
-   * 14, not the brief's 12: a narrow viewport (a phone held upright) has to
-   * back further off before the whole 6 m wall is inside a 45° frame — see
-   * `fitAspect` and `CameraRig`.
-   */
-  maxDistance: 14,
-  /**
-   * The eye never goes below this height. At the far end of the dolly a 100°
-   * polar angle would put the camera under the floor — which is single-sided
-   * and vanishes — so the polar limit tightens with distance to keep this much
-   * clearance; see `CameraRig`.
+   * The eye never goes below this height. At 20 m a 100° polar angle would put
+   * the camera under the floor, so the polar limit tightens with distance to
+   * keep this much clearance — see `CameraRig`.
    */
   floorClearance: 0.3,
+  /** the keyboard walk: `a` / `d` orbit at this many degrees per second … */
+  walkDegrees: 40,
+  /** … and `w` / `s` dolly at this fraction of the current distance per second */
+  walkRate: 0.7,
   /**
    * The aspect the preset distances below were framed for. Anything narrower
-   * pushes the two wide presets back in proportion, so the wall is composed
+   * pushes the wide presets back in proportion, so the wall is composed
    * rather than cropped; anything wider is left alone.
    */
   fitAspect: 1.6,
@@ -263,25 +331,20 @@ export const CAMERA = {
 } as const;
 
 /**
- * The three presets. `position` / `target` are metres; the target sits at eye
- * height for the two wide views (a level, architectural gaze) and on the
+ * The four presets. `position` / `target` are metres; the target sits at eye
+ * height for the three wide views (a level, architectural gaze) and on the
  * lower-left quadrant of the panel for the close one, where the pitch reads.
  */
 export interface CameraPreset {
-  readonly id: "front" | "oblique" | "close";
+  readonly id: "front" | "oblique" | "close" | "back";
   readonly position: readonly [number, number, number];
   readonly target: readonly [number, number, number];
   /** whether the distance is stretched to fit a narrower viewport */
   readonly fit: boolean;
 }
 
-/**
- * Negative — the oblique view stands to the LEFT of the wall's normal, so the
- * scale figure (which stands right of centre) is on the far side of the room
- * from the camera. From the right it would be closer to the lens than the wall
- * is, and a 1.8 m person would fill the frame.
- */
-const OBLIQUE_DEG = -35;
+/** The oblique stands to the right of the wall's normal, as the brief had it. */
+const OBLIQUE_DEG = 35;
 /**
  * 6.5 m, not the brief's 5. At 5 m and 35° the near corner of the wall falls
  * outside a 45° frame — the panel is cropped on the right and the riser runs
@@ -314,6 +377,13 @@ export const PRESETS: readonly CameraPreset[] = [
     target: [-WALL.width / 4, WALL.riserHeight + WALL.height / 4, 0],
     // never stretched: this view is about the pitch, not about the composition
     fit: false,
+  },
+  {
+    // the service view: 6 m behind the wall, level, looking at its centre
+    id: "back",
+    position: [0, CAMERA.eye, -6],
+    target: [0, CAMERA.eye, 0],
+    fit: true,
   },
 ];
 

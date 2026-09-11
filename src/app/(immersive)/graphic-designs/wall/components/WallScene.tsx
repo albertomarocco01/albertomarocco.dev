@@ -10,16 +10,16 @@ import {
   WALL_CENTRE_Y,
   type LoopVariant,
 } from "../wall.config";
-import { BackdropMaterial } from "./backdrop-material";
 import { CameraRig } from "./CameraRig";
 import { LoopSource } from "./loop-source";
 import { LedWallMaterial } from "./wall-material";
 import { initRoomLight } from "./room-light";
+import { WallBack } from "./wall-back";
 import type { WallBus } from "./wall-bus";
 
 /**
- * The room: a floor, a riser, the wall, and a figure for scale. One unit is one
- * metre, so every number here is the number a client would be quoted.
+ * The room: an endless ground, a riser, the wall — and its back. One unit is
+ * one metre, so every number here is the number a client would be quoted.
  *
  * Order of work in a frame:
  *   −1  the loop is advanced and drawn into its render target (throttled to 30 Hz)
@@ -51,18 +51,17 @@ export function WallScene({
   const fbo = useFBO(LOOP.fboWidth, LOOP.fboHeight, { depthBuffer: false, stencilBuffer: false });
   const [loop] = useState(() => new LoopSource(fbo, variant));
   const [material] = useState(() => new LedWallMaterial(loop.texture));
-  // the shell is dropped 2 m below the floor so its bottom rim is never in
-  // frame; the gradient is told the same range, or the lift lands nowhere near it
-  const [backdrop] = useState(() => new BackdropMaterial(-2, ROOM.backdropHeight - 2));
   const [light] = useState(() => initRoomLight());
+  const [backLight] = useState(() => initRoomLight(ROOM.wallLight.intensity * ROOM.backLight.ratio));
+  const [back] = useState(() => new WallBack());
 
   useEffect(
     () => () => {
       loop.dispose();
       material.dispose();
-      backdrop.dispose();
+      back.dispose();
     },
-    [loop, material, backdrop],
+    [loop, material, back],
   );
 
   // One wake channel. Any input stamps the bus; on the still paths (reduced
@@ -96,22 +95,25 @@ export function WallScene({
   useFrame((state, delta) => {
     loop.update(state.gl, Math.min(delta, 0.1), still);
     light.color.copy(loop.hot);
+    backLight.color.copy(loop.hot);
   }, -1);
-
-  const figure = ROOM.figure;
 
   return (
     <>
       <color attach="background" args={["#000000"]} />
+      {/* the world ends in black, not at an edge: linear fog on every standard
+          material. The wall's own shaders are not opted in, so the face stays
+          bright at any distance while the ground under it fades away. */}
+      <fog attach="fog" args={["#000000", ROOM.fog.near, ROOM.fog.far]} />
 
       {/* a flat bounce, so the floor has something for the reflection to sit in */}
       <ambientLight intensity={ROOM.ambient} />
 
       {/*
-        The wall as what it physically is: a 6 × 3 m area light. It is the only
+        The wall as what it physically is: a 6 × 3 m area light. It is the main
         source in the room, it carries the loop's colour, and it is what puts a
-        pool of light on the floor and an edge on the figure. Rotated a half
-        turn because a RectAreaLight shines along its local −Z.
+        pool of light on the floor. Rotated a half turn because a RectAreaLight
+        shines along its local −Z.
       */}
       {ROOM.wallLight.enabled && (
         <primitive
@@ -120,14 +122,14 @@ export function WallScene({
           rotation={[0, Math.PI, 0]}
         />
       )}
-
-      {/* the walls of the room, implied by a gradient and nothing else */}
-      <mesh position={[0, ROOM.backdropHeight / 2 - 2, 0]} renderOrder={-1}>
-        <cylinderGeometry
-          args={[ROOM.backdropRadius, ROOM.backdropRadius, ROOM.backdropHeight, 40, 1, true]}
+      {/* the service light: the same size, behind the wall, shining at its back */}
+      {ROOM.wallLight.enabled && (
+        <primitive
+          object={backLight}
+          position={[0, WALL_CENTRE_Y, -WALL.bodyDepth - ROOM.backLight.distance]}
+          rotation={[0, Math.PI, 0]}
         />
-        <primitive object={backdrop} attach="material" />
-      </mesh>
+      )}
 
       {/* the floor — the glow it carries is the whole point of the room */}
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
@@ -153,29 +155,14 @@ export function WallScene({
         <meshStandardMaterial color={ROOM.riserColor} roughness={0.95} metalness={0} />
       </mesh>
 
-      {/* the cabinets behind the face: the wall has a back, and it shows obliquely */}
-      <mesh position={[0, WALL_CENTRE_Y, -WALL.bodyDepth / 2]}>
-        <boxGeometry args={[WALL.width + 0.04, WALL.height + 0.04, WALL.bodyDepth]} />
-        <meshStandardMaterial color={ROOM.bodyColor} roughness={0.88} metalness={0.15} />
-      </mesh>
+      {/* the 72 cabinets behind the face, their cabling, the support, the processor */}
+      <primitive object={back.group} />
 
       {/* the LED surface */}
       <mesh position={[0, WALL_CENTRE_Y, WALL.faceOffset]}>
         <planeGeometry args={[WALL.width, WALL.height]} />
         <primitive object={material} attach="material" />
       </mesh>
-
-      {/* 1.8 m of someone, for scale — a capsule and a sphere, nothing more */}
-      <group position={[figure.position[0], figure.position[1], figure.position[2]]}>
-        <mesh position={[0, figure.centreY, 0]}>
-          <capsuleGeometry args={[figure.radius, figure.length, 6, 20]} />
-          <meshStandardMaterial color={figure.color} roughness={figure.roughness} metalness={0} />
-        </mesh>
-        <mesh position={[0, figure.headY, 0]}>
-          <sphereGeometry args={[figure.headRadius, 24, 16]} />
-          <meshStandardMaterial color={figure.color} roughness={figure.roughness} metalness={0} />
-        </mesh>
-      </group>
 
       <CameraRig preset={preset} presetNonce={presetNonce} reduced={still} bus={bus} />
     </>

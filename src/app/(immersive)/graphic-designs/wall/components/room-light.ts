@@ -9,20 +9,21 @@ import { ROOM, WALL } from "../wall.config";
  * room, and the falloff of that light across the floor is most of what makes
  * the scale believable. A `RectAreaLight` of exactly the panel's dimensions is
  * the honest way to do it: no point light standing in for an area source, no
- * environment map, no HDRI.
+ * environment map, no HDRI. A second, dimmer one stands behind the wall and
+ * shines at its back, so the service side is readable.
  *
  * Three's linearly-transformed-cosine tables have to be uploaded once before
  * any rect-area light renders, or every surface it touches comes out black. The
  * call is idempotent and the tables are shared, so it is done here, once, and
- * this module is the only place that reaches into three's addons.
+ * this module is the only place that reaches into three's addons for lights.
  */
 let initialised = false;
 
-export function initRoomLight(): THREE.RectAreaLight {
+export function initRoomLight(intensity: number = ROOM.wallLight.intensity): THREE.RectAreaLight {
   if (!initialised) {
     RectAreaLightUniformsLib.init();
     initialised = true;
   }
   // colour is set every frame from the loop's current accent (see WallScene)
-  return new THREE.RectAreaLight(0xffffff, ROOM.wallLight.intensity, WALL.width, WALL.height);
+  return new THREE.RectAreaLight(0xffffff, intensity, WALL.width, WALL.height);
 }

@@ -16,11 +16,19 @@ import { useTabVisible } from "@/lib/use-tab-visible";
  *
  * React here holds only what changes the tree: WebGL availability, context
  * loss, which preset and which loop are current, whether the visitor has
- * touched anything yet, and the frameloop. The camera, the loop's clock and the
- * live distance never pass through it.
+ * touched anything yet, and the frameloop. The camera, the loop's clock, the
+ * live distance and the walk keys never pass through it.
  */
 
 const isChrome = (t: EventTarget | null) => t instanceof Element && t.closest("a, button") !== null;
+
+/** the walk: `a` / `d` orbit, `w` / `s` dolly — as directions */
+const WALK_KEYS: Record<string, readonly [orbit: number, dolly: number]> = {
+  a: [-1, 0],
+  d: [1, 0],
+  w: [0, 1],
+  s: [0, -1],
+};
 
 export default function App({ copy }: { copy: WallCopy }) {
   const router = useRouter();
@@ -38,6 +46,7 @@ export default function App({ copy }: { copy: WallCopy }) {
   const [loopIndex, setLoopIndex] = useState(0);
   const [started, setStarted] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
+  const held = useRef(new Set<string>());
 
   const variant = LOOP.variants[loopIndex];
   // hidden → nothing at all; reduced motion, or a CPU rasteriser that cannot
@@ -69,15 +78,33 @@ export default function App({ copy }: { copy: WallCopy }) {
     [wake],
   );
 
-  // ── keys: 1 2 3 views, ← → loop, Esc exits ──
+  // ── keys: 1 2 3 4 views, ← → loop, wasd walks (held), Esc exits ──
   useEffect(() => {
+    const keys = held.current;
+    const syncWalk = () => {
+      let orbit = 0;
+      let dolly = 0;
+      for (const k of keys) {
+        orbit += WALK_KEYS[k][0];
+        dolly += WALK_KEYS[k][1];
+      }
+      bus.setWalk(Math.sign(orbit), Math.sign(dolly));
+    };
     const onKeyDown = (event: KeyboardEvent) => {
-      // Alt+← is browser back and Ctrl/Cmd+1..3 switches tab — a demo that eats
+      // Alt+← is browser back and Ctrl/Cmd+1..4 switches tab — a demo that eats
       // those is a demo you cannot leave. Auto-repeat would also restart the
-      // 1.2 s crossfade thirty times a second.
+      // 1.2 s crossfade thirty times a second (and a held walk key is tracked
+      // from its first press, so its repeats carry nothing).
       if (event.altKey || event.ctrlKey || event.metaKey || event.repeat) return;
       if (event.key === "Escape") {
         router.push("/graphic-designs");
+        return;
+      }
+      const walk = event.key.toLowerCase();
+      if (walk in WALK_KEYS) {
+        keys.add(walk);
+        syncWalk();
+        wake();
         return;
       }
       const view = PRESETS.findIndex((_, index) => event.key === String(index + 1));
@@ -95,9 +122,26 @@ export default function App({ copy }: { copy: WallCopy }) {
         stepLoop(-1);
       }
     };
+    const onKeyUp = (event: KeyboardEvent) => {
+      const walk = event.key.toLowerCase();
+      if (keys.delete(walk)) syncWalk();
+    };
+    // a key held across an alt-tab never sends its keyup: let go of everything
+    const release = () => {
+      if (keys.size === 0) return;
+      keys.clear();
+      syncWalk();
+    };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [router, choosePreset, stepLoop]);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", release);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", release);
+      release();
+    };
+  }, [router, choosePreset, stepLoop, wake, bus]);
 
   // ── the hand on the room: a drag, the wheel, a finger ──
   useEffect(() => {

@@ -8,10 +8,10 @@ import type { Locale } from "@/lib/locale";
  * EN/IT parity compiler-enforced.
  *
  * The piece's own name — "Parete — LED Wall" — is a title, not copy, and stays
- * as-is in both locales, as does the loop's title ("Liminal Field") and the
+ * as-is in both locales, as does the loop's title ("Liminal Field"), the
  * four variant names (amber / ember / teal / violet), which are the shared
- * palette's own keys. Numbers and units live in `wall.config.ts`; only the
- * labels around them are here.
+ * palette's own keys, and the two trade terms on the spec line. Numbers and
+ * units live in `wall.config.ts`; only the labels around them are here.
  */
 export interface WallCopy {
   metaTitle: string;
@@ -30,13 +30,15 @@ export interface WallCopy {
     wall: string;
     pitch: string;
     cabinets: string;
+    /** the rigging, in the trade's own English in both locales */
+    rig: string;
     loop: string;
     distance: string;
   };
   /** the loop's title — a work title, identical in both locales */
   loopTitle: string;
   /** camera preset names, bottom-right pager */
-  views: { front: string; oblique: string; close: string };
+  views: { front: string; oblique: string; close: string; back: string };
   /** accessible group labels and the two loop arrows */
   viewsAria: string;
   loopAria: string;
@@ -49,21 +51,22 @@ export interface WallCopy {
 const en: WallCopy = {
   metaTitle: "Parete — LED Wall",
   metaDescription:
-    "A 6 × 3 m LED wall in a dark room running the generative loops live. Orbit it, switch loops, get close enough to see the pixel pitch.",
-  aria: "Parete — 3D preview of a 6 by 3 metre LED wall. Drag to orbit, wheel to dolly, keys 1 2 3 for views, arrow keys switch the loop, Escape exits.",
+    "A 6 × 3 m LED wall on an endless dark ground, running the generative loops live. Orbit it, walk round the back, switch loops, get close enough to see the pixel pitch.",
+  aria: "Parete — 3D preview of a 6 by 3 metre LED wall. Drag to orbit, wheel to dolly, w a s d to walk, keys 1 2 3 4 for views (4 is the back), arrow keys switch the loop, Escape exits.",
   exit: "← exit the demo",
   noWebgl: "This demo needs WebGL. Your browser or device doesn't support it.",
   contextLost: "The graphics context was lost. Reload the page to continue.",
-  keyboardHint: "1 2 3 views · ← → loop · drag orbits · wheel dollies",
+  keyboardHint: "1 2 3 4 views · ← → loop · wasd walks · drag orbits · wheel dollies",
   spec: {
     wall: "led wall",
     pitch: "pitch",
     cabinets: "cabinets",
+    rig: "ground support · daisy-chain",
     loop: "loop",
     distance: "distance",
   },
   loopTitle: "Liminal Field",
-  views: { front: "front", oblique: "oblique", close: "close" },
+  views: { front: "front", oblique: "oblique", close: "close", back: "back" },
   viewsAria: "camera view",
   loopAria: "loop",
   prevLoop: "previous loop",
@@ -74,21 +77,22 @@ const en: WallCopy = {
 const it: WallCopy = {
   metaTitle: "Parete — LED Wall",
   metaDescription:
-    "Un led wall di 6 × 3 m in una stanza buia con i loop generativi dal vivo. Giraci intorno, cambia loop, avvicinati fino a vedere il pixel pitch.",
-  aria: "Parete — anteprima 3D di un led wall di 6 per 3 metri. Trascina per orbitare, rotella per avvicinarti, tasti 1 2 3 per le viste, le frecce cambiano loop, Esc esce.",
+    "Un led wall di 6 × 3 m su un pavimento buio senza fine, con i loop generativi dal vivo. Giraci intorno, passa dietro, cambia loop, avvicinati fino a vedere il pixel pitch.",
+  aria: "Parete — anteprima 3D di un led wall di 6 per 3 metri. Trascina per orbitare, rotella per avvicinarti, w a s d per muoverti, tasti 1 2 3 4 per le viste (4 è il retro), le frecce cambiano loop, Esc esce.",
   exit: "← esci dalla demo",
   noWebgl: "Questa demo richiede WebGL. Il tuo browser o dispositivo non lo supporta.",
   contextLost: "Il contesto grafico è andato perso. Ricarica la pagina per continuare.",
-  keyboardHint: "1 2 3 viste · ← → loop · trascina per girare · rotella per avvicinare",
+  keyboardHint: "1 2 3 4 viste · ← → loop · wasd per muoverti · trascina per girare · rotella per avvicinare",
   spec: {
     wall: "led wall",
     pitch: "pitch",
     cabinets: "cabinet",
+    rig: "ground support · daisy-chain",
     loop: "loop",
     distance: "distanza",
   },
   loopTitle: "Liminal Field",
-  views: { front: "frontale", oblique: "obliqua", close: "da vicino" },
+  views: { front: "frontale", oblique: "obliqua", close: "da vicino", back: "retro" },
   viewsAria: "vista",
   loopAria: "loop",
   prevLoop: "loop precedente",

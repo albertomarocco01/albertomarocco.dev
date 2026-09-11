@@ -14,8 +14,9 @@ const target = new THREE.Vector3();
  * a prop's fields from inside a component (the React compiler rules), and so
  * the whole input contract of the piece reads in one block.
  *
- * Orbit and dolly only — no truck. The three presets are compositions; letting
- * the wall slide off-centre would turn a rendering into a viewer.
+ * Orbit and dolly only — no truck. The presets are compositions; letting the
+ * wall slide off-centre would turn a rendering into a viewer. The azimuth is
+ * free: the back of the wall is part of the piece.
  */
 function configureControls(c: CameraControlsImpl): void {
   c.minPolarAngle = CAMERA.minPolar * DEG;
@@ -38,11 +39,11 @@ function configureControls(c: CameraControlsImpl): void {
 
 /**
  * Keep the eye above the floor. A fixed 100° polar limit is fine at 7 m, but
- * at the far end of the dolly it puts the camera under the ground plane, which
- * is single-sided and vanishes. So the limit is the smaller of the configured
- * one and the angle at which the eye would reach `floorClearance` at the
- * current distance; camera-controls only clamps when asked, so an out-of-range
- * polar is nudged back with its own damping.
+ * at 20 m it puts the camera under the ground plane, which is single-sided
+ * and vanishes. So the limit is the smaller of the configured one and the
+ * angle at which the eye would reach `floorClearance` at the current distance;
+ * camera-controls only clamps when asked, so an out-of-range polar is nudged
+ * back with its own damping.
  */
 function clampPolarToFloor(c: CameraControlsImpl, animate: boolean): void {
   const ty = c.getTarget(target).y;
@@ -53,8 +54,8 @@ function clampPolarToFloor(c: CameraControlsImpl, animate: boolean): void {
 }
 
 /**
- * Frame a preset. The two wide views are pushed back on a narrower viewport —
- * a 6 m wall does not fit a phone held upright at 7 m — by stretching the
+ * Frame a preset. The wide views are pushed back on a narrower viewport — a
+ * 6 m wall does not fit a phone held upright at 7 m — by stretching the
  * camera's offset from its target, which keeps the angle and only changes the
  * distance. `camera.aspect` is read off the instance rather than through React,
  * so a resize never yanks a visitor who has orbited away from a preset.
@@ -85,13 +86,15 @@ function applyPreset(c: CameraControlsImpl, preset: CameraPreset, animate: boole
 }
 
 /**
- * The camera: three presets, a damped orbit inside architectural limits, and —
- * once the room has been left alone for a while — a drift of a few degrees so
- * the wall keeps catching the light instead of freezing into a screenshot.
+ * The camera: four presets, a damped orbit that goes right round the wall, a
+ * keyboard walk, and — once the room has been left alone for a while — a
+ * drift of a few degrees so the wall keeps catching the light instead of
+ * freezing into a screenshot.
  *
  * The drift never fights the visitor: any input stamps the bus, which drops it
- * and restarts the idle count. Under reduced motion there is no drift at all
- * and the presets cut rather than fly.
+ * and restarts the idle count, and a held walk key holds the count at zero.
+ * Under reduced motion there is no drift at all, the presets cut rather than
+ * fly, and the walk moves without a damping tail.
  */
 export function CameraRig({
   preset,
@@ -152,6 +155,20 @@ export function CameraRig({
     const c = ref.current;
     if (!c) return;
     bus.setDistance(c.distance);
+    const dt = Math.min(delta, 0.1);
+
+    // the walk: held keys, applied through the controls' own damping so a
+    // release glides to a stop instead of cutting
+    const walk = bus.walk();
+    const walking = walk.orbit !== 0 || walk.dolly !== 0;
+    if (walking) {
+      if (walk.orbit !== 0) void c.rotate(walk.orbit * CAMERA.walkDegrees * DEG * dt, 0, !reduced);
+      if (walk.dolly !== 0) void c.dolly(walk.dolly * CAMERA.walkRate * dt * c.distance, !reduced);
+      idle.current = 0;
+      drifting.current = false;
+      invalidate(); // on the demand loop, the next step needs a frame of its own
+    }
+
     clampPolarToFloor(c, !reduced);
     if (reduced) return;
 
@@ -161,8 +178,8 @@ export function CameraRig({
       idle.current = 0;
       drifting.current = false;
     }
+    if (walking) return;
 
-    const dt = Math.min(delta, 0.1);
     idle.current += dt;
     if (idle.current < CAMERA.idleSeconds) return;
 

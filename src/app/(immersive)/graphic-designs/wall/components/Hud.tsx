@@ -6,7 +6,7 @@ import type { WallBus } from "./wall-bus";
 /**
  * Everything written over the room: the title cover and its key line (the first
  * idle state only), the spec sheet bottom-left, and the two controls
- * bottom-right — the view pager and the loop switcher, which are the same three
+ * bottom-right — the view pager and the loop switcher, which are the same four
  * keys and the same two arrows, made visible and tappable.
  *
  * The spec line is a spec sheet on purpose: pitch and viewing distance are the
@@ -60,6 +60,7 @@ export function Hud({
         <span className="wall-spec-wide">
           {LED_CABINETS[0]} × {LED_CABINETS[1]} {copy.spec.cabinets}
         </span>
+        <span className="wall-spec-wide">{copy.spec.rig}</span>
         <span className="wall-spec-wide">
           {copy.spec.loop}: {copy.loopTitle} / {variant}
         </span>
