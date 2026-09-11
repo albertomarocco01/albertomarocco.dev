@@ -2,6 +2,8 @@ import {
   FILTER_BETA,
   FILTER_D_CUTOFF,
   FILTER_MIN_CUTOFF,
+  FIST_ENTER_FRAMES,
+  FIST_EXIT_FRAMES,
   HAND_LOST_GRACE_MS,
   PALM_OPEN_FRAMES,
   PINCH_ENTER,
@@ -9,6 +11,7 @@ import {
   PINCH_EXIT,
   PINCH_EXIT_FRAMES,
   PUSH_COOLDOWN_MS,
+  PUSH_FOCUS_SPEED_FACTOR,
   PUSH_GROWTH_RATE,
   PUSH_MIN_PRESENCE_MS,
   PUSH_SPEED,
@@ -37,7 +40,9 @@ export interface WorldSample {
   /** |thumb tip − index tip| (ignored when explicit) */
   pinchDist: number;
   pinch: boolean;
+  /** four fingers extended (push) / four fingers curled (fist) — never both */
   fingersOpen: boolean;
+  fingersClosed: boolean;
   /** sample timestamp (ms) — a repeated stamp is not a new detection */
   t: number;
 }
@@ -48,9 +53,16 @@ export interface HandState {
   /** edges, valid for the frame they were raised in */
   pinchEnter: boolean;
   pinchExit: boolean;
-  /** raised for one frame when an open palm pushes; where it was */
+  /** the hand is a fist; `fistEnter` for one frame, with the palm centre then */
+  fist: boolean;
+  fistEnter: boolean;
+  fistX: number;
+  fistY: number;
+  /** raised for one frame when an open palm pushes; where it was, and which way */
   pushX: number;
   pushY: number;
+  pushDirX: number;
+  pushDirY: number;
   pushed: boolean;
   /** render-smoothed points */
   tipX: number;
@@ -69,8 +81,14 @@ export class HandTracker {
     pinching: false,
     pinchEnter: false,
     pinchExit: false,
+    fist: false,
+    fistEnter: false,
+    fistX: 0,
+    fistY: 0,
     pushX: 0,
     pushY: 0,
+    pushDirX: 0,
+    pushDirY: -1,
     pushed: false,
     tipX: 0,
     tipY: 0,
@@ -80,6 +98,12 @@ export class HandTracker {
     velY: 0,
     size: 0,
   };
+
+  /**
+   * Focus mode (a print is open): the open-palm sweep is the close gesture —
+   * a lower speed threshold and no cooldown. Set by the scene each frame.
+   */
+  focus = false;
 
   private tip = new OneEuro2(FILTER_MIN_CUTOFF, FILTER_BETA, FILTER_D_CUTOFF);
   private hold = new OneEuro2(FILTER_MIN_CUTOFF, FILTER_BETA, FILTER_D_CUTOFF);
@@ -99,6 +123,7 @@ export class HandTracker {
   private growth = 0;
   private pinchCount = 0;
   private openCount = 0;
+  private closedCount = 0;
   private lastPush = -1e9;
   private explicit = false;
 
@@ -106,6 +131,7 @@ export class HandTracker {
     const s = this.state;
     s.pinchEnter = false;
     s.pinchExit = false;
+    s.fistEnter = false;
     s.pushed = false;
 
     // A landmark sample that stopped being refreshed (the producer stalled or
@@ -138,11 +164,13 @@ export class HandTracker {
     const s = this.state;
     s.present = true;
     s.pinching = false;
+    s.fist = false;
     this.explicit = sample.explicit;
     this.since = now;
     this.lastSampleT = -1;
     this.pinchCount = 0;
     this.openCount = 0;
+    this.closedCount = 0;
     this.tip.reset();
     this.hold.reset();
     this.palm.reset();
@@ -170,6 +198,7 @@ export class HandTracker {
     const s = this.state;
     if (s.pinching) s.pinchExit = true;
     s.pinching = false;
+    s.fist = false;
     s.present = false;
   }
 
@@ -205,6 +234,37 @@ export class HandTracker {
     this.growth += (g - this.growth) * a;
     this.prevSize = size;
 
+    const settled = now - this.since > PUSH_MIN_PRESENCE_MS;
+
+    // Fist — the four fingers curled, counted only once the hand has settled
+    // (the same gate as the push). A fist also brings thumb and index
+    // together, so while it holds the pinch detector is frozen, and a pinch
+    // that was on ends here: the world opens what the hand was holding.
+    if (!this.explicit) {
+      if (!s.fist) {
+        this.closedCount = settled && sample.fingersClosed ? this.closedCount + 1 : 0;
+        if (this.closedCount >= FIST_ENTER_FRAMES) {
+          s.fist = true;
+          s.fistEnter = true;
+          s.fistX = this.palm.x;
+          s.fistY = this.palm.y;
+          this.closedCount = 0;
+          this.pinchCount = 0;
+          if (s.pinching) {
+            s.pinching = false;
+            s.pinchExit = true;
+          }
+        }
+      } else {
+        this.closedCount = sample.fingersClosed ? 0 : this.closedCount + 1;
+        if (this.closedCount >= FIST_EXIT_FRAMES) {
+          s.fist = false;
+          this.closedCount = 0;
+          this.pinchCount = 0;
+        }
+      }
+    }
+
     // Pinch — with hysteresis on the ratio and on time.
     if (this.explicit) {
       if (sample.pinch && !s.pinching) {
@@ -214,7 +274,7 @@ export class HandTracker {
         s.pinching = false;
         s.pinchExit = true;
       }
-    } else {
+    } else if (!s.fist) {
       const ratio = size > 1e-4 ? sample.pinchDist / size : 1;
       if (!s.pinching) {
         this.pinchCount = ratio < PINCH_ENTER ? this.pinchCount + 1 : 0;
@@ -233,23 +293,30 @@ export class HandTracker {
       }
     }
 
-    // Open palm → push. Never while pinching, never right after appearing
-    // (the filters are still settling and would read as a swipe).
+    // Open palm → push. Never while pinching or fisted (the open test is the
+    // fist's inverse — keep it that way), never right after appearing (the
+    // filters are still settling and would read as a swipe). In focus mode
+    // the same sweep closes the print: a lower threshold, no cooldown.
     if (!this.explicit) {
       this.openCount = sample.fingersOpen ? this.openCount + 1 : 0;
       const open = this.openCount >= PALM_OPEN_FRAMES;
       const speed = Math.hypot(this.palmVelX, this.palmVelY);
+      const threshold = PUSH_SPEED * (this.focus ? PUSH_FOCUS_SPEED_FACTOR : 1);
       if (
         open &&
         !s.pinching &&
-        now - this.since > PUSH_MIN_PRESENCE_MS &&
-        now - this.lastPush > PUSH_COOLDOWN_MS &&
-        (speed > PUSH_SPEED || this.growth > PUSH_GROWTH_RATE)
+        !s.fist &&
+        settled &&
+        (this.focus || now - this.lastPush > PUSH_COOLDOWN_MS) &&
+        (speed > threshold || this.growth > PUSH_GROWTH_RATE)
       ) {
         this.lastPush = now;
         s.pushed = true;
         s.pushX = this.palm.x;
         s.pushY = this.palm.y;
+        // The sweep's direction; a push straight at the camera has none — down.
+        s.pushDirX = speed > 0.5 ? this.palmVelX / speed : 0;
+        s.pushDirY = speed > 0.5 ? this.palmVelY / speed : -1;
       }
     }
   }

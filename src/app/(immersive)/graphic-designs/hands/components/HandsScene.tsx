@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { hasWebGL2 } from "@/lib/webgl-caps";
 import { useTabVisible } from "@/lib/use-tab-visible";
-import { CAMERA_FOV_DEG, CAMERA_Z, DPR_RANGE } from "../hands.config";
+import { CAMERA_FOV_DEG, CAMERA_Z, DPR_RANGE, FIST_CURL } from "../hands.config";
 import { HandTracker, type HandState, type WorldSample } from "../engine/hand";
 import { LM, type HandsInput } from "../engine/input";
 import { World, type WorldEvent } from "../engine/world";
@@ -95,11 +95,14 @@ function landmarkSample(pts: Float32Array, vw: number, vh: number, t: number, ou
   out.pinchDist = d(LM.THUMB_TIP, LM.INDEX_TIP);
   out.pinch = false;
   // Four fingers extended: each tip farther from the wrist than its PIP joint.
-  out.fingersOpen =
-    d(LM.INDEX_TIP, LM.WRIST) > d(LM.INDEX_PIP, LM.WRIST) * 1.08 &&
-    d(LM.MIDDLE_TIP, LM.WRIST) > d(LM.MIDDLE_PIP, LM.WRIST) * 1.08 &&
-    d(LM.RING_TIP, LM.WRIST) > d(LM.RING_PIP, LM.WRIST) * 1.08 &&
-    d(LM.PINKY_TIP, LM.WRIST) > d(LM.PINKY_PIP, LM.WRIST) * 1.08;
+  // Four fingers curled — the fist — is the mirror: each tip nearer the wrist
+  // than its PIP. The gap between the two ratios keeps them exclusive.
+  const wi = d(LM.INDEX_TIP, LM.WRIST), pi = d(LM.INDEX_PIP, LM.WRIST);
+  const wm = d(LM.MIDDLE_TIP, LM.WRIST), pm = d(LM.MIDDLE_PIP, LM.WRIST);
+  const wr = d(LM.RING_TIP, LM.WRIST), pr = d(LM.RING_PIP, LM.WRIST);
+  const wp = d(LM.PINKY_TIP, LM.WRIST), pp = d(LM.PINKY_PIP, LM.WRIST);
+  out.fingersOpen = wi > pi * 1.08 && wm > pm * 1.08 && wr > pr * 1.08 && wp > pp * 1.08;
+  out.fingersClosed = wi < pi * FIST_CURL && wm < pm * FIST_CURL && wr < pr * FIST_CURL && wp < pp * FIST_CURL;
   out.t = t;
   return out;
 }
@@ -114,6 +117,7 @@ function explicitSample(u: number, v: number, pinch: boolean, vw: number, vh: nu
   out.pinchDist = pinch ? 0 : Infinity;
   out.pinch = pinch;
   out.fingersOpen = false;
+  out.fingersClosed = false;
   out.t = t;
   return out;
 }
@@ -122,7 +126,7 @@ function explicitSample(u: number, v: number, pinch: boolean, vw: number, vh: nu
 function placeReticle(
   el: HTMLDivElement,
   h: HandState,
-  rs: { on: boolean; pinch: boolean },
+  rs: { on: boolean; pinch: boolean; fist: boolean },
   vw: number,
   vh: number,
   width: number,
@@ -141,12 +145,16 @@ function placeReticle(
     rs.pinch = h.pinching;
     el.classList.toggle("is-pinch", h.pinching);
   }
+  if (rs.fist !== h.fist) {
+    rs.fist = h.fist;
+    el.classList.toggle("is-fist", h.fist);
+  }
 }
 
 function blankSample(): WorldSample {
   return {
     explicit: true, tipX: 0, tipY: 0, holdX: 0, holdY: 0, palmX: 0, palmY: 0,
-    size: 1, pinchDist: Infinity, pinch: false, fingersOpen: false, t: 0,
+    size: 1, pinchDist: Infinity, pinch: false, fingersOpen: false, fingersClosed: false, t: 0,
   };
 }
 
@@ -166,7 +174,10 @@ function Field({ input, reticles, worldRef, reducedMotion, onEvent }: FieldProps
   const trackers = useRef([new HandTracker(), new HandTracker()]);
   const samples = useRef([blankSample(), blankSample()]);
   const layout = useRef({ w: 0, h: 0 });
-  const reticleState = useRef([{ on: false, pinch: false }, { on: false, pinch: false }]);
+  const reticleState = useRef([
+    { on: false, pinch: false, fist: false },
+    { on: false, pinch: false, fist: false },
+  ]);
   const onEventRef = useRef(onEvent);
   useEffect(() => {
     onEventRef.current = onEvent;
@@ -215,23 +226,32 @@ function Field({ input, reticles, worldRef, reducedMotion, onEvent }: FieldProps
     const now = performance.now();
     const dt = Math.min(delta, 0.1);
 
-    // Sources → world samples → tracked hands.
+    // Sources → world samples → tracked hands. In focus mode the open-palm
+    // sweep is the close gesture (lower threshold, no cooldown).
+    const focus = w.isOpen();
     const states: HandState[] = [];
     for (let i = 0; i < 2; i++) {
       const s = input.slots[i];
       let sample: WorldSample | null = null;
       if (s?.kind === "landmarks") sample = landmarkSample(s.pts, vw, vh, s.t, samples.current[i]);
       else if (s?.kind === "explicit") sample = explicitSample(s.u, s.v, s.pinch, vw, vh, s.t, samples.current[i]);
+      trackers.current[i].focus = focus;
       states.push(trackers.current[i].update(sample, now, dt));
     }
 
-    const pushes = input.drainPushes().map((p) => ({ x: (p.u - 0.5) * vw, y: (0.5 - p.v) * vh }));
+    const toWorld = (p: { u: number; v: number }) => ({ x: (p.u - 0.5) * vw, y: (0.5 - p.v) * vh });
+    const pushes = input.drainPushes().map(toWorld);
+    const taps = input.drainTaps().map(toWorld);
+    // A flick's direction, aspect-corrected into world axes (v points down).
+    const flicks = input.drainFlicks().map((f) => ({ x: f.dx * vw, y: -f.dy * vh }));
     const commands = input.drainCommands();
 
     w.showFocus = input.lastDevice === "keyboard";
-    w.update(now, dt, states, pushes, commands, input.kbdMove);
+    w.hoverEnabled = input.lastDevice !== "touch";
+    w.update(now, dt, states, pushes, taps, flicks, commands, input.kbdMove);
 
-    // Reticles: DOM rings at the index tips, contracting while pinching.
+    // Reticles: DOM rings at the index tips, contracting while pinching,
+    // filled while the hand is a fist.
     const els = reticles.current?.els;
     if (els) {
       for (let i = 0; i < 2; i++) {

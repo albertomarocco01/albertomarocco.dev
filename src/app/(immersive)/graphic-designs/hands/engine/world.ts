@@ -2,6 +2,7 @@ import * as THREE from "three";
 import {
   ANGLE_SPRING,
   ANGULAR_DAMPING,
+  CAMERA_Z,
   CARD_MAX_COVERAGE,
   CARD_MAX_ROTATION_DEG,
   CARD_MIN_SCALE,
@@ -12,10 +13,12 @@ import {
   HELD_Z,
   HOLD_LAG_S,
   HOLD_RADIUS_FACTOR,
+  HOVER,
   KEYBOARD_SPEED,
   LINEAR_DAMPING,
   MAX_SPEED,
   MAX_SUBSTEPS,
+  OPEN,
   PHYSICS_STEP_S,
   PRINTS,
   PUSH_COOLDOWN_MS,
@@ -48,6 +51,10 @@ import type { KeyboardCommand } from "./input";
  *
  * Local coordinates are a card's *unit-area* frame (origin at the centre); the
  * body's group carries the layout scale `S`, so `world = pos + R(angle)·S·local`.
+ *
+ * Two words are easy to confuse here: the keyboard *focus* (`focusId`, the
+ * Tab ring) and *focus mode* — one print `opened` at the centre, the others
+ * away. The second is `opened` in code, `opened` / `closed` in events.
  */
 
 export type WorldEvent =
@@ -55,7 +62,10 @@ export type WorldEvent =
   | { type: "released"; body: Body }
   | { type: "torn"; body: Body }
   | { type: "pushed" }
-  | { type: "focus"; body: Body | null };
+  | { type: "focus"; body: Body | null }
+  /** a print opened; `bottom` is its lower edge as a fraction of the viewport height (for the caption) */
+  | { type: "opened"; body: Body; bottom: number }
+  | { type: "closed"; body: Body };
 
 interface Card {
   index: number;
@@ -71,6 +81,18 @@ interface Card {
   fadeStart: number;
   /** stable id so a respawned whole card keeps its keyboard index */
   seed: number;
+}
+
+/** A body that left for focus mode, and where it belongs. */
+interface Away {
+  /** 0 = home, 1 = fully away; moves toward `target` from `t0` */
+  k: number;
+  target: 0 | 1;
+  t0: number;
+  dirX: number;
+  dirY: number;
+  spin: number;
+  home: { x: number; y: number; angle: number; vx: number; vy: number; vang: number; opacity: number };
 }
 
 export interface Body {
@@ -101,6 +123,15 @@ export interface Body {
   opacity: number;
   fading: boolean;
   alive: boolean;
+  /** hover: 0 → 1 and the smoothed (direction × amount) toward the nearest tip */
+  hover: number;
+  hoverTx: number;
+  hoverTy: number;
+  /** extra scale on top of the layout scale (the opened print grows) */
+  scaleMul: number;
+  away: Away | null;
+  /** the dismissed print, on its way out */
+  leaving: { t0: number; dirX: number; dirY: number } | null;
 }
 
 interface Wave {
@@ -124,6 +155,15 @@ interface Holder {
 
 const KBD_SLOT = 2;
 const OUTLINE_COLOR = 0x85827b;
+const HOVER_TILT = THREE.MathUtils.degToRad(HOVER.tiltDeg);
+const AWAY_SPIN = THREE.MathUtils.degToRad(OPEN.awaySpinDeg);
+
+/** The site's settling curve, near enough: fast out, long tail. */
+const easeOut = (p: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, p)), 4);
+const smoothstep = (x: number) => {
+  const t = Math.min(1, Math.max(0, x));
+  return t * t * (3 - 2 * t);
+};
 
 export class World {
   readonly root = new THREE.Group();
@@ -148,8 +188,15 @@ export class World {
   private focusId: number | null = null;
   private kbd = { x: 0, y: 0, vx: 0, vy: 0, holding: null as Body | null };
   private lastPush = -1e9;
+  /** focus mode: the print at the centre (also while it leaves), or null */
+  opened: Body | null = null;
+  private openedAt = -1e9;
+  /** the opened print's scale multiplier that fits it to the viewport */
+  private openScale = 1;
   reducedMotion = false;
   showFocus = false;
+  /** hover answers the hand and the pointer, never a touch */
+  hoverEnabled = true;
   onEvent: (e: WorldEvent) => void = () => {};
 
   constructor(private readonly anisotropy: number) {}
@@ -185,6 +232,7 @@ export class World {
     this.root.clear();
     this.bodies = [];
     this.cards = [];
+    this.opened = null;
   }
 
   /** Called whenever the viewport changes: world size at z = 0 and px size. */
@@ -198,12 +246,12 @@ export class World {
     const floor = vw < vh ? CARD_MIN_SCALE * Math.min(vw, vh) : 0;
     const cap = Math.sqrt((CARD_MAX_COVERAGE * vw * vh) / PRINTS.length);
     this.S = Math.min(Math.max(base, floor), cap);
-    for (const body of this.bodies) body.group.scale.setScalar(this.S);
     for (const card of this.cards) {
       const px = this.pxWorld / this.S;
       card.materials[0].uniforms.u_px.value = px;
       card.materials[1].uniforms.u_px.value = px;
     }
+    if (this.opened) this.openScale = this.fitScale(this.opened);
   }
 
   private addCard(index: number, texture: THREE.Texture): void {
@@ -285,6 +333,12 @@ export class World {
       opacity: 0,
       fading: false,
       alive: true,
+      hover: 0,
+      hoverTx: 0,
+      hoverTy: 0,
+      scaleMul: 1,
+      away: null,
+      leaving: null,
     };
     for (const m of card.materials) {
       m.uniforms.u_torn.value = 0;
@@ -342,6 +396,8 @@ export class World {
     dt: number,
     hands: HandState[],
     pushes: { x: number; y: number }[],
+    taps: { x: number; y: number }[],
+    flicks: { x: number; y: number }[],
     commands: KeyboardCommand[],
     kbdMove: { x: number; y: number },
   ): void {
@@ -358,11 +414,24 @@ export class World {
     }));
     holders.push(this.keyboardHolder(commands, kbdMove, dt));
 
-    for (const h of hands) if (h.pushed) this.push(h.pushX, h.pushY, now);
+    // A fist opens what the hand holds (read before the releases below) or
+    // the print nearest the palm.
+    const fistOpens: { body: Body | null; x: number; y: number }[] = [];
+    hands.forEach((h, slot) => {
+      if (h.fistEnter) fistOpens.push({ body: this.heldBy(slot), x: h.fistX, y: h.fistY });
+    });
+
+    for (const h of hands) if (h.pushed) this.push(h.pushX, h.pushY, now, h.pushDirX, h.pushDirY);
     for (const p of pushes) this.push(p.x, p.y, now);
+    for (const f of flicks) this.close(f.x, f.y);
 
     this.applyHolds(holders, now);
+    for (const t of taps) this.open(this.nearestWhole(t.x, t.y));
+    for (const f of fistOpens) this.open(f.body ?? this.nearestWhole(f.x, f.y));
+
     this.reunite(now);
+    this.hover(hands, dt);
+    this.transitions(now, dt);
 
     // Fixed-step integration, clamped so a stall can never integrate a jump.
     this.accumulator = Math.min(this.accumulator + dt, PHYSICS_STEP_S * MAX_SUBSTEPS);
@@ -379,17 +448,28 @@ export class World {
   }
 
   private sync(body: Body): void {
+    const hv = this.reducedMotion ? 0 : body.hover;
     body.group.position.set(body.x, body.y, body.z);
-    body.group.rotation.z = body.angle;
-    // z already orders the cards; a held card also draws last so it reads on top.
-    body.group.renderOrder = body.holders.length ? 5 : 0;
+    // The hover tilt turns the card's face toward the tip; reduced motion keeps
+    // the lift (a z change) and drops the tilt and the growth.
+    body.group.rotation.set(-body.hoverTy * HOVER_TILT * (this.reducedMotion ? 0 : 1), body.hoverTx * HOVER_TILT * (this.reducedMotion ? 0 : 1), body.angle);
+    body.group.scale.setScalar(this.S * body.scaleMul * (1 + HOVER.scale * hv));
+    // z already orders the cards; a held card also draws last so it reads on
+    // top, and the opened print over everything.
+    body.group.renderOrder = body === this.opened ? 6 : body.holders.length ? 5 : 0;
   }
 
   private fade(body: Body, dt: number): void {
+    // Bodies away for focus mode, and the dismissed print, own their opacity.
+    if (body.away || body.leaving) return;
     const target = body.fading ? 0 : 1;
     const k = 1 - Math.exp(-(dt * 1000) / (FADE_MS * 0.35));
     body.opacity += (target - body.opacity) * k;
     if (!body.fading && body.opacity > 0.995) body.opacity = 1;
+    this.applyOpacity(body);
+  }
+
+  private applyOpacity(body: Body): void {
     const m = body.card.materials;
     if (body.kind === "whole") {
       m[0].uniforms.u_opacity.value = body.opacity;
@@ -433,6 +513,7 @@ export class World {
           break;
         }
         case "tear": {
+          if (this.opened) break;
           const body = k.holding ?? this.focusedBody();
           if (body && body.kind === "whole" && !body.fading) {
             const n =
@@ -443,6 +524,12 @@ export class World {
         }
         case "push":
           this.push(0, 0, this.time);
+          break;
+        case "open":
+          this.open(this.focusedBody());
+          break;
+        case "close":
+          this.close(0, -1);
           break;
       }
     }
@@ -472,8 +559,14 @@ export class World {
     return this.bodies.find((b) => b.id === this.focusId && b.alive) ?? null;
   }
 
+  /** The bodies a visitor can reach: alive, not fading, not away for focus mode. */
+  private reachable(): Body[] {
+    return this.bodies.filter((b) => b.alive && !b.fading && !b.away);
+  }
+
   private moveFocus(dir: 1 | -1): void {
-    const list = this.bodies.filter((b) => b.alive && !b.fading);
+    if (this.opened) return; // the opened print is the only one there is
+    const list = this.reachable();
     if (!list.length) return;
     const i = list.findIndex((b) => b.id === this.focusId);
     const next = i < 0 ? (dir > 0 ? 0 : list.length - 1) : (i + dir + list.length) % list.length;
@@ -494,12 +587,21 @@ export class World {
     return this.focusIndex(body);
   }
 
+  /** Focus mode proper: a print is open and not yet on its way out. */
+  isOpen(): boolean {
+    return this.opened !== null && !this.opened.leaving;
+  }
+
   /** World size at z = 0 (for tests and overlays). */
   viewport(): { vw: number; vh: number; scale: number } {
     return { vw: this.vw, vh: this.vh, scale: this.S };
   }
 
   /* ---- hold / release / tear ------------------------------------------ */
+
+  private heldBy(slot: number): Body | null {
+    return this.bodies.find((b) => b.alive && b.holders.includes(slot)) ?? null;
+  }
 
   private applyHolds(holders: Holder[], now: number): void {
     for (const h of holders) {
@@ -538,7 +640,7 @@ export class World {
     let best: Body | null = null;
     let bestD = Infinity;
     for (const body of this.bodies) {
-      if (!body.alive || body.fading) continue;
+      if (!body.alive || body.fading || body.away || body.leaving || body === this.opened) continue;
       if (body.holders.includes(h.slot) || body.holders.length >= 2) continue;
       const d = Math.hypot(body.x - h.holdX, body.y - h.holdY);
       if (d < HOLD_RADIUS_FACTOR * body.r0 * this.S && d < bestD) {
@@ -572,6 +674,13 @@ export class World {
         this.onEvent({ type: "released", body });
       }
     }
+  }
+
+  /** Every hand lets go of this body, quietly (no release event, no velocity). */
+  private dropHolds(body: Body): void {
+    if (body.holders.includes(KBD_SLOT)) this.kbd.holding = null;
+    body.holders = [];
+    body.anchors.clear();
   }
 
   /** World point → the body's local (unit-area, centroid-relative) frame. */
@@ -646,6 +755,12 @@ export class World {
         opacity: body.opacity,
         fading: false,
         alive: true,
+        hover: 0,
+        hoverTx: 0,
+        hoverTy: 0,
+        scaleMul: 1,
+        away: null,
+        leaving: null,
       };
       halves.push(half);
       this.root.add(group);
@@ -693,6 +808,7 @@ export class World {
 
   /** Torn halves dim and the print quietly rejoins the drift, whole. */
   private reunite(now: number): void {
+    if (this.opened) return; // the halves are away; their clock waits
     for (const card of this.cards) {
       if (!card.halves) continue;
       const [a, b] = card.halves;
@@ -717,9 +833,200 @@ export class World {
     }
   }
 
+  /* ---- hover ------------------------------------------------------------ */
+
+  /**
+   * A whole, free print near a hand's index tip (camera or pointer) answers:
+   * lifts, grows a touch, tilts toward the tip. Smooth falloff with distance,
+   * an exponential settle both ways.
+   */
+  private hover(hands: HandState[], dt: number): void {
+    const k = 1 - Math.exp(-dt / HOVER.lagS);
+    for (const body of this.bodies) {
+      if (!body.alive) continue;
+      let target = 0;
+      let tx = 0;
+      let ty = 0;
+      const eligible =
+        this.hoverEnabled &&
+        body.kind === "whole" &&
+        !body.fading &&
+        !body.holders.length &&
+        !body.away &&
+        !body.leaving;
+      if (eligible) {
+        const R = HOVER.radius * body.r0 * this.S * body.scaleMul;
+        for (const h of hands) {
+          if (!h.present) continue;
+          const dx = h.tipX - body.x;
+          const dy = h.tipY - body.y;
+          const d = Math.hypot(dx, dy);
+          if (d >= R) continue;
+          const f = 1 - smoothstep(d / R);
+          if (f > target) {
+            target = f;
+            tx = d > 1e-4 ? (dx / d) * f : 0;
+            ty = d > 1e-4 ? (dy / d) * f : 0;
+          }
+        }
+      }
+      body.hover += (target - body.hover) * k;
+      body.hoverTx += (tx - body.hoverTx) * k;
+      body.hoverTy += (ty - body.hoverTy) * k;
+      if (target === 0 && body.hover < 1e-3) body.hover = body.hoverTx = body.hoverTy = 0;
+    }
+  }
+
+  /* ---- focus mode: open / close ----------------------------------------- */
+
+  private nearestWhole(x: number, y: number): Body | null {
+    let best: Body | null = null;
+    let bestD = Infinity;
+    for (const body of this.bodies) {
+      if (!body.alive || body.fading || body.away || body.leaving || body.kind !== "whole") continue;
+      if (body === this.opened) continue;
+      const d = Math.hypot(body.x - x, body.y - y);
+      if (d < HOLD_RADIUS_FACTOR * body.r0 * this.S && d < bestD) {
+        bestD = d;
+        best = body;
+      }
+    }
+    return best;
+  }
+
+  /** Scale multiplier that fits the print to the viewport as seen at OPEN.z. */
+  private fitScale(body: Body): number {
+    const depth = (CAMERA_Z - OPEN.z) / CAMERA_Z;
+    const fit = Math.min(
+      (OPEN.heightFrac * this.vh * depth) / (body.card.hh * 2),
+      (OPEN.maxWidthFrac * this.vw * depth) / (body.card.hw * 2),
+    );
+    return fit / this.S;
+  }
+
+  /**
+   * Open a whole print: it flies to the centre, rises and grows to fit; every
+   * other body drifts outward with a small spin while fading, nearest first,
+   * its physics paused. Nothing is disposed.
+   */
+  open(body: Body | null): void {
+    if (!body || this.opened || !body.alive || body.fading || body.kind !== "whole" || body.away) return;
+    this.dropHolds(body);
+    body.vx = body.vy = body.vang = 0;
+    body.leaving = null;
+    this.opened = body;
+    this.openedAt = this.time;
+    this.openScale = this.fitScale(body);
+    this.focusId = body.id;
+    const depth = (CAMERA_Z - OPEN.z) / CAMERA_Z;
+    const bottom = 0.5 + (this.openScale * this.S * body.card.hh) / (this.vh * depth);
+
+    const others = this.bodies
+      .filter((b) => b.alive && b !== body)
+      .sort((a, b) => Math.hypot(a.x, a.y) - Math.hypot(b.x, b.y));
+    others.forEach((b, rank) => {
+      // Out of reach now: whatever held it lets go.
+      if (b.holders.length) this.dropHolds(b);
+      const d = Math.hypot(b.x, b.y);
+      const dirX = d > 0.3 ? b.x / d : Math.cos(b.driftAngle);
+      const dirY = d > 0.3 ? b.y / d : Math.sin(b.driftAngle);
+      b.away = {
+        k: b.away?.k ?? 0,
+        target: 1,
+        t0: this.time + rank * OPEN.awayStaggerMs,
+        dirX,
+        dirY,
+        spin: (rank % 2 ? 1 : -1) * AWAY_SPIN,
+        home: b.away?.home ?? {
+          x: b.x, y: b.y, angle: b.angle, vx: b.vx, vy: b.vy, vang: b.vang, opacity: b.opacity,
+        },
+      };
+    });
+    this.onEvent({ type: "opened", body, bottom });
+  }
+
+  /**
+   * Close the opened print: it leaves in `dir`, fading; the others come back
+   * where they were. Ignored right after an open (a double-click's second
+   * press, a hand still in motion) — nothing closes by accident.
+   */
+  close(dirX: number, dirY: number): void {
+    const b = this.opened;
+    if (!b || b.leaving || this.time - this.openedAt < OPEN.armMs) return;
+    const n = Math.hypot(dirX, dirY) || 1;
+    b.leaving = { t0: this.time, dirX: dirX / n, dirY: dirY / n };
+    for (const o of this.bodies) {
+      if (!o.away) continue;
+      o.away.target = 0;
+      o.away.t0 = this.time;
+    }
+    this.onEvent({ type: "closed", body: b });
+  }
+
+  /** The dismissed print rejoins the drift, whole, at a free spot. */
+  private rejoin(body: Body): void {
+    const card = body.card;
+    const refocus = this.focusId === body.id;
+    body.alive = false;
+    this.root.remove(body.group);
+    body.outline.geometry.dispose();
+    this.bodies = this.bodies.filter((x) => x !== body);
+    this.opened = null;
+    this.spawnWhole(card);
+    if (refocus) this.focusId = card.whole!.id;
+  }
+
+  /** The away / return drift of the others and the dismissed print's exit — frame time, not physics. */
+  private transitions(now: number, dt: number): void {
+    const rm = this.reducedMotion;
+    for (const b of this.bodies) {
+      if (!b.alive) continue;
+      const a = b.away;
+      if (a) {
+        if (now >= a.t0) {
+          // Reduced motion: a quicker fade, no travel, no spin.
+          const rate = (a.target ? 1 / OPEN.awayMs : 1 / OPEN.returnMs) * (rm ? 3 : 1);
+          a.k = Math.min(1, Math.max(0, a.k + (a.target ? 1 : -1) * rate * dt * 1000));
+        }
+        const e = easeOut(a.k);
+        const dist = rm ? 0 : OPEN.awayDist;
+        b.x = a.home.x + a.dirX * dist * e;
+        b.y = a.home.y + a.dirY * dist * e;
+        b.angle = a.home.angle + (rm ? 0 : a.spin * e);
+        b.opacity = a.home.opacity * (1 - a.k);
+        this.applyOpacity(b);
+        if (a.target === 0 && a.k <= 0) {
+          b.vx = a.home.vx;
+          b.vy = a.home.vy;
+          b.vang = a.home.vang;
+          b.away = null;
+        }
+      }
+      const l = b.leaving;
+      if (l) {
+        if (!rm) {
+          b.x += l.dirX * OPEN.exitSpeed * dt;
+          b.y += l.dirY * OPEN.exitSpeed * dt;
+        }
+        b.opacity = 1 - Math.min(1, (now - l.t0) / OPEN.exitMs);
+        this.applyOpacity(b);
+        if (now - l.t0 >= OPEN.rejoinMs) this.rejoin(b);
+      }
+    }
+  }
+
   /* ---- push ------------------------------------------------------------- */
 
-  private push(x: number, y: number, now: number): void {
+  private push(x: number, y: number, now: number, dirX?: number, dirY?: number): void {
+    // In focus mode a push is the close: off in the sweep's direction, or away
+    // from the centre for a click / tap, or down when there is no direction.
+    if (this.opened) {
+      const d = Math.hypot(x, y);
+      if (dirX !== undefined && dirY !== undefined) this.close(dirX, dirY);
+      else if (d > 0.5) this.close(x / d, y / d);
+      else this.close(0, -1);
+      return;
+    }
     // One wave per cooldown, whichever source asks (the camera path has its
     // own per-hand cooldown too).
     if (now - this.lastPush < PUSH_COOLDOWN_MS) return;
@@ -739,7 +1046,7 @@ export class World {
     for (const w of this.waves) {
       const front = w.radius * Math.min(1, (now - w.t0) / PUSH_WAVE_MS);
       for (const body of this.bodies) {
-        if (!body.alive || body.holders.length) continue;
+        if (!body.alive || body.holders.length || body.away || body.leaving || body === this.opened) continue;
         const dx = body.x - w.x;
         const dy = body.y - w.y;
         const d = Math.hypot(dx, dy);
@@ -764,22 +1071,32 @@ export class World {
     const halfW = this.vw / 2;
     const halfH = this.vh / 2;
     const t = this.time / 1000;
+    const flightK = 1 - Math.exp(-dt / OPEN.flightLagS);
 
     for (const body of bodies) {
-      if (!body.alive) continue;
+      if (!body.alive || body.away || body.leaving) continue;
       const r = body.r0 * this.S;
 
-      if (body.holders.length) {
+      if (body === this.opened) {
+        // The flight: centre, upright, fitted — the hold's exponential settle.
+        body.x += (0 - body.x) * flightK;
+        body.y += (0 - body.y) * flightK;
+        body.angle += (0 - body.angle) * flightK;
+        body.scaleMul += (this.openScale - body.scaleMul) * flightK;
+        body.vx = body.vy = body.vang = 0;
+      } else if (body.holders.length) {
         this.follow(body, holders, dt);
       } else {
-        // Drift: a slow wandering target velocity the card relaxes toward.
+        // Drift: a slow wandering target velocity the card relaxes toward —
+        // damped while a hand hovers it, so it stays put to be taken.
         let dvx = 0;
         let dvy = 0;
         if (!this.reducedMotion) {
           body.driftAngle +=
             Math.sin(t * Math.PI * 2 * DRIFT_WANDER_HZ + body.driftPhase) * dt * 0.6;
-          dvx = Math.cos(body.driftAngle) * DRIFT_SPEED;
-          dvy = Math.sin(body.driftAngle) * DRIFT_SPEED;
+          const drift = DRIFT_SPEED * (1 - HOVER.driftDamp * body.hover);
+          dvx = Math.cos(body.driftAngle) * drift;
+          dvy = Math.sin(body.driftAngle) * drift;
         }
         const damp = 1 - Math.exp(-LINEAR_DAMPING * dt);
         body.vx += (dvx - body.vx) * damp;
@@ -802,10 +1119,10 @@ export class World {
     // Light card–card repulsion so they never stack.
     for (let i = 0; i < bodies.length; i++) {
       const a = bodies[i];
-      if (!a.alive) continue;
+      if (!a.alive || a.away || a.leaving || a === this.opened) continue;
       for (let j = i + 1; j < bodies.length; j++) {
         const b = bodies[j];
-        if (!b.alive) continue;
+        if (!b.alive || b.away || b.leaving || b === this.opened) continue;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const d = Math.hypot(dx, dy);
@@ -826,8 +1143,8 @@ export class World {
     }
 
     for (const body of bodies) {
-      if (!body.alive) continue;
-      if (!body.holders.length) {
+      if (!body.alive || body.away || body.leaving) continue;
+      if (!body.holders.length && body !== this.opened) {
         const sp = Math.hypot(body.vx, body.vy);
         if (sp > MAX_SPEED) {
           body.vx *= MAX_SPEED / sp;
@@ -837,7 +1154,9 @@ export class World {
         body.y += body.vy * dt;
         body.angle += body.vang * dt;
       }
-      const targetZ = body.holders.length ? HELD_Z : body.restZ;
+      const lift = HOVER.lift * body.hover;
+      const targetZ =
+        body === this.opened ? OPEN.z + lift : body.holders.length ? HELD_Z : body.restZ + lift;
       body.z += (targetZ - body.z) * (1 - Math.exp(-dt / 0.12));
     }
   }

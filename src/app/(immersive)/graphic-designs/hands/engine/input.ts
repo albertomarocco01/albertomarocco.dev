@@ -33,7 +33,9 @@ export type KeyboardCommand =
   | { type: "focusPrev" }
   | { type: "toggleHold" }
   | { type: "tear" }
-  | { type: "push" };
+  | { type: "push" }
+  | { type: "open" }
+  | { type: "close" };
 
 export class HandsInput {
   mode: InputMode;
@@ -41,6 +43,10 @@ export class HandsInput {
   slots: [HandSample | null, HandSample | null] = [null, null];
   /** explicit pushes (double-click / -tap): drained each frame */
   pushes: { u: number; v: number }[] = [];
+  /** clicks / taps (short, still, lone): open the print under them; drained each frame */
+  taps: { u: number; v: number }[] = [];
+  /** flicks / swipes while pressed: unit direction in (u, v); close the opened print; drained each frame */
+  flicks: { dx: number; dy: number }[] = [];
   /** keyboard commands: drained each frame */
   commands: KeyboardCommand[] = [];
   /** arrow keys held right now: -1 / 0 / 1 per axis (v down) */
@@ -71,6 +77,18 @@ export class HandsInput {
   drainPushes(): { u: number; v: number }[] {
     const out = this.pushes;
     this.pushes = [];
+    return out;
+  }
+
+  drainTaps(): { u: number; v: number }[] {
+    const out = this.taps;
+    this.taps = [];
+    return out;
+  }
+
+  drainFlicks(): { dx: number; dy: number }[] {
+    const out = this.flicks;
+    this.flicks = [];
     return out;
   }
 

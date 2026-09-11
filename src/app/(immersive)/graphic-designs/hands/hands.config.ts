@@ -153,9 +153,71 @@ export const MAX_SPEED = 30;
 /** Arrow keys move a held card at this speed (fraction of viewport height / s). */
 export const KEYBOARD_SPEED = 0.55;
 
+/* ---- hover: a print answers a hand or the pointer before anything is pressed */
+export const HOVER = {
+  /** reach around the index tip: this × the body's half-diagonal */
+  radius: 1.6,
+  /** z lift at full hover (world units) */
+  lift: 0.25,
+  /** scale gain at full hover (×1.05) */
+  scale: 0.05,
+  /** tilt of the card toward the tip at full hover (deg); negative flips it */
+  tiltDeg: 5,
+  /** the drift's target velocity is multiplied by (1 − this × hover) */
+  driftDamp: 0.5,
+  /** exponential settle, time constant (s) — the hold's shape, slower */
+  lagS: 0.14,
+} as const;
+
+/* ---- fist → open ------------------------------------------------------- */
+/** Fist: each of the four tips nearer the wrist than its PIP × this (the mirror of the open test). */
+export const FIST_CURL = 0.95;
+/** Consecutive detections to enter / leave the fist. */
+export const FIST_ENTER_FRAMES = 4;
+export const FIST_EXIT_FRAMES = 6;
+/** In focus mode the open-palm sweep closes the print at this × PUSH_SPEED, with no cooldown. */
+export const PUSH_FOCUS_SPEED_FACTOR = 0.75;
+
+/** Focus mode: the opened print, the others leaving and coming back. */
+export const OPEN = {
+  /** the opened print rises to this z … */
+  z: 1.2,
+  /** … aspect-fitted to this share of the viewport height as seen at that z … */
+  heightFrac: 0.62,
+  /** … never wider than this share of the width */
+  maxWidthFrac: 0.7,
+  /** flight to the centre: exponential settle, time constant (s) */
+  flightLagS: 0.14,
+  /** the others: drift outward this far (world units) with a small spin while fading, over awayMs */
+  awayDist: 1.2,
+  awaySpinDeg: 6,
+  awayMs: 700,
+  /** stagger between one print leaving and the next, nearest first */
+  awayStaggerMs: 45,
+  /** the others coming back */
+  returnMs: 600,
+  /** the dismissed print: speed off in the sweep direction, fade time, and when it rejoins the drift */
+  exitSpeed: 7,
+  exitMs: 500,
+  rejoinMs: 1000,
+  /** a close this soon after the open is ignored (a double-click's second press, a hand still moving) */
+  armMs: 450,
+  /** caption: fades in this long after the open (flight + a beat); the first-time hint stays hintMs */
+  captionDelayMs: 900,
+  hintMs: 3000,
+} as const;
+
 /* ---- pointer ---------------------------------------------------------- */
 export const DOUBLE_TAP_MS = 320;
 export const DOUBLE_TAP_PX = 28;
+/** A click / tap that opens: press → release within this, moving less than this (mouse / touch). */
+export const CLICK_MS = 250;
+export const CLICK_PX = 6;
+export const TAP_PX = 12;
+/** A flick / swipe that closes: pointer speed while pressed, in short viewport sides per second, after this much travel. */
+export const FLICK_SPEED = 1.6;
+export const FLICK_MIN_PX = 24;
 
 /* ---- HUD --------------------------------------------------------------- */
-export const LEGEND_MS = 4000;
+/** The onboarding card stays this long after the gate (and on `?`) unless a gesture succeeds first. */
+export const ONBOARDING_MS = 10000;

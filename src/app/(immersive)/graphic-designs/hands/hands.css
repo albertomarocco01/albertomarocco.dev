@@ -88,6 +88,74 @@
   border-color: var(--ink);
   scale: 0.6;
 }
+/* a fist: the ring fills — the hand is about to open a print */
+.hands-reticle.is-fist {
+  border-color: var(--ink);
+  background: var(--ink);
+  scale: 0.7;
+}
+
+/* ---- caption under an opened print (top is set per print by the scene) ---- */
+.hands-caption {
+  position: absolute;
+  left: 50%;
+  top: 82%;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+  max-width: min(92vw, 40rem);
+  pointer-events: none;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 1.1s var(--ease);
+}
+.hands-caption.is-on {
+  opacity: 1;
+}
+/* the guide (on `?`) sits where the caption does: the caption yields while it shows */
+.hands-stage.is-guide .hands-caption {
+  opacity: 0;
+}
+.hands-caption-text {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.hands-caption-hint {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+  color: var(--ink-ghost);
+  opacity: 0;
+  transition: opacity 0.9s var(--ease);
+}
+.hands-caption-hint.is-on {
+  opacity: 1;
+}
+@media (max-width: 560px) {
+  .hands-caption {
+    margin-top: 1rem;
+    gap: 0.45rem;
+  }
+  .hands-caption-text {
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    line-height: 1.8;
+    white-space: normal;
+    text-wrap: balance;
+  }
+  .hands-caption-hint {
+    letter-spacing: 0.14em;
+  }
+}
 
 /* ---- persistent chrome ---- */
 .hands-exit {
@@ -268,7 +336,7 @@
   text-wrap: balance;
 }
 
-/* ---- HUD legend, bottom-centre ---- */
+/* ---- HUD: the onboarding card, bottom-centre (two lines, the keys on `?`) ---- */
 .hands-legend {
   position: fixed;
   left: 50%;
@@ -314,6 +382,9 @@
   .hands-legend {
     bottom: 1.6rem;
     gap: 0.4rem;
+    padding: 1.6rem 1.4rem 0.6rem;
+    /* five short lines over a dense drift: a deeper pool */
+    background: radial-gradient(ellipse 75% 120% at 50% 100%, rgba(0, 0, 0, 0.88), transparent 100%);
   }
   .hands-legend-line {
     font-size: 0.62rem;
@@ -436,6 +507,8 @@
 @media (prefers-reduced-motion: reduce) {
   .hands-gate,
   .hands-legend,
+  .hands-caption,
+  .hands-caption-hint,
   .hands-reticle,
   .hands-exit,
   .hands-gate-btn,
