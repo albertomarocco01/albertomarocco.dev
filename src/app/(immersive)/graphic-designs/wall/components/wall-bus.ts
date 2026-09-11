@@ -19,6 +19,17 @@ export class WallBus {
   private wakeFrame: (() => void) | null = null;
   /** the held walk keys, as directions: orbit −1 | 0 | 1, dolly −1 | 0 | 1 */
   private readonly walking = { orbit: 0, dolly: 0 };
+  /** which way the next loop switch wipes: +1 left → right, −1 right → left */
+  private sweep = 1;
+
+  /** App sets this just before it changes the loop; the scene reads it when the change lands. */
+  setLoopSweep(direction: number): void {
+    this.sweep = direction;
+  }
+
+  loopSweep(): number {
+    return this.sweep;
+  }
 
   /** The scene hands over R3F’s `invalidate` (and null on unmount). A method
    *  rather than a public field: writing to a prop object is what the React

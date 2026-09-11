@@ -115,8 +115,19 @@ export const LOOP = {
   throttleMs: 33,
   /** matches the site's own pace (Aura.tsx advances u_time by delta × 1) */
   timeScale: 1,
-  /** crossfade between palettes when the loop changes */
+  /**
+   * A loop switch is a wipe across the cabinets: the new palette replaces the
+   * old along a soft front that crosses the wall in this long …
+   */
   switchSeconds: 1.2,
+  /** … this many cabinets wide … */
+  wipeCabinets: 1,
+  /**
+   * … while the colour behind the front settles over this long. Shorter than
+   * the crossing, so the front is a clear edge from the first cabinet on; long
+   * enough that a switch during a switch retargets that colour without a pop.
+   */
+  paletteSeconds: 0.4,
   variants: ["amber", "ember", "teal", "violet"] as const satisfies readonly AuraVariant[],
 } as const;
 

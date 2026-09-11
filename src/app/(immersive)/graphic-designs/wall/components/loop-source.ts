@@ -2,6 +2,9 @@ import * as THREE from "three";
 import { AuraMaterial, VARIANT_PALETTE, type AuraMaterialImpl } from "@/components/canvas/aura-material";
 import { LOOP, type LoopVariant } from "../wall.config";
 
+/** smoothstep on 0 … 1 — no bounce, no linear ramp */
+const ease = (t: number) => t * t * (3 - 2 * t);
+
 /**
  * The wall's content: the site's own aura shader, rendered into a texture.
  *
@@ -12,12 +15,20 @@ import { LOOP, type LoopVariant } from "../wall.config";
  * samples that target. Nothing here edits the shared shader: the module is
  * imported read-only, exactly as the home page uses it.
  *
+ * A palette switch is something the wall does, not a fade. The loop draws into
+ * one of two same-sized targets, and at a switch the two trade places: the
+ * frame that was on the wall stays behind as a snapshot, the loop repaints the
+ * other target in the new colours, and the wall's shader uncovers live over
+ * snapshot along a front that crosses the cabinets. Nothing is copied.
+ *
  * Everything mutable lives on the instance and is only ever touched through
  * these methods — the React compiler rules do not allow property assignment on
  * anything that crosses a hook or a prop, and this object does both.
  */
 export class LoopSource {
-  private readonly target: THREE.WebGLRenderTarget;
+  private readonly targets: readonly [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget];
+  /** which target the loop draws into; the other one holds the snapshot */
+  private live = 0;
   private readonly scene = new THREE.Scene();
   /** the aura's vertex shader ignores it, but three still wants a camera */
   private readonly camera = new THREE.Camera();
@@ -25,13 +36,20 @@ export class LoopSource {
   private readonly material: AuraMaterialImpl;
   private readonly mesh: THREE.Mesh;
 
-  /** palette crossfade: from → to over LOOP.switchSeconds */
+  private variant: LoopVariant;
+  /** palette tween: from → to over LOOP.paletteSeconds */
   private readonly hotFrom = new THREE.Vector3();
   private readonly hotTo = new THREE.Vector3();
   private readonly midFrom = new THREE.Vector3();
   private readonly midTo = new THREE.Vector3();
   private mix = 1;
-  /** the live accent, kept in step with the fade — the room's light is this colour */
+  /** the switch front, linear in time: 0 … 1 across the wall, 1 when none is in flight */
+  private crossing = 1;
+  /** +1 sweeps left → right, −1 right → left */
+  private direction = 1;
+  /** the accent the snapshot was painted in — the room's light blends out of it */
+  private readonly hotSnapshot = new THREE.Vector3();
+  private readonly hotLight = new THREE.Vector3();
   private readonly hotColor = new THREE.Color();
 
   private time = 0;
@@ -42,8 +60,11 @@ export class LoopSource {
    *  which is a clock and has to stay one. */
   private dirty = true;
 
-  constructor(target: THREE.WebGLRenderTarget, variant: LoopVariant) {
-    this.target = target;
+  constructor(
+    targets: readonly [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget],
+    variant: LoopVariant,
+  ) {
+    this.targets = targets;
 
     // one triangle, big enough to cover clip space (the material's own idiom)
     const geometry = new THREE.BufferGeometry();
@@ -66,58 +87,89 @@ export class LoopSource {
     this.mesh = mesh;
     this.scene.add(mesh);
 
-    this.setVariant(variant, true);
+    this.variant = variant;
+    this.setVariant(variant, true, 1);
   }
 
-  /** The render target's texture — the wall's map. */
+  /** The target the loop is drawing into — the wall's map. */
   get texture(): THREE.Texture {
-    return this.target.texture;
+    return this.targets[this.live].texture;
+  }
+
+  /** The frame that was on the wall when the current switch began. */
+  get snapshot(): THREE.Texture {
+    return this.targets[1 - this.live].texture;
+  }
+
+  /** How far the front has crossed the wall, eased: 0 … 1, and 1 at rest. */
+  get wipe(): number {
+    return ease(this.crossing);
+  }
+
+  get wipeDirection(): number {
+    return this.direction;
   }
 
   /**
-   * Crossfade to another palette. `VARIANT_PALETTE` entries interpolate
-   * cleanly, so one material and one target are enough — no second loop.
+   * Switch palette. On the running path this is a wipe: the targets trade
+   * places, the new one is painted before the wall next samples it, and the
+   * front starts across. A switch during a switch does not restart the front —
+   * there is one snapshot, and restarting would pop whatever the front has not
+   * reached yet — it only retargets the colour the front uncovers, from
+   * wherever that colour currently is. `instant` (reduced motion, a CPU
+   * rasteriser, the first paint) cuts.
    */
-  setVariant(variant: LoopVariant, instant: boolean): void {
-    const next = VARIANT_PALETTE[variant];
-    const [hx, hy, hz] = next.hot;
-    const [mx, my, mz] = next.mid;
+  setVariant(variant: LoopVariant, instant: boolean, direction: number): void {
+    if (variant === this.variant && !instant) return;
+    this.variant = variant;
+    const [hx, hy, hz] = VARIANT_PALETTE[variant].hot;
+    const [mx, my, mz] = VARIANT_PALETTE[variant].mid;
+    const { u_hot, u_mid } = this.material.uniforms;
     if (instant) {
       this.hotFrom.set(hx, hy, hz);
       this.midFrom.set(mx, my, mz);
-      this.hotTo.copy(this.hotFrom);
-      this.midTo.copy(this.midFrom);
       this.mix = 1;
+      this.crossing = 1;
     } else {
-      // start from wherever the fade currently is, so a fast double-press blends
-      this.hotFrom.copy(this.material.uniforms.u_hot.value);
-      this.midFrom.copy(this.material.uniforms.u_mid.value);
-      this.hotTo.set(hx, hy, hz);
-      this.midTo.set(mx, my, mz);
+      if (this.crossing >= 1) {
+        this.live = 1 - this.live;
+        this.crossing = 0;
+        this.direction = direction < 0 ? -1 : 1;
+        this.hotSnapshot.copy(u_hot.value);
+      }
+      this.hotFrom.copy(u_hot.value);
+      this.midFrom.copy(u_mid.value);
       this.mix = 0;
     }
+    this.hotTo.set(hx, hy, hz);
+    this.midTo.set(mx, my, mz);
     this.applyPalette();
-    this.dirty = true; // a colour change must reach the target even while paused
+    this.dirty = true; // the colour, or a fresh target, must reach the wall even while paused
   }
 
   private applyPalette(): void {
-    const k = this.mix * this.mix * (3 - 2 * this.mix); // smoothstep — no bounce, no linear ramp
-    const hot = this.material.uniforms.u_hot.value.lerpVectors(this.hotFrom, this.hotTo, k);
+    const k = ease(this.mix);
+    this.material.uniforms.u_hot.value.lerpVectors(this.hotFrom, this.hotTo, k);
     this.material.uniforms.u_mid.value.lerpVectors(this.midFrom, this.midTo, k);
-    // the palette is display-referred (the bytes the home page paints), so it is
-    // decoded on the way into a light colour, exactly as the wall shader decodes it
-    this.hotColor.setRGB(hot.x, hot.y, hot.z, THREE.SRGBColorSpace);
   }
 
-  /** The loop's current accent — the colour of the light the wall throws. */
+  /**
+   * The colour of the light the wall throws: the live accent where the front
+   * has passed, the snapshot's where it has not — so the pool on the floor
+   * changes with the wall instead of ahead of it. The palette is
+   * display-referred (the bytes the home page paints), so it is decoded on the
+   * way into a light colour, exactly as the wall shader decodes it.
+   */
   get hot(): THREE.Color {
-    return this.hotColor;
+    const h = this.hotLight.lerpVectors(this.hotSnapshot, this.material.uniforms.u_hot.value, this.wipe);
+    return this.hotColor.setRGB(h.x, h.y, h.z, THREE.SRGBColorSpace);
   }
 
   /**
    * Advance the loop and redraw the target if it is due. The clock always runs
    * at real time — only the redraw is throttled, so 30 Hz into the texture
-   * costs half as much as 60 without changing the loop's pace.
+   * costs half as much as 60 without changing the loop's pace. The front is
+   * not throttled: it lives in the wall's shader and moves every frame.
    * `frozen` holds the clock still (reduced motion) but still allows the one
    * paint a palette change asks for.
    */
@@ -125,11 +177,13 @@ export class LoopSource {
     if (!frozen) {
       this.time += delta * LOOP.timeScale;
       if (this.mix < 1) {
-        this.mix = Math.min(1, this.mix + delta / LOOP.switchSeconds);
+        this.mix = Math.min(1, this.mix + delta / LOOP.paletteSeconds);
         this.applyPalette();
       }
-    } else if (this.mix < 1) {
+      if (this.crossing < 1) this.crossing = Math.min(1, this.crossing + delta / LOOP.switchSeconds);
+    } else if (this.mix < 1 || this.crossing < 1) {
       this.mix = 1;
+      this.crossing = 1;
       this.applyPalette();
     }
 
@@ -144,20 +198,23 @@ export class LoopSource {
     this.material.uniforms.u_time.value = this.time;
 
     const previous = gl.getRenderTarget();
-    gl.setRenderTarget(this.target);
+    gl.setRenderTarget(this.targets[this.live]);
     gl.render(this.scene, this.camera);
     gl.setRenderTarget(previous);
   }
 
-  /** Ask for one repaint of the target on the next frame that runs. */
+  /** A restored context: repaint on the next frame. The snapshot came back
+   *  empty too, so a switch caught mid-flight lands at once. */
   markDirty(): void {
     this.dirty = true;
+    this.crossing = 1;
   }
 
   dispose(): void {
     // The triangle is NOT removed from the scene: the scene is private to this
     // instance and goes with it, while a StrictMode remount reuses the instance
     // — pulling the mesh out there would leave the target black for good.
+    // The two targets are drei's `useFBO`s and are disposed by it.
     this.geometry.dispose();
     this.material.dispose();
   }

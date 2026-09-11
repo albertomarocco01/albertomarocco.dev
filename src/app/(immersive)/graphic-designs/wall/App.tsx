@@ -69,13 +69,25 @@ export default function App({ copy }: { copy: WallCopy }) {
     [wake],
   );
 
+  // ← / → cycle, and the wipe runs the way the arrow points
   const stepLoop = useCallback(
     (step: number) => {
       const count = LOOP.variants.length;
+      bus.setLoopSweep(step);
       setLoopIndex((current) => (current + step + count) % count);
       wake();
     },
-    [wake],
+    [bus, wake],
+  );
+
+  // a swatch: the wipe runs toward it, the way the palette row reads
+  const chooseLoop = useCallback(
+    (index: number, sweep: number) => {
+      bus.setLoopSweep(sweep);
+      setLoopIndex(index);
+      wake();
+    },
+    [bus, wake],
   );
 
   // ── keys: 1 2 3 4 views, ← → loop, wasd walks (held), Esc exits ──
@@ -202,7 +214,7 @@ export default function App({ copy }: { copy: WallCopy }) {
           preset={preset}
           started={started}
           onPreset={choosePreset}
-          onLoopStep={stepLoop}
+          onLoop={chooseLoop}
         />
       )}
     </div>

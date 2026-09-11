@@ -22,10 +22,13 @@ import type { WallBus } from "./wall-bus";
  * one metre, so every number here is the number a client would be quoted.
  *
  * Order of work in a frame:
- *   −1  the loop is advanced and drawn into its render target (throttled to 30 Hz)
+ *   −1  the loop is advanced and drawn into its render target (throttled to 30 Hz);
+ *       a switch's front moves, the wall's material and the two lights follow
  *    0  drei's reflector re-renders the room from under the floor
  *    1  the composer renders the room and adds the bloom
  */
+/** 2:1, matching the wall. No depth: the source is one triangle. */
+const TARGET = { depthBuffer: false, stencilBuffer: false };
 export function WallScene({
   variant,
   preset,
@@ -47,10 +50,12 @@ export function WallScene({
   const gl = useThree((state) => state.gl);
   const invalidate = useThree((state) => state.invalidate);
 
-  // 2:1, matching the wall. No depth: the source is one triangle.
-  const fbo = useFBO(LOOP.fboWidth, LOOP.fboHeight, { depthBuffer: false, stencilBuffer: false });
-  const [loop] = useState(() => new LoopSource(fbo, variant));
-  const [material] = useState(() => new LedWallMaterial(loop.texture));
+  // two targets: the loop draws into one, and at a switch the other holds the
+  // frame that was on the wall while the front crosses it (see loop-source.ts)
+  const fbo = useFBO(LOOP.fboWidth, LOOP.fboHeight, TARGET);
+  const held = useFBO(LOOP.fboWidth, LOOP.fboHeight, TARGET);
+  const [loop] = useState(() => new LoopSource([fbo, held], variant));
+  const [material] = useState(() => new LedWallMaterial(loop.texture, loop.snapshot));
   const [light] = useState(() => initRoomLight());
   const [backLight] = useState(() => initRoomLight(ROOM.wallLight.intensity * ROOM.backLight.ratio));
   const [back] = useState(() => new WallBack());
@@ -88,14 +93,16 @@ export function WallScene({
   }, [gl, loop, invalidate]);
 
   useEffect(() => {
-    loop.setVariant(variant, still);
+    loop.setVariant(variant, still, bus.loopSweep());
     invalidate(); // when nothing is running, the change needs a frame of its own
-  }, [loop, variant, still, invalidate]);
+  }, [loop, variant, still, invalidate, bus]);
 
   useFrame((state, delta) => {
     loop.update(state.gl, Math.min(delta, 0.1), still);
-    light.color.copy(loop.hot);
-    backLight.color.copy(loop.hot);
+    material.setLoop(loop.texture, loop.snapshot, loop.wipe, loop.wipeDirection);
+    const hot = loop.hot;
+    light.color.copy(hot);
+    backLight.color.copy(hot);
   }, -1);
 
   return (

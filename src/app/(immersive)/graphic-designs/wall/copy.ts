@@ -39,11 +39,9 @@ export interface WallCopy {
   loopTitle: string;
   /** camera preset names, bottom-right pager */
   views: { front: string; oblique: string; close: string; back: string };
-  /** accessible group labels and the two loop arrows */
+  /** accessible labels of the two control groups: the view pager, the palette row */
   viewsAria: string;
   loopAria: string;
-  prevLoop: string;
-  nextLoop: string;
   /** decimal mark for the pitch and the live distance (2.6 mm / 2,6 mm) */
   decimal: string;
 }
@@ -52,11 +50,11 @@ const en: WallCopy = {
   metaTitle: "Parete — LED Wall",
   metaDescription:
     "A 6 × 3 m LED wall on an endless dark ground, running the generative loops live. Orbit it, walk round the back, switch loops, get close enough to see the pixel pitch.",
-  aria: "Parete — 3D preview of a 6 by 3 metre LED wall. Drag to orbit, wheel to dolly, w a s d to walk, keys 1 2 3 4 for views (4 is the back), arrow keys switch the loop, Escape exits.",
+  aria: "Parete — 3D preview of a 6 by 3 metre LED wall. Drag to orbit, wheel to dolly, w a s d to walk, keys 1 2 3 4 for views (4 is the back), the left and right arrows or the swatches change the loop's palette, Escape exits.",
   exit: "← exit the demo",
   noWebgl: "This demo needs WebGL. Your browser or device doesn't support it.",
   contextLost: "The graphics context was lost. Reload the page to continue.",
-  keyboardHint: "1 2 3 4 views · ← → loop · wasd walks · drag orbits · wheel dollies",
+  keyboardHint: "1 2 3 4 views · ← → palette · wasd walks · drag orbits · wheel dollies",
   spec: {
     wall: "led wall",
     pitch: "pitch",
@@ -68,9 +66,7 @@ const en: WallCopy = {
   loopTitle: "Liminal Field",
   views: { front: "front", oblique: "oblique", close: "close", back: "back" },
   viewsAria: "camera view",
-  loopAria: "loop",
-  prevLoop: "previous loop",
-  nextLoop: "next loop",
+  loopAria: "loop palette",
   decimal: ".",
 };
 
@@ -78,11 +74,11 @@ const it: WallCopy = {
   metaTitle: "Parete — LED Wall",
   metaDescription:
     "Un led wall di 6 × 3 m su un pavimento buio senza fine, con i loop generativi dal vivo. Giraci intorno, passa dietro, cambia loop, avvicinati fino a vedere il pixel pitch.",
-  aria: "Parete — anteprima 3D di un led wall di 6 per 3 metri. Trascina per orbitare, rotella per avvicinarti, w a s d per muoverti, tasti 1 2 3 4 per le viste (4 è il retro), le frecce cambiano loop, Esc esce.",
+  aria: "Parete — anteprima 3D di un led wall di 6 per 3 metri. Trascina per orbitare, rotella per avvicinarti, w a s d per muoverti, tasti 1 2 3 4 per le viste (4 è il retro), le frecce sinistra e destra o i campioni di colore cambiano la palette del loop, Esc esce.",
   exit: "← esci dalla demo",
   noWebgl: "Questa demo richiede WebGL. Il tuo browser o dispositivo non lo supporta.",
   contextLost: "Il contesto grafico è andato perso. Ricarica la pagina per continuare.",
-  keyboardHint: "1 2 3 4 viste · ← → loop · wasd per muoverti · trascina per girare · rotella per avvicinare",
+  keyboardHint: "1 2 3 4 viste · ← → palette · wasd per muoverti · trascina per girare · rotella per avvicinare",
   spec: {
     wall: "led wall",
     pitch: "pitch",
@@ -94,9 +90,7 @@ const it: WallCopy = {
   loopTitle: "Liminal Field",
   views: { front: "frontale", oblique: "obliqua", close: "da vicino", back: "retro" },
   viewsAria: "vista",
-  loopAria: "loop",
-  prevLoop: "loop precedente",
-  nextLoop: "loop successivo",
+  loopAria: "palette del loop",
   decimal: ",",
 };
 

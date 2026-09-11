@@ -1,12 +1,24 @@
 import { useCallback } from "react";
+import { VARIANT_PALETTE } from "@/components/canvas/aura-material";
 import type { WallCopy } from "../copy";
-import { LED, LED_CABINETS, PRESETS, WALL, type LoopVariant } from "../wall.config";
+import { LED, LED_CABINETS, LOOP, PRESETS, WALL, type LoopVariant } from "../wall.config";
 import type { WallBus } from "./wall-bus";
+
+/**
+ * Each palette's accent, as its swatch shows it. `VARIANT_PALETTE` is
+ * display-referred — the bytes the home page paints — so it goes to CSS as-is.
+ */
+const SWATCH = Object.fromEntries(
+  LOOP.variants.map((name) => {
+    const [r, g, b] = VARIANT_PALETTE[name].hot.map((c) => Math.round(c * 255));
+    return [name, `rgb(${r} ${g} ${b})`];
+  }),
+) as Record<LoopVariant, string>;
 
 /**
  * Everything written over the room: the title cover and its key line (the first
  * idle state only), the spec sheet bottom-left, and the two controls
- * bottom-right — the view pager and the loop switcher, which are the same four
+ * bottom-right — the view pager and the palette row, which are the same four
  * keys and the same two arrows, made visible and tappable.
  *
  * The spec line is a spec sheet on purpose: pitch and viewing distance are the
@@ -21,7 +33,7 @@ export function Hud({
   preset,
   started,
   onPreset,
-  onLoopStep,
+  onLoop,
 }: {
   copy: WallCopy;
   bus: WallBus;
@@ -29,7 +41,8 @@ export function Hud({
   preset: number;
   started: boolean;
   onPreset: (index: number) => void;
-  onLoopStep: (step: number) => void;
+  /** a palette by index, and which way the wipe should run to reach it */
+  onLoop: (index: number, sweep: number) => void;
 }) {
   const distanceRef = useCallback(
     (el: HTMLSpanElement | null) => bus.registerDistance(el, copy.decimal),
@@ -37,6 +50,7 @@ export function Hud({
   );
 
   const pitch = LED.pitchMm.toFixed(1).replace(".", copy.decimal);
+  const current = LOOP.variants.indexOf(variant);
 
   return (
     <>
@@ -88,24 +102,24 @@ export function Hud({
           ))}
         </div>
 
-        <div className="wall-loop" role="group" aria-label={copy.loopAria}>
-          <button
-            type="button"
-            className="wall-key wall-arrow"
-            aria-label={copy.prevLoop}
-            onClick={() => onLoopStep(-1)}
-          >
-            ←
-          </button>
-          <span className="wall-loop-name">{variant}</span>
-          <button
-            type="button"
-            className="wall-key wall-arrow"
-            aria-label={copy.nextLoop}
-            onClick={() => onLoopStep(1)}
-          >
-            →
-          </button>
+        {/* one lamp per palette, lit in its own accent, its name under it */}
+        <div className="wall-palette" role="group" aria-label={copy.loopAria}>
+          {LOOP.variants.map((name, index) => (
+            <button
+              key={name}
+              type="button"
+              className={`wall-key wall-swatch${index === current ? " is-on" : ""}`}
+              aria-pressed={index === current}
+              onClick={() => onLoop(index, Math.sign(index - current))}
+            >
+              <span
+                className="wall-swatch-lamp"
+                style={{ backgroundColor: SWATCH[name] }}
+                aria-hidden="true"
+              />
+              {name}
+            </button>
+          ))}
         </div>
       </div>
 

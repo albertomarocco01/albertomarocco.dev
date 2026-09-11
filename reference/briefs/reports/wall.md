@@ -500,3 +500,203 @@ everywhere (the composer and the reflector's mirror pass are inside the count).
   imports the file, so `b36bf6a` alone does not compile; the tree is consistent
   again from `feat(wall): …` onward. Nothing to do unless bisecting.
 - Nothing to change in a shared file.
+
+## Round 2b — the loops and their colours, visible
+
+Brief `round2/05-wall-loops.md`, built 2026-09-11 on the same AMD Radeon
+integrated GPU as round 2a (`ANGLE (AMD, AMD Radeon(TM) Graphics, D3D11)`).
+Two commits: `fix(wall): phone pager no longer wraps a label in two` (the audit
+fix) and `feat(wall): palette row, cabinet wipe on switch`. No shared file
+touched, nothing installed; `VARIANT_PALETTE` is still imported read-only.
+
+### Audit
+
+`npx tsc --noEmit` clean and eslint zero findings before any change. Driven
+with agent-browser on the real GPU, console captured: front, back (`4`), eight
+loop switches, `1`, the Tab order, Esc → index → card three times (heap 38.8 /
+31.3 / 33.0 MB on the three entries, one canvas each, no errors), reduced
+motion (0 draws at rest, after a preset cut and after a loop switch), and a
+390 × 844 phone at DPR 2 in Italian.
+
+One real defect: **on the phone the pager broke `da vicino` onto two lines.**
+The four views and the loop switcher shared one 358 px row. Fixed in its own
+commit: labels are `nowrap`, the pager takes the full width with the loop under
+it, the spec line moves up. The feature commit then turns that second row into
+the palette.
+
+### What changed, and why
+
+1. **A palette row instead of `← amber →`.** Bottom-right, one button per
+   `LOOP.variants` entry: a lamp (a 7 px disc in the variant's `hot` colour,
+   from `VARIANT_PALETTE` as sRGB, unconverted) with the name under it. The
+   current one is ringed in `--ink`, the others in `--ink-dim`: an `outline`
+   3 px off the disc, so the ring floats around the lamp. Same `wall-key`
+   register as the pager: mono lowercase, `--ink-ghost` → `--ink` on hover,
+   focus and selection, the amber underline on `:focus-visible`,
+   `aria-pressed`, group label `loop palette` / `palette del loop`. The names
+   sit on the pager's baseline, the lamps stand above them. Click or tap
+   selects; ← / → still cycle. The spec line still reads
+   `loop: liminal field / amber`.
+   - **Layout.** One row beside the pager above 1280 px; stacked under the
+     pager, right-aligned, up to 1280 px; on a phone two rows of four in equal
+     columns, so each view sits over a palette. Under `pointer: coarse` every
+     key is at least 44 × 44 px.
+   - **Copy.** `prevLoop` / `nextLoop` went with the arrows. `loopAria` is now
+     `loop palette` / `palette del loop`; the stage `aria` says the left and
+     right arrows or the swatches change the palette, and the key line reads
+     `← → palette`.
+   - **No fifth "white" loop.** The site's white field is not another palette
+     of the smoke: it is `AuraMaterial`'s other branch, orbs whose centres come
+     from the JS physics sim in `Aura.tsx` through `u_blobs`. Putting it on the
+     wall means porting that sim into the loop source, which is out of scope, as
+     the brief says.
+
+2. **A switch is a wipe across the cabinets.**
+   - **No blit: two targets trade places.** `WallScene` allocates a second
+     `useFBO(1024, 512)`, once, and drei disposes it with the first on unmount.
+     The loop draws into one target; at a switch the other becomes live, and
+     the frame that was on the wall stays behind, untouched, as the snapshot.
+     That is the brief's memory budget with nothing copied at all. three's
+     `copyTextureToTexture` reaches a render-target source through
+     `copyTexSubImage2D` out of a HalfFloat framebuffer, a path I did not want
+     to depend on across GPUs, and a swap leaves no hitch to measure. The newly
+     live target is painted in the same frame, before the wall samples it.
+   - **The front.** `LedWallMaterial` gains `uSnapshot`, `uWipe`, `uWipeDir`
+     and `uWipeWidth`: the live content uncovers the snapshot along a
+     `smoothstep` front one cabinet wide (`LOOP.wipeCabinets`), crossing the
+     wall in `LOOP.switchSeconds` (1.2 s, eased in and out). It reads each lamp's
+     own sample position, so up close the front steps lamp by lamp. At rest the
+     front stands past the far edge; the cost is one texture fetch.
+   - **The direction follows the hand.** → and a swatch to the right of the
+     current one wipe left to right; ← and a swatch to the left, right to left
+     (`WallBus.setLoopSweep`, read by the scene when the change lands).
+   - **The colour behind the front settles in 0.4 s, not 1.2 s**
+     (`LOOP.paletteSeconds`), which is a deviation. If the live palette tweens
+     as long as the front travels, the step at the front is only as big as the
+     tween has got: a quarter of the way across it carries a quarter of the
+     change, and the wipe reads as a tint seeping in that only becomes an edge
+     past the middle. At 0.4 s the edge carries about 90 % of the change by the
+     second cabinet. It stays a tween rather than a cut because the tween is
+     what keeps a switch during a switch smooth.
+   - **The lights follow what the wall shows**, also a deviation from "follow
+     the live palette". Both `RectAreaLight`s take the snapshot's accent mixed
+     toward the live one by how far the front has crossed. With the palette
+     settling in 0.4 s, following it alone would light the floor in the new
+     colour while most of the wall still showed the old. The floor's reflection
+     needs nothing: it re-renders the wall.
+   - **A switch during a switch does not restart the front.** There is one
+     snapshot, and restarting would pop everything the front has not reached
+     yet. The front keeps going; the colour it uncovers retargets from wherever
+     it is.
+   - **Reduced motion and the software path cut**, as before. A restored WebGL
+     context also lands a switch in flight at once, since its snapshot came
+     back empty.
+
+3. **"As vivid as the index": measured, and left alone.** "Liminal Field" open
+   on `/xperiments` and the wall at the front preset, both at 1600 × 900 in
+   amber. The table gives linear luminance and display-referred chroma over the
+   content: the row above its caption, the wall face inset by 50 px.
+
+   | | p50 lum | p99 lum | p50 RGB | p99 RGB | chroma of the brightest 5 % |
+   |---|---|---|---|---|---|
+   | row, 3 frames | 0.0115–0.0118 | 0.021–0.024 | 32 27 23 | 48–52 38–41 27–29 | 19–21 |
+   | wall, 2 frames | 0.0123–0.0125 | 0.025–0.038 | 34–35 28 22 | 54–70 42–51 31–32 | 25–35 |
+
+   The wall is already a little brighter at the median, brighter in the flares
+   and more saturated. That follows from the pipeline: the row writes the
+   shader's bytes at gain 1, while the wall decodes them, applies
+   `LED.intensity` in linear light, and the bloom adds on top. The wall is
+   neither dimmer nor duller than the row, so **`LED.intensity` stays 1.35 and
+   `BLOOM.luminanceThreshold` stays 0.045**. Any higher gain is the step §Colour
+   describes as lifting the smoke's body toward beige, and nothing here asks for
+   it. On `/xperiments` the row also sits over the grey orb field, which makes
+   it look lighter than it measures.
+
+### New tunables
+
+- `wall.config.ts`: `LOOP.switchSeconds` 1.2 is now the time the front takes to
+  cross the wall; `LOOP.wipeCabinets` 1 is its width in cabinets;
+  `LOOP.paletteSeconds` 0.4 is how long the colour behind it takes to settle.
+- `wall.css`: the 1280 px breakpoint where the controls stack, and the width the
+  spec line leaves them (`42rem` beside the one-row strip, `26rem` beside the
+  stack).
+
+### Known limits (new)
+
+- **The snapshot is a still.** Ahead of the front the smoke pauses for at most
+  1.2 s; at the loop's pace (`u_time × 0.035`) nothing visibly moves in that
+  time.
+- **A switch during a switch does not wipe again.** A fast double press is one
+  wipe whose colour changes on the way, and a press just before the front lands
+  is mostly a 0.4 s crossfade on the side already swept. The front also keeps
+  its first direction.
+- **The 44 px touch targets were checked by geometry, not by a finger.**
+  agent-browser's device emulation does not set `pointer: coarse`, so on the
+  emulated phone the pager keys measured 88 × 30 and the swatches 88 × 46; the
+  `pointer: coarse` rule is what lifts every key to 44 px on a real touch screen.
+
+### Verification
+
+agent-browser, headless Chrome on the real GPU, 1600 × 900 and Italian unless
+stated.
+
+- **Four switches each way** by key, 1.5 s apart: amber → ember → teal → violet
+  → amber, then back, ending where it began both ways. Frame pacing across all
+  eight, sampled on `requestAnimationFrame`: 60 fps, p50 16.7 ms, p95 17.1 ms,
+  max 17.5 ms, the same as the page at rest (max 17.4 ms). Headless Chrome is
+  vsync-locked here, so this shows no dropped frame and no hitch at a switch
+  rather than headroom. Draw calls: 41.5 per frame at rest and 41.5 during a
+  switch, the same as round 2a's front view, because the snapshot is a swap
+  and not an extra pass.
+- **The front, measured.** Eight columns across the wall were read straight
+  from the default framebuffer after each frame's final draw, every ~120 ms.
+  ← from amber: the right-hand column turns at 250 ms and the left-hand one at
+  999 ms, each column flipping within one sample. → from violet: left to right
+  at the same pace.
+- **A switch during a switch**: → at 0 ms and → again at 450 ms. The front kept
+  going. The columns it had not reached stayed violet until it got there, with
+  no pop; the side already swept retargeted from amber to ember, and the wall
+  landed on ember at about 1.1 s.
+- **Keyboard on the swatches.** Tab order: exit → the four views → amber →
+  ember → teal → violet. Enter on ember selects it; Tab then Space selects teal;
+  Shift+Tab twice then Enter returns to amber. `aria-pressed` follows each time.
+- **Reduced motion.** → is a cut: the first frame after the press shows the
+  whole wall in the new palette.
+- **Phone, 390 × 844 at DPR 2**: the pager and the palette are two rows of four
+  across 358 px, the swatches 88 × 46, and the spec line ends 23 px above the
+  controls. At 1024 px the controls stack at the right and the three-line spec
+  line ends 49 px short of them; at 1366 px and 1600 px they are one row, 36 px
+  clear at both.
+- **English**: `front oblique close back`, then `amber ember teal violet`; group
+  `loop palette`; key line `← → palette`. The strip is 521 px wide at 1600 px,
+  against 585 px in Italian.
+- **Software** (SwiftShader, `ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device
+  (Subzero)))`): 0 draws in 1.5 s at rest; → cuts straight to ember, then 0
+  draws in the following 1.5 s; no bloom, as before; no errors.
+- **Exit / re-enter ×3** from `/graphic-designs`, with `console.error`,
+  `console.warn`, `error` and `unhandledrejection` captured across the client
+  navigations: heap 32.1 / 38.2 / 33.9 MB on the three entries; one wall canvas
+  on each entry and none on each exit; a switch works after every re-entry; a
+  fresh WebGL2 context is still obtainable afterwards. Nothing was logged but
+  R3F's `THREE.Clock` notice, once per mount.
+- `npx tsc --noEmit` clean; `npx eslint` on the folder, zero findings.
+  `npm run build` was not run: 00-shared does not list 05 among the briefs
+  that build.
+
+### How to test it in two minutes (round 2b)
+
+1. Open the demo. Bottom-right, beside or under the views: four lamps, amber
+   ringed. Click **teal**: the teal smoke crosses the wall left to right behind
+   a cabinet-wide edge, and the pool of light on the floor turns with it.
+2. From teal, press **←** twice, quickly: one wipe from the right whose colour
+   changes on the way, landing on amber.
+3. **Tab** to the lamps: Enter or Space picks one.
+4. Press **3** and switch from up close: the front steps lamp by lamp.
+5. DevTools → Rendering → `prefers-reduced-motion: reduce`: a switch is a cut.
+
+### For the director (07-release)
+
+- Nothing to change in a shared file.
+- For 06: the palette row now follows the pager in the Tab order, so the tour
+  label "after the pager" lands after the four swatches unless it is placed
+  between the two groups.

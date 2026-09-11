@@ -5,6 +5,7 @@ import {
   LED_DOT_GAIN,
   LED_OFF_FLOOR,
   LED_PIXELS,
+  LOOP,
 } from "../wall.config";
 
 /**
@@ -22,6 +23,10 @@ import {
  * flat surface across `resolveLo … resolveHi`, well before the 0.5 cells/pixel
  * limit. The mask is normalised so its cell average is exactly 1, so the wall
  * does not change brightness as the structure fades in or out.
+ *
+ * A loop switch is drawn here too: the frame that was on the wall arrives as a
+ * second texture, and the live content replaces it along a soft front that
+ * crosses the cabinets.
  *
  * Colour: the loop texture holds the site's own display-referred output (the
  * bytes the home page paints), so it is decoded to linear light here and the
@@ -46,6 +51,10 @@ const vertexShader = /* glsl */ `
 
 const fragmentShader = /* glsl */ `
   uniform sampler2D uLoop;
+  uniform sampler2D uSnapshot; // the frame on the wall when a switch began
+  uniform float uWipe;         // the switch front, 0 … 1 across the wall (1 = at rest)
+  uniform float uWipeDir;      // +1 sweeps left → right, −1 right → left
+  uniform float uWipeWidth;    // soft front width, in uv
   uniform vec2  uPixels;     // lamps across the wall (x, y)
   uniform vec2  uCabinets;   // cabinet grid
   uniform float uFill;       // lit dot diameter / cell
@@ -88,6 +97,15 @@ const fragmentShader = /* glsl */ `
     vec2 sampleUv = mix(uv, cell / uPixels, resolve);
     vec3 content = texture2D(uLoop, sampleUv).rgb;
 
+    // a loop switch: the live content uncovers the held frame along a soft
+    // front. It reads the lamp's own sample position, so up close the front
+    // steps lamp by lamp, the way a processor draws it. At rest the front
+    // stands past the far edge and this mixes nothing.
+    float along = uWipeDir > 0.0 ? sampleUv.x : 1.0 - sampleUv.x;
+    float front = mix(-0.5 * uWipeWidth, 1.0 + 0.5 * uWipeWidth, uWipe);
+    float held = smoothstep(front - 0.5 * uWipeWidth, front + 0.5 * uWipeWidth, along);
+    content = mix(content, texture2D(uSnapshot, sampleUv).rgb, held);
+
     // the lamp itself: a round dot inside its cell, analytically anti-aliased
     vec2 g = fract(uv * uPixels) - 0.5;
     float r = length(g) * 2.0;                       // 0 at the centre, 1 at the cell edge
@@ -122,13 +140,17 @@ const fragmentShader = /* glsl */ `
  * so the intensity is what sets how hard the bloom bites.
  */
 export class LedWallMaterial extends THREE.ShaderMaterial {
-  constructor(loop: THREE.Texture) {
+  constructor(live: THREE.Texture, snapshot: THREE.Texture) {
     super({
       vertexShader,
       fragmentShader,
       toneMapped: false,
       uniforms: {
-        uLoop: { value: loop },
+        uLoop: { value: live },
+        uSnapshot: { value: snapshot },
+        uWipe: { value: 1 },
+        uWipeDir: { value: 1 },
+        uWipeWidth: { value: LOOP.wipeCabinets / LED_CABINETS[0] },
         uPixels: { value: new THREE.Vector2(LED_PIXELS[0], LED_PIXELS[1]) },
         uCabinets: { value: new THREE.Vector2(LED_CABINETS[0], LED_CABINETS[1]) },
         uFill: { value: LED.fill },
@@ -142,5 +164,17 @@ export class LedWallMaterial extends THREE.ShaderMaterial {
         uResolve: { value: new THREE.Vector2(LED.resolveLo, LED.resolveHi) },
       },
     });
+  }
+
+  /**
+   * Once a frame, from the loop source: which target is live, which one holds
+   * the snapshot (they trade places at a switch), and where the front is.
+   */
+  setLoop(live: THREE.Texture, snapshot: THREE.Texture, wipe: number, direction: number): void {
+    const u = this.uniforms;
+    u.uLoop.value = live;
+    u.uSnapshot.value = snapshot;
+    u.uWipe.value = wipe;
+    u.uWipeDir.value = direction;
   }
 }

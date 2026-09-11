@@ -114,8 +114,8 @@
   flex-wrap: wrap;
   align-items: baseline;
   /* one line where there is room for one, and never under the controls: the
-     second term reserves the width the pager and the loop switcher occupy */
-  max-width: min(58rem, calc(100vw - 33rem));
+     second term reserves the width the pager and the palette row occupy */
+  max-width: min(58rem, calc(100vw - 42rem));
   font-family: var(--mono);
   font-size: 0.64rem;
   letter-spacing: 0.18em;
@@ -145,13 +145,14 @@
   bottom: calc(1.6rem + env(safe-area-inset-bottom, 0px));
   z-index: 45;
   display: flex;
-  align-items: center;
+  /* the palette names sit on the pager's baseline, their lamps stand above */
+  align-items: flex-end;
   gap: 1.6rem;
 }
 .wall-pager,
-.wall-loop {
+.wall-palette {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.15rem;
 }
 .wall-key {
@@ -180,19 +181,23 @@
 .wall-key.is-on {
   color: var(--ink);
 }
-.wall-arrow {
-  padding: 0.42rem 0.45rem;
-  font-size: 0.72rem;
-  letter-spacing: 0;
+/* a palette: its lamp, lit in its own accent, over its name */
+.wall-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
 }
-.wall-loop-name {
-  min-width: 4.2em;
-  font-family: var(--mono);
-  font-size: 0.64rem;
-  letter-spacing: 0.18em;
-  text-transform: lowercase;
-  text-align: center;
-  color: var(--ink);
+.wall-swatch-lamp {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  outline: 1px solid var(--ink-dim);
+  outline-offset: 3px;
+  transition: outline-color 0.5s var(--ease);
+}
+.wall-swatch.is-on .wall-swatch-lamp {
+  outline-color: var(--ink);
 }
 .wall-sr {
   position: absolute;
@@ -231,14 +236,27 @@
 @media (prefers-reduced-motion: reduce) {
   .wall-title,
   .wall-exit,
-  .wall-key {
+  .wall-key,
+  .wall-swatch-lamp {
     transition: none;
   }
 }
 
-/* ---- phones ---- */
+/* ---- narrower screens, phones ---- */
+@media (max-width: 1280px) {
+  /* the pager and the palette row stack at the right, which gives the spec
+     line back the width of one of them */
+  .wall-controls {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.2rem;
+  }
+  .wall-spec {
+    max-width: calc(100vw - 26rem);
+  }
+}
 @media (max-width: 720px) {
-  /* the cabinet count and the loop line are the first to go: the switcher
+  /* the cabinet count and the loop line are the first to go: the palette row
      already names the loop, and the pitch is the number that matters */
   .wall-spec-wide {
     display: none;
@@ -257,30 +275,34 @@
   }
   .wall-spec {
     left: 1rem;
-    bottom: calc(6.4rem + env(safe-area-inset-bottom, 0px));
+    bottom: calc(7.2rem + env(safe-area-inset-bottom, 0px));
     max-width: calc(100vw - 2rem);
     font-size: 0.58rem;
   }
-  /* four views and the loop do not share 390 px without squeezing a label onto
-     two lines: the pager takes the full width, the loop sits under it */
+  /* two rows of four across the full width, one column per label, so the
+     views and the palettes line up instead of squeezing a label onto two lines */
   .wall-controls {
     right: 1rem;
     left: 1rem;
     bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
-    flex-direction: column;
-    align-items: flex-end;
+    align-items: stretch;
     gap: 0;
   }
-  .wall-pager {
-    align-self: stretch;
-    justify-content: space-between;
-  }
-  .wall-key,
-  .wall-loop-name {
-    font-size: 0.58rem;
+  .wall-pager,
+  .wall-palette {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
   }
   .wall-key {
-    padding: 0.55rem 0.4rem; /* a 44 px tap target without growing the type */
+    padding: 0.55rem 0.2rem;
+    font-size: 0.58rem;
+  }
+}
+/* a finger needs 44 px, whatever the viewport */
+@media (pointer: coarse) {
+  .wall-key {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 @media (hover: none) and (pointer: coarse) {
