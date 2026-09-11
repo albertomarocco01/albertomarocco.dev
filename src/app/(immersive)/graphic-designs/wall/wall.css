@@ -165,6 +165,7 @@
   letter-spacing: 0.18em;
   text-transform: lowercase;
   color: var(--ink-ghost);
+  white-space: nowrap; /* "da vicino" is one label, not two lines */
   cursor: pointer;
   transition: color 0.5s var(--ease);
 }
@@ -256,16 +257,23 @@
   }
   .wall-spec {
     left: 1rem;
-    bottom: calc(3.6rem + env(safe-area-inset-bottom, 0px));
+    bottom: calc(6.4rem + env(safe-area-inset-bottom, 0px));
     max-width: calc(100vw - 2rem);
     font-size: 0.58rem;
   }
+  /* four views and the loop do not share 390 px without squeezing a label onto
+     two lines: the pager takes the full width, the loop sits under it */
   .wall-controls {
     right: 1rem;
     left: 1rem;
     bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+  }
+  .wall-pager {
+    align-self: stretch;
     justify-content: space-between;
-    gap: 0.6rem;
   }
   .wall-key,
   .wall-loop-name {
