@@ -238,6 +238,13 @@ export const CAMERA = {
    */
   maxDistance: 14,
   /**
+   * The eye never goes below this height. At the far end of the dolly a 100°
+   * polar angle would put the camera under the floor — which is single-sided
+   * and vanishes — so the polar limit tightens with distance to keep this much
+   * clearance; see `CameraRig`.
+   */
+  floorClearance: 0.3,
+  /**
    * The aspect the preset distances below were framed for. Anything narrower
    * pushes the two wide presets back in proportion, so the wall is composed
    * rather than cropped; anything wider is left alone.

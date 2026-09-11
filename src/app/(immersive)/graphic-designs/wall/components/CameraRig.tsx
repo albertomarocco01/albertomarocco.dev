@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { CameraControls, CameraControlsImpl } from "@react-three/drei";
+import * as THREE from "three";
 import { CAMERA, PRESETS, type CameraPreset } from "../wall.config";
 import type { WallBus } from "./wall-bus";
 
 const DEG = Math.PI / 180;
 const ACTION = CameraControlsImpl.ACTION;
+const target = new THREE.Vector3();
 
 /**
  * Limits and input map. A module-scope helper so nothing writes to a hook's or
@@ -32,6 +34,22 @@ function configureControls(c: CameraControlsImpl): void {
   c.touches.one = ACTION.TOUCH_ROTATE;
   c.touches.two = ACTION.TOUCH_DOLLY;
   c.touches.three = ACTION.NONE;
+}
+
+/**
+ * Keep the eye above the floor. A fixed 100° polar limit is fine at 7 m, but
+ * at the far end of the dolly it puts the camera under the ground plane, which
+ * is single-sided and vanishes. So the limit is the smaller of the configured
+ * one and the angle at which the eye would reach `floorClearance` at the
+ * current distance; camera-controls only clamps when asked, so an out-of-range
+ * polar is nudged back with its own damping.
+ */
+function clampPolarToFloor(c: CameraControlsImpl, animate: boolean): void {
+  const ty = c.getTarget(target).y;
+  const cos = THREE.MathUtils.clamp((CAMERA.floorClearance - ty) / c.distance, -1, 1);
+  const max = Math.min(CAMERA.maxPolar * DEG, Math.acos(cos));
+  c.maxPolarAngle = max;
+  if (c.polarAngle > max + 1e-4) void c.rotatePolarTo(max, animate);
 }
 
 /**
@@ -134,6 +152,7 @@ export function CameraRig({
     const c = ref.current;
     if (!c) return;
     bus.setDistance(c.distance);
+    clampPolarToFloor(c, !reduced);
     if (reduced) return;
 
     const wokeAt = bus.lastWake();
