@@ -120,11 +120,12 @@ export const AUTO = {
   /** seconds without input — on any print, touched or not — before the current
    *  starts (or resumes); the next input cancels it again. A print always
    *  finishes by itself once the visitor stops. */
-  idleDelay: 6,
-  /** strength relative to a natural stir when it starts (brief: ~20 %) … */
-  strength: 0.15,
-  /** … ramping to full over this many seconds of continued idleness, so any
-   *  print finishes in bounded time once the visitor stops */
+  idleDelay: 3,
+  /** strength relative to a natural stir when it starts … */
+  strength: 0.22,
+  /** … ramping to full over this many seconds of continued idleness. Left
+   *  alone, a print shows a ghost within ~5 s of the current starting and is
+   *  fixed in 25–30 s — a tray left to develop, never a fast-forward. */
   rampTime: 36,
   /** direct development along the current's path (see STIR.exposeGain) */
   exposeGain: 1.5,
@@ -145,7 +146,7 @@ export const AUTO = {
   dye: 0.3,
 } as const;
 
-/** Development, fixing, draining. */
+/** Development, fixing, the handover. */
 export const DEVELOP = {
   /** exposure += dye × rate × dt */
   rate: 1.6,
@@ -153,10 +154,20 @@ export const DEVELOP = {
   fixThreshold: 0.85,
   /** the remainder eases to 1 over this many seconds */
   fixEase: 1.2,
-  /** `fixed` holds this long before the tray drains */
-  fixedHold: 2.5,
-  /** the drain — black rising over the print */
-  drain: 1.6,
+  /** `fixed` holds this long — enough to register that it is done — before
+   *  the handover */
+  fixedHold: 0.4,
+  /** the handover: the finished print sinks while the next comes up under it,
+   *  over this many seconds … */
+  dissolve: 1.2,
+  /** … and a shorter ramp for a manual ← / → */
+  dissolveManual: 0.8,
+  /** fresh paper wets through over this many seconds: developer carried by
+   *  the liquid's own motion (the wake of the previous stir, the current)
+   *  acts on a new print only gradually, so a handover never shows the next
+   *  print flaring up in yesterday's swirls. The hand's own developer and its
+   *  footprint act at once. */
+  wetIn: 3,
   /** coverage is measured on the GPU every … seconds */
   coverageInterval: 0.25,
   /** … into an RGBA8 target of this many texels a side (16 taps each) */
@@ -182,6 +193,8 @@ export const LOOK = {
   printMargin: 0.04,
   /** refraction: UV offset = velocity × velTexel × this */
   refraction: 0.016,
+  /** the sinking print refracts more as it goes down: × (1 + this) at the end */
+  sinkDepth: 1.5,
   /** the slosh after a rock: a visual wobble of the refraction, UV amplitude, decay s, Hz */
   slosh: 0.006,
   sloshDecay: 1.2,

@@ -259,18 +259,26 @@ void main() {
 }
 `;
 
-/** The composite: print under the liquid → development curve → paper → room. */
+/** The composite: print under the liquid → development curve → paper → room.
+ *  Through a handover (`u_drain` 0 → 1) the outgoing print — `u_printOld`
+ *  with its exposure frozen in `u_exposureOld` — sinks over the incoming one:
+ *  deeper under the liquid, darker, its grain gone. */
 export const COMPOSITE_FRAG = /* glsl */ `${HEAD}
 uniform sampler2D u_print;
 uniform sampler2D u_exposure;
+uniform sampler2D u_printOld;
+uniform sampler2D u_exposureOld;
 uniform sampler2D u_velocity;
 uniform sampler2D u_dye;
 uniform vec2 u_res;
 uniform vec2 u_aspectN;
 uniform vec4 u_rect;
+uniform vec4 u_rectOld;
 uniform vec2 u_velTexel;
 uniform float u_drain;
+uniform float u_sink;
 uniform float u_seed;
+uniform float u_seedOld;
 uniform float u_fluid;
 uniform vec2 u_slosh;
 uniform float u_refraction;
@@ -305,24 +313,17 @@ vec3 toSRGB(vec3 c) {
   return mix(12.92 * c, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
 }
 
-void main() {
-  vec2 uv = vUv;
-
-  // ── the liquid: seen only through what it does ──
-  vec2 vel = texture(u_velocity, uv).xy * u_fluid;
-  float speed = length(vel);
-  vec2 uvR = uv + (vel * u_velTexel * u_refraction + u_slosh) * u_fluid;
-
-  // ── the print, refracted together with its development ──
-  float e = texture(u_exposure, uvR).x;
-  vec2 puv = (uvR - u_rect.xy) / u_rect.zw;
-  vec2 edgeD = min(puv, 1.0 - puv) * (u_rect.zw * u_res);
+/** One print under the liquid, seen at uvR: its developed tone (linear) and
+ *  its paper coverage. The paper comes up midtones first, shadows last. */
+vec2 develop(sampler2D printTex, sampler2D expTex, vec4 rect, float seed, float grainAmt, vec2 uvR) {
+  float e = texture(expTex, uvR).x;
+  vec2 puv = (uvR - rect.xy) / rect.zw;
+  vec2 edgeD = min(puv, 1.0 - puv) * (rect.zw * u_res);
   float inPaper = clamp(min(edgeD.x, edgeD.y) + 0.5, 0.0, 1.0);
-  vec4 print = texture(u_print, clamp(puv, 0.0, 1.0));
+  vec4 print = texture(printTex, clamp(puv, 0.0, 1.0));
   float paper = inPaper * print.a;
   float L = dot(print.rgb, vec3(0.2126, 0.7152, 0.0722));
 
-  // ── development: the paper comes up, midtones first, shadows last ──
   float lift = 1.0 - pow(1.0 - e, u_curve.x);
   float knee = mix(u_curve.y, u_curve.z, e * e);
   float d = 1.0 - L;
@@ -335,8 +336,19 @@ void main() {
   vec2 gp = uvR * u_res;
   float ptex = vnoise(gp / 5.0) * 0.6 + vnoise(gp / 13.0) * 0.4;
   tone *= 1.0 + (ptex - 0.5) * 2.0 * u_paperTex * L;
-  float grain = hash21(floor(gp) + u_seed) - 0.5;
-  tone *= 1.0 + grain * 2.0 * u_grain * lift;
+  float grain = hash21(floor(gp) + seed) - 0.5;
+  tone *= 1.0 + grain * 2.0 * grainAmt * lift;
+  return vec2(tone, paper);
+}
+
+void main() {
+  vec2 uv = vUv;
+
+  // ── the liquid: seen only through what it does ──
+  vec2 vel = texture(u_velocity, uv).xy * u_fluid;
+  float speed = length(vel);
+  vec2 shift = (vel * u_velTexel * u_refraction + u_slosh) * u_fluid;
+  vec2 uvR = uv + shift;
 
   // ── the safelight: one amber radial, top-left, static ──
   vec2 sl = (uv - vec2(0.0, 1.0)) * u_aspectN - vec2(0.1, -0.08);
@@ -344,16 +356,24 @@ void main() {
 
   // fibre paper: the highlights warm toward the lamp, the shadows stay neutral
   vec3 paperTint = mix(vec3(1.0), vec3(1.0, 0.94, 0.86), 0.35 + 0.65 * safelight);
-  vec3 col = paperTint * tone * paper;
+
+  // ── the print in the tray, refracted together with its development ──
+  vec2 nw = develop(u_print, u_exposure, u_rect, u_seed, u_grain, uvR);
+  vec3 col = paperTint * nw.x * nw.y;
+
+  // ── the handover: the finished print sinks — deeper under the liquid, darker,
+  //    its grain going — and the next one comes up underneath it ──
+  if (u_drain < 1.0) {
+    float keep = 1.0 - u_drain;
+    vec2 od = develop(u_printOld, u_exposureOld, u_rectOld, u_seedOld, u_grain * keep, uv + shift * (1.0 + u_sink * u_drain));
+    // darker as it goes (× keep) and thinner over the print beneath (× keep again)
+    vec3 old = paperTint * od.x * od.y * keep;
+    col = old + col * (1.0 - od.y * keep);
+  }
 
   // the developer itself: an almost invisible darker cloud over the print
   float dye = texture(u_dye, uv).x * u_fluid;
   col *= 1.0 - dye * u_dyeShade;
-
-  // the drain: black rising over the print, the room light untouched
-  float lvl = u_drain * 1.5 - 0.2;
-  float black = 1.0 - smoothstep(lvl - 0.3, lvl + 0.1, uv.y);
-  col *= (1.0 - black) * (1.0 - smoothstep(0.55, 1.0, u_drain));
 
   vec3 outc = toSRGB(clamp(col, 0.0, 1.0));
 

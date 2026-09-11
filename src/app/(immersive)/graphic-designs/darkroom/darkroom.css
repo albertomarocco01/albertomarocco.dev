@@ -152,27 +152,6 @@
   }
 }
 
-/* ---- HUD: print counter bottom-left, development bottom-right ---- */
-.darkroom-hud {
-  position: absolute;
-  bottom: calc(1.6rem + env(safe-area-inset-bottom, 0px));
-  z-index: 40;
-  font-family: var(--mono);
-  font-size: 0.64rem;
-  letter-spacing: 0.22em;
-  text-transform: lowercase;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-dim);
-  pointer-events: none;
-  white-space: nowrap;
-}
-.darkroom-hud-left {
-  left: 1.6rem;
-}
-.darkroom-hud-right {
-  right: 1.6rem;
-}
-
 /* ---- fallbacks: no WebGL, context lost ---- */
 .darkroom-msg {
   position: absolute;
@@ -215,18 +194,5 @@
   .darkroom-exit {
     top: 1rem;
     left: 1rem;
-  }
-  .darkroom-hud {
-    bottom: calc(1.15rem + env(safe-area-inset-bottom, 0px));
-    font-size: 0.58rem;
-  }
-  .darkroom-hud-left {
-    left: 1rem;
-  }
-  .darkroom-hud-right {
-    right: 1rem;
-  }
-  .darkroom-next {
-    bottom: calc(3.6rem + env(safe-area-inset-bottom, 0px));
   }
 }

@@ -8,7 +8,7 @@ import type { Locale } from "@/lib/locale";
  * EN/IT parity compiler-enforced.
  *
  * The piece's own name — "Camera Oscura — Darkroom" — is a title, not copy, and
- * stays as-is in both locales. HUD labels are lowercase mono, few words.
+ * stays as-is in both locales. Labels are lowercase mono, few words.
  */
 export interface DarkroomCopy {
   metaTitle: string;
@@ -21,12 +21,10 @@ export interface DarkroomCopy {
   hint: string;
   /** keyboard hint under the idle hint (hidden on coarse pointers) */
   keyboardHint: string;
-  /** HUD, bottom-left: `print 03 / 12` — the label before the counter */
+  /** the live region announces a fix only: `print 3 fixed` — nothing else is written over the tray */
   print: string;
-  /** HUD, bottom-right: `developing 42 %` → `fixed` */
-  developing: string;
   fixed: string;
-  /** the visible advance control under reduced motion */
+  /** the visible advance control under reduced motion, once the print is fixed */
   nextPrint: string;
   /** accessible name of the same control */
   nextPrintAria: string;
@@ -44,7 +42,6 @@ const en: DarkroomCopy = {
   hint: "stir the developer",
   keyboardHint: "space agitates · ← → change print · esc exits",
   print: "print",
-  developing: "developing",
   fixed: "fixed",
   nextPrint: "next print →",
   nextPrintAria: "Next print",
@@ -61,7 +58,6 @@ const it: DarkroomCopy = {
   hint: "muovi lo sviluppo",
   keyboardHint: "spazio agita · ← → cambia stampa · esc esce",
   print: "stampa",
-  developing: "in sviluppo",
   fixed: "fissata",
   nextPrint: "stampa successiva →",
   nextPrintAria: "Stampa successiva",

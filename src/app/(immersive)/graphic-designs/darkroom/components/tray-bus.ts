@@ -15,7 +15,8 @@ import { PRINTS } from "../darkroom.config";
 
 export type DarkroomMode = "fluid" | "brush";
 
-export type Phase = "developing" | "fixing" | "fixed" | "draining";
+/** `dissolving` is the handover: the finished print sinks while the next comes up under it. */
+export type Phase = "developing" | "fixing" | "fixed" | "dissolving";
 
 export interface HudSnapshot {
   /** 0-based index of the print in the tray */
@@ -24,9 +25,7 @@ export interface HudSnapshot {
   /** mean exposure over the print, 0..1 */
   coverage: number;
   phase: Phase;
-  /** any input on THIS print yet (hides the idle hint) */
-  touched: boolean;
-  /** anything at all has happened this session (hides the title cover) */
+  /** anything at all has happened this session (hides the title cover and the hint) */
   started: boolean;
 }
 
@@ -69,7 +68,6 @@ export class TrayBus {
     count: PRINTS.length,
     coverage: 0,
     phase: "developing",
-    touched: false,
     started: false,
   };
   private readonly listeners = new Set<() => void>();
@@ -157,7 +155,6 @@ export class TrayBus {
       (next.count ?? s.count) === s.count &&
       (next.coverage ?? s.coverage) === s.coverage &&
       (next.phase ?? s.phase) === s.phase &&
-      (next.touched ?? s.touched) === s.touched &&
       (next.started ?? s.started) === s.started
     ) {
       return;

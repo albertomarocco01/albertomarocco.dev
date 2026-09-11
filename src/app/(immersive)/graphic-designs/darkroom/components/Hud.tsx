@@ -2,13 +2,13 @@ import { useSyncExternalStore } from "react";
 import type { DarkroomCopy } from "../copy";
 import type { DarkroomMode, TrayBus } from "./tray-bus";
 
-const two = (n: number) => String(n).padStart(2, "0");
-
 /**
- * Everything written over the tray: the title cover (first idle state only),
- * the idle hint on a fresh print, the two HUD corners and, under the brush
- * path, the visible advance control. Subscribes to the bus itself so the
- * engine's snapshots never re-render the Canvas above it.
+ * Only the photograph: nothing is written over the running tray. What remains
+ * is the title cover and the idle hint on the very first idle state (both go
+ * at the first input, or when the current takes over), a visually hidden live
+ * region that announces a fix, and — on the brush path, once the print is
+ * fixed — the advance control. Subscribes to the bus itself so the engine's
+ * snapshots never re-render the Canvas above it.
  */
 export function Hud({
   bus,
@@ -23,12 +23,6 @@ export function Hud({
 }) {
   const s = useSyncExternalStore(bus.subscribe, bus.getSnapshot, bus.getSnapshot);
   const ready = mode !== null;
-  // `fixed` holds through the drain that follows it; a manual drain keeps its percentage
-  const fixed = s.phase === "fixed" || s.phase === "fixing" || (s.phase === "draining" && s.coverage >= 1);
-  const pct = Math.min(100, Math.max(0, Math.round(s.coverage * 100)));
-  // the hint invites a hand on a print that is still developing: gone at the
-  // first input, and never over a print that is fixing, fixed or draining
-  const hintHidden = !ready || s.touched || s.phase !== "developing";
 
   return (
     <>
@@ -37,23 +31,17 @@ export function Hud({
         <span className="darkroom-title-sub">darkroom</span>
       </div>
 
-      <div className={`darkroom-hint${hintHidden ? " is-hidden" : ""}`} aria-hidden="true">
+      <div className={`darkroom-hint${!ready || s.started ? " is-hidden" : ""}`} aria-hidden="true">
         <span className="darkroom-hint-main">{copy.hint}</span>
         <span className="darkroom-hint-keys">{copy.keyboardHint}</span>
       </div>
 
-      <div className="darkroom-hud darkroom-hud-left">
-        {copy.print} {two(s.index + 1)} / {two(s.count)}
-      </div>
-      <div className="darkroom-hud darkroom-hud-right">
-        {fixed ? copy.fixed : `${copy.developing} ${pct} %`}
-      </div>
       {/* the percentage changes many times a second — only the fix is announced */}
       <span className="sr-only" aria-live="polite">
         {s.phase === "fixed" ? `${copy.print} ${s.index + 1} ${copy.fixed}` : ""}
       </span>
 
-      {mode === "brush" && (
+      {mode === "brush" && s.phase === "fixed" && (
         <button type="button" className="darkroom-next" onClick={onNext} aria-label={copy.nextPrintAria}>
           {copy.nextPrint}
         </button>

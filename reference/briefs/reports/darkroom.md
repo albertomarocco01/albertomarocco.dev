@@ -335,3 +335,194 @@ the director's `(immersive)/layout.tsx` + global rule for the scrollbar gutter
   prints finish too — any print finishes in bounded time once input stops.
 - Software rasterisers are routed to the brush path (the site's field makes the
   same call); the brief only asked that the no-GPU behaviour be exercised.
+
+
+## Round 2
+
+Route `/graphic-designs/darkroom` · brief `reference/briefs/round2/02-darkroom.md` ·
+2026-09-11 on an AMD Radeon (integrated, ANGLE D3D11) — a different machine
+from round 1's GTX 1660 SUPER; timings below are from this GPU. Next 16.3.4 /
+three 0.186 / R3F 9.7. Two commits: `fix(darkroom): a resting pointer no
+longer counts as input`, then `feat(darkroom): dissolve into the next print,
+no HUD, self-developing tray`.
+
+### Audit
+
+Every path in round 1's "two minutes" was driven again headless (agent-browser,
+real GPU, 1440 × 900) before any change: happy path, keyboard, reduced motion,
+phone touch, exit / re-enter ×3 (one canvas each time, heap 25 / 26 / 27 MB,
+console only three's `THREE.Clock` notice and `Context Lost.` on unmount).
+`tsc` and eslint were clean on the folder.
+
+One real defect, confirmed the way the brief suspected it: **a resting mouse
+counted as input.** Every `pointermove` poked the bus, and the OS emits
+sub-pixel jitter on a parked mouse, so the idle clock never reached
+`AUTO.idleDelay` — with 1 px jitter every 100 ms the current never started
+and the print crept up at ~0.5 %/s from the jitter's own footprint. Fixed in
+its own commit: `App.tsx` drops a move shorter than `STIR.deadzone` (2 px)
+from the last position it wrote. Regression: same jitter, the current starts
+at 6 s and develops the print; a 30 px move still cancels it.
+
+Not ours: the emulated phone in agent-browser reports no touch points and
+`pointer: coarse` false, so the keyboard line under the hint shows there;
+round 1 verified it hidden under CDP touch emulation. The `THREE.Clock`
+deprecation notice is R3F's. While this session ran, the sibling sessions'
+mid-edit build errors (`hands`, `wall`) blanked the dev server for a minute at
+a time; nothing in this folder.
+
+### 1. The handover — a finished print gives way to the next one at once
+
+Round 1: coverage ≥ 0.85 → `fixing` 1.2 s → `fixed` held 2.5 s → 1.6 s of
+rising black → the next print loaded into a still, black tray → the idle
+hint. Now, once the print is fixed (`DEVELOP.fixedHold` 0.4 s), the next one
+is **in the tray at once** and the finished one **sinks over it** for
+`DEVELOP.dissolve` 1.2 s: deeper under the still-moving liquid (its refraction
+grows by `LOOK.sinkDepth`), darker, its grain going. No black, no cut.
+
+Mechanically — `darkroom-engine.ts` `handover()`: the outgoing print's exposure
+is copied into a hold target (`hold`, same size and format as the exposure
+ping-pong), its texture, rect and grain seed are bound as `u_printOld` /
+`u_exposureOld` / `u_rectOld` / `u_seedOld`, then `bindPrint()` binds the
+incoming print, clears the exposure and dye buffers and starts its
+`generation` — the velocity and pressure fields are **not** cleared, a
+handover is not a still tray. The composite (`shaders.ts`, `develop()` now a
+function called for both prints) blends on `u_drain` (0 → 1 on a smoothstep of
+the phase clock; 1 also means "no outgoing print", so the branch costs nothing
+outside a handover): the old print × keep in brightness and × keep in opacity
+over the new one. The phase is `dissolving` (`Phase` in `tray-bus.ts`;
+`draining` is gone); dye and exposure are accepted through it (`accepting`),
+so the incoming print answers the hand from its first frame. `settle()` ends
+it: idle clock from zero, the current allowed, the hold released.
+
+- Manual ← / → use the same handover with `DEVELOP.dissolveManual` 0.8 s. A
+  command mid-handover re-targets the incoming print (rebinds, clears its
+  buffers, keeps the sinking one and the clock) — `handover()` again.
+- If the next print has not loaded, the outgoing one still sinks and the tray
+  waits black; the print is bound the moment it lands (`onPrintReady`), a
+  broken one is skipped (`onPrintBroken`). Never a stall.
+- Brush path: a cut, as before (`drain` = 1, `settle()` at once).
+- A resize mid-handover remaps both the live exposure (old rect → new rect,
+  as in round 1) and the hold (its own print's rect, `rectOld`, re-fitted from
+  the outgoing texture) — `allocate()`.
+- Sub-stepped like every phase; the fluid runs through it.
+
+**Fresh paper wets through** (`DEVELOP.wetIn` 3 s): the first capture showed
+the incoming print flaring up in the previous stir's leftover swirls — the
+wake band (`MOTION_DYE`) lays developer wherever the liquid still moves, and
+on a print at exposure 0 that read as smoke on black, the "fluid demo" look
+the piece must avoid. Now developer carried by the liquid's own motion acts on
+a new print on a smoothstep over its first 3 s; the hand's own developer and
+its direct footprint act at once. Through a handover after a vigorous stir the
+incoming print now stays a faint latent ghost until the hand or the current
+takes it.
+
+Timeline measured (50 ms trace, whole-tray serpentine to fix print 1):
+`fixing` → `fixed` 1.19 s → `dissolving`, print 2 bound 0.42 s later →
+print 2 `developing` 1.21 s after that. From fixed to the next print in the
+tray and answering the hand: **0.4 s**; the sink complete: **1.6 s**.
+
+### 2. Only the photograph — no bottom HUD
+
+`Hud.tsx` renders the title cover and the centred hint on the **very first
+idle state only** (both go at the first input or when the current takes over,
+on `started`), the `sr-only` live region (`print 3 fixed` / `stampa 3
+fissata`, on `fixed` only) and, on the brush path, the `next print →` control
+**only once the print is fixed**. The two corners are gone, with their CSS
+(`.darkroom-hud*`, the phone overrides) and `copy.developing`; `copy.print`
+stays for the live region. The hint no longer returns on every fresh print —
+the brief's "first idle state only" was read as applying to both the cover and
+the hint. `touched` left the snapshot with it; `coverage` stays in it (cheap,
+and the one observable of the engine).
+
+### 3. Left alone, it develops by itself — perceptibly
+
+`AUTO.idleDelay` 6 → 3 s, `AUTO.strength` 0.15 → 0.22, `AUTO.rampTime` 36 →
+36 (the brief's 0.4 / 20 s fixed a print in ~17 s from load on this GPU and
+read as a fast-forward; 0.25 / 30 s gave ~24 s; 0.22 / 36 s lands in the
+window). With no input at all, 1440 × 900:
+
+| moment | s from load |
+|---|---|
+| current starts | ~4 |
+| coverage 2 % (a ghost) | 6 |
+| coverage 5 % | 8 |
+| coverage 20 % | 13 |
+| coverage 50 % | 18 |
+| `fixing` | 25 |
+| `fixed` | 26 |
+| print 2 in the tray | 26.4 |
+| print 2 `developing` | 27.5 |
+
+(trace at 250 ms, started ~1.5 s after the engine; the second print's clock
+starts at 27.5 s and its current 3 s later.)
+
+A resting pointer no longer resets the idle clock (the audit fix above); a
+print stirred and then abandoned gets the same 3 s (the idle clock is the
+same one — confirmed: stir, stop, the current resumes and finishes).
+
+### New tunables (all in `darkroom.config.ts`)
+
+| name | value | meaning |
+|---|---|---|
+| STIR.deadzone | 2 | CSS px a pointer must move before it counts as input |
+| DEVELOP.fixedHold | 0.4 | was 2.5 |
+| DEVELOP.dissolve | 1.2 | the handover, s (replaces `drain` 1.6) |
+| DEVELOP.dissolveManual | 0.8 | the handover on ← / → |
+| DEVELOP.wetIn | 3 | fresh paper: the wake's developer ramps in over this |
+| LOOK.sinkDepth | 1.5 | extra refraction of the sinking print at the end |
+| AUTO.idleDelay / strength / rampTime | 3 / 0.22 / 36 | were 6 / 0.15 / 36 |
+
+### Known limits (new)
+
+- On touch with reduced motion there is no way to skip a print before it is
+  fixed: the `next print →` control appears only once fixed (the brief's
+  rule) and there is no keyboard. Space on a keyboard still develops evenly.
+- Through a handover the incoming print can show a faint latent ghost where
+  the liquid still moves strongly from the previous stir — by design (the
+  wet-in ramp keeps it a ghost); it never flares.
+- The hold target adds one exposure-sized half-float texture (≈ 1.3 MB at
+  1024 × 640) for the life of the engine.
+- Timings above are from an integrated Radeon; round 1's GTX ran the same sim
+  at the same fixed step, so they should match within a second.
+
+### Verification
+
+`npx tsc --noEmit`: clean for this folder (the sibling sessions' in-progress
+`wall` and `hands` edits carried their own errors at the time). `npx eslint`
+on the folder: zero findings. Everything below headless over agent-browser on
+the real GPU, 1440 × 900 unless stated, synthetic pointer events, in-page
+tracers (`harness.js`, `verify.sh` in this session's scratchpad).
+
+| path | result |
+|---|---|
+| mouse happy path — whole-tray serpentine | fixed in ~10 s; `fixed` 1.2 s later; print 2 in the tray 0.4 s after that; developing 1.2 s later |
+| no input at all, mouse parked over the tray with 1 px jitter | current at 6 s (round 1: never), prints develop and hand over by themselves |
+| no input at all | table above |
+| → then → again 0.3 s into the dissolve | print 2 bound, then print 3 re-targeted in the same dissolve (phase stays `dissolving`), `developing` 0.78 s after the first press |
+| ← during developing, then Alt+← | print 2 sinks in 0.8 s, print 2 → 1 lands; Alt+← ignored |
+| viewport 1440 × 900 → 900 × 1400 mid-dissolve, 4 s stir, back | dissolve settles at 0.78 s in the portrait viewport; 54 % after the stir, 72 % after the resize back (wake afterglow), development on the paper, no error |
+| keyboard only, Space held | `fixing` after 13.7 s, `fixed` 1.2 s later, print 2 in the tray 0.4 s after, `developing` 1.2 s later — the handover by itself |
+| brush path (reduced motion, IT) | no control at start; a stroke paints (10 %), the hint goes; Space presses → `fixed`, `stampa successiva →` appears and the live region says `stampa 1 fissata`; click → print 2 `developing` in the same frame (a cut), control gone |
+| phone 390 × 844 @3×, touch | an 8 s finger loop: `fixing` at 4.9 s, `fixed`, print 2 in the tray 0.4 s later, `developing` 1.2 s after — no text over the tray but the exit link |
+| `/graphic-designs` → card → demo → exit ×3 | one canvas each time, heap 26 / 27 / 28 MB, console only `THREE.Clock` and `Context Lost.` |
+
+### How to test it in two minutes
+
+1. Open `/graphic-designs`, click **Camera Oscura**. Black tray, amber glow
+   top-left, `Camera Oscura` and `stir the developer`. Do nothing: after 3 s
+   the title and hint fade, a ghost comes up within a few seconds, the print
+   is fixed in about half a minute — and the next print is in the tray at
+   once, the finished one sinking over it.
+2. Stir print 2 in slow loops over the whole paper; when it fixes, keep
+   stirring through the handover: the next print answers your hand under the
+   sinking one. Nothing is written over the tray but the exit link.
+3. Press **→** mid-stir: the print sinks in 0.8 s and the next is there;
+   press **→** again during the sink: it re-targets. **←** goes back. Park
+   the mouse and wait: the current finishes whatever you left.
+4. Hold **Space** on a fresh print: it comes up evenly and hands over by
+   itself.
+5. DevTools → Rendering → `prefers-reduced-motion: reduce`: the pointer
+   paints, nothing advances by itself, `next print →` appears only once the
+   print is fixed (Space presses get you there), and it cuts.
+6. Device toolbar, a phone: drag a finger. Exit and re-enter a couple of
+   times with the console open: nothing but three's notices.
