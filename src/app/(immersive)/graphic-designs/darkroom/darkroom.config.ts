@@ -55,6 +55,10 @@ export const SIM = {
 
 /** Pointer / touch injection. */
 export const STIR = {
+  /** a pointer that has moved less than this many CSS px since the last
+   *  position written to the bus is resting, not stirring: the OS emits
+   *  sub-pixel jitter, and every write would restart the idle clock */
+  deadzone: 2,
   /** velocity splat radius, fraction of the short side (brief: 3–4 %) */
   radius: 0.04,
   /** the developer laid down at the pointer is a little wider than the push, so

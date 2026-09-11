@@ -6,6 +6,7 @@ import { hasWebGL2 } from "@/lib/webgl-caps";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { useTabVisible } from "@/lib/use-tab-visible";
 import type { DarkroomCopy } from "./copy";
+import { STIR } from "./darkroom.config";
 import { DarkroomCanvas } from "./components/DarkroomCanvas";
 import { Hud } from "./components/Hud";
 import { TrayBus, type DarkroomMode } from "./components/tray-bus";
@@ -48,18 +49,30 @@ export default function App({ copy }: { copy: DarkroomCopy }) {
       const r = el.getBoundingClientRect();
       return [(e.clientX - r.left) / r.width, 1 - (e.clientY - r.top) / r.height];
     };
+    // the last position written per pointer: a move shorter than the deadzone
+    // is a resting pointer (OS jitter), not input, and must not reach the bus —
+    // every write there restarts the idle clock and the current never starts
+    const last = new Map<number, { x: number; y: number }>();
+    const end = (id: number) => {
+      last.delete(id);
+      bus.pointerEnd(id);
+    };
     const onMove = (e: PointerEvent) => {
       if (isChrome(e.target)) {
         // over the exit link / next button the pointer is gone for the tray —
         // otherwise its first move back would read as a teleport
-        bus.pointerEnd(e.pointerId);
+        end(e.pointerId);
         return;
       }
+      const l = last.get(e.pointerId);
+      if (l && Math.hypot(e.clientX - l.x, e.clientY - l.y) < STIR.deadzone) return;
+      last.set(e.pointerId, { x: e.clientX, y: e.clientY });
       const [x, y] = at(e);
       bus.pointerMove(e.pointerId, x, y, e.buttons > 0);
     };
     const onDown = (e: PointerEvent) => {
       if (isChrome(e.target)) return;
+      last.set(e.pointerId, { x: e.clientX, y: e.clientY });
       const [x, y] = at(e);
       bus.pointerMove(e.pointerId, x, y, true);
     };
@@ -67,9 +80,9 @@ export default function App({ copy }: { copy: DarkroomCopy }) {
       // a lifted finger is gone; a released mouse button is still a pointer.
       // pointerEnd only marks it: the engine consumes the last segment first.
       if (e.pointerType === "mouse") bus.pointerDown(e.pointerId, false);
-      else bus.pointerEnd(e.pointerId);
+      else end(e.pointerId);
     };
-    const onEnd = (e: PointerEvent) => bus.pointerEnd(e.pointerId);
+    const onEnd = (e: PointerEvent) => end(e.pointerId);
     el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerdown", onDown);
     el.addEventListener("pointerup", onUp);
