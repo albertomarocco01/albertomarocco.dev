@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
         // default policy. Note: this header is served by the Next/Vercel server —
         // a separate static-export host (e.g. a plain .it host) would need the
         // same header set at the web-server/CDN level instead.
-        source: "/xperiments/tarassaco",
+        source: "/graphic-designs/tarassaco",
         headers: [
           {
             key: "Permissions-Policy",
@@ -32,7 +32,7 @@ const nextConfig: NextConfig = {
       },
       {
         // Mani — Hands reads the webcam only (no microphone). Same scoping.
-        source: "/xperiments/hands",
+        source: "/graphic-designs/hands",
         headers: [{ key: "Permissions-Policy", value: "camera=(self)" }],
       },
       // Content-addressed static payloads that never change without a rename:
@@ -70,6 +70,20 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
         ],
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      {
+        // The five merge demos opened under /xperiments/<id> until round 2
+        // (2026-09), which put them under the generative rows' route. They
+        // belong to /graphic-designs; links already shared keep working. The
+        // id list is explicit so /xperiments itself — still the rows — and
+        // any future /xperiments/* page are left alone.
+        source: "/xperiments/:id(vortex|tarassaco|darkroom|hands|wall)",
+        destination: "/graphic-designs/:id",
+        permanent: true,
       },
     ];
   },

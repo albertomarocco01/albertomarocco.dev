@@ -13,8 +13,9 @@
 // error boundary loads with its segment on every page, and importing the
 // dictionaries there shipped both of them, in full, to every visitor.
 //
-// The two immersive demos under /xperiments keep their copy next to themselves
-// (see xperiments/*/copy.ts) — same cookie + dictionary approach, typed against
+// The five immersive demos under /graphic-designs keep their copy next to
+// themselves (see (immersive)/graphic-designs/*/copy.ts) — same cookie +
+// dictionary approach, typed against
 // `Locale` so parity is still compiler-enforced, but their vocabulary is their
 // own and doesn't belong in the site dictionary.
 

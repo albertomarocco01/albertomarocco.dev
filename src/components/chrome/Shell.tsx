@@ -165,8 +165,8 @@ export function Shell({
         </div>
         <nav aria-label={nav.primary}>
           {NAV.map((item) => {
-            // Exact match is enough: the only deeper /xperiments/* routes are the
-            // immersive demos, which render outside this shell entirely.
+            // Exact match is enough: the only deeper routes, /graphic-designs/*,
+            // are the immersive demos, which render outside this shell entirely.
             const current = pathname === item.href;
             return (
               <Link

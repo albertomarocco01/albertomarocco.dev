@@ -16,12 +16,13 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// The generative work, on its own route. This index deliberately lives in the
-// (site) group while its children — /xperiments/vortex, /xperiments/tarassaco —
-// stay in (immersive): the rows here host the live WebGL aura, which needs the
-// shared field canvas the site chrome mounts, while the demos need a bare
-// viewport. Route groups don't affect URLs, and only pages resolving to the
-// *same* path would collide, so the two halves of /xperiments/* coexist.
+// The generative work, on its own route, in the (site) group: the rows here host
+// the live WebGL aura, which needs the shared field canvas the site chrome
+// mounts. The merge demos that used to hang below it moved in round 2 and now
+// split the same way under /graphic-designs: the index in (site), the demos in
+// (immersive)/graphic-designs/*, which need a bare viewport. Route groups don't
+// affect URLs, and only pages resolving to the *same* path would collide, so
+// the two halves coexist. Old /xperiments/<id> links redirect (next.config.ts).
 export default async function Xperiments() {
   const dict = getDictionary(await getLocale());
   const { xperiments } = dict;

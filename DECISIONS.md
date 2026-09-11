@@ -342,7 +342,7 @@ A code-review + optimisation pass over the /about work. Nothing visual moved;
 all of it is what ships, and when.
 
 - **The dictionaries never reach the client.** `(site)/error.tsx`,
-  `(immersive)/xperiments/error.tsx` and `loading.tsx` are Client Components
+  `(immersive)/graphic-designs/error.tsx` and `loading.tsx` are Client Components
   that Next loads with their segment on every page, and each imported
   `getDictionary` — so both full dictionaries (~13 KB minified, three times
   over) were in every visitor's bundle for five strings. The locale

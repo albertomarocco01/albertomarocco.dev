@@ -18,18 +18,20 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 // The merge-designs index. Each entry opens a chrome-less immersive demo under
-// /xperiments/*. Add to this list as new merged sets ship — the page scales.
+// /graphic-designs/* — (immersive)/graphic-designs/<id>, beside this (site)
+// page; see (site)/xperiments/page.tsx for why the two groups don't collide.
+// Add to this list as new merged sets ship — the page scales.
 // Structural only: the title/meta/description of each card live in the
 // dictionary, keyed by `id` (dict.gd.demos), the same split as lib/work.ts.
 const DEMOS = [
   {
     id: "vortex",
-    href: "/xperiments/vortex",
+    href: "/graphic-designs/vortex",
     cover: "/vortex/images/img_001.webp",
   },
   {
     id: "tarassaco",
-    href: "/xperiments/tarassaco",
+    href: "/graphic-designs/tarassaco",
     cover: "/tarassaco/cover.svg",
   },
   // The three 2026 demos (briefs in reference/briefs/). Each owns its route
@@ -37,17 +39,17 @@ const DEMOS = [
   // only ever replace the file, never this list.
   {
     id: "darkroom",
-    href: "/xperiments/darkroom",
+    href: "/graphic-designs/darkroom",
     cover: "/darkroom/cover.webp",
   },
   {
     id: "hands",
-    href: "/xperiments/hands",
+    href: "/graphic-designs/hands",
     cover: "/hands/cover.webp",
   },
   {
     id: "wall",
-    href: "/xperiments/wall",
+    href: "/graphic-designs/wall",
     cover: "/wall/cover.webp",
   },
 ];

@@ -12,7 +12,7 @@ import { getDictionary, getLocale } from "@/lib/i18n";
 // The full site chrome — loading veil, custom cursor, Lenis smooth-scroll, the
 // shared WebGL field, grain and the topbar shell — lives here, NOT in the root
 // layout. That keeps it scoped to the main site (this route group) so immersive
-// routes like (immersive)/xperiments/* can own the viewport without inheriting
+// routes like (immersive)/graphic-designs/* can own the viewport without inheriting
 // the cursor:none design system, Lenis (which would corrupt their absolute
 // coordinate physics) or the field canvas. Route groups don't affect URLs.
 export default async function SiteLayout({

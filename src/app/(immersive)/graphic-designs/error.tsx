@@ -10,7 +10,8 @@ import { useLocale } from "@/lib/use-locale";
  * with no way out. Always offer the way back to the index.
  *
  * Copy that is specific to this boundary lives here (the demos' own copy.ts
- * files are per-demo and this boundary covers both); the retry/ref labels come
+ * files are per-demo and this boundary covers all five under
+ * /graphic-designs/*); the retry/ref labels come
  * from boundary-copy.ts, the shared dictionary's own strings. See
  * (site)/error.tsx for why the locale is read off `<html lang>` rather than
  * passed in.
@@ -26,7 +27,7 @@ const COPY = {
   },
 } as const;
 
-export default function XperimentsError({
+export default function DemoError({
   error,
   unstable_retry,
 }: {

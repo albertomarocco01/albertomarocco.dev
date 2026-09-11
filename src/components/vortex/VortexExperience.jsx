@@ -18,8 +18,8 @@ import { VortexScene } from "./components/VortexScene.jsx";
  * a phase with the on-screen arrow, ← / Esc. The exit link leaves entirely
  * (back to the merge-designs list — `exitHref`).
  *
- * `copy` is the active locale's strings (see ../../app/(immersive)/xperiments/
- * vortex/copy.ts), resolved on the server and handed down through VortexClient —
+ * `copy` is the active locale's strings (see ../../app/(immersive)/
+ * graphic-designs/vortex/copy.ts), resolved on the server and handed down through VortexClient —
  * this whole tree is `ssr: false`, so it can't read the cookie itself.
  */
 export function VortexExperience({ copy, exitHref = "/graphic-designs" }) {

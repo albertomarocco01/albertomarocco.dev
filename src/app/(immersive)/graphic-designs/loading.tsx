@@ -4,17 +4,18 @@ import { LOADER_TAG } from "@/lib/boundary-copy";
 import { useLocale } from "@/lib/use-locale";
 
 /**
- * Enables partial prefetching for the demo routes (see (site)/loading.tsx for
- * why they are dynamic). Also covers the real gap here: these pages mount a
- * WebGL canvas and, for Tarassaco, a 13MB MediaPipe payload, so there is a
- * genuine wait to fill with something other than white.
+ * Enables partial prefetching for the five demo routes under /graphic-designs/*
+ * (see (site)/loading.tsx for why they are dynamic). Also covers the real gap
+ * here: these pages mount a WebGL canvas and, for Tarassaco and Mani, the
+ * MediaPipe wasm + model, so there is a genuine wait to fill with something
+ * other than white.
  *
  * A Client Component, deliberately: reading the cookie with `getLocale()` would
  * make this fallback request-dependent and forfeit the prefetch it exists for.
  * `useLocale` reads the locale off `<html lang>` after hydration instead, and
  * the word is the veil's own (`dict.loader.tag` is composed from LOADER_TAG).
  */
-export default function XperimentsLoading() {
+export default function DemoLoading() {
   return (
     <div
       aria-busy="true"

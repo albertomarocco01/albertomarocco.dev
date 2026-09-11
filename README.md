@@ -34,7 +34,7 @@ src/
                   figure-material (the /about cut-outs, orbs in front),
                   field-state (Aura's published frame)
     providers/    AppProvider (entered / reduced-motion / fieldReady), SmoothScroll
-  app/(immersive)/xperiments/
+  app/(immersive)/graphic-designs/
                   the five Merge demos — vortex, tarassaco, darkroom (Camera
                   Oscura), hands (Mani), wall (Parete). One folder each:
                   page → client (ssr:false) → App + components/, hooks/,

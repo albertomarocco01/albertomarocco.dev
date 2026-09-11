@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
 import { getLocale } from "@/lib/i18n";
-import { HANDS_COPY } from "./copy";
-import { HandsClient } from "./client";
+import { TARASSACO_COPY } from "./copy";
+import { TarassacoClient } from "./client";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const copy = HANDS_COPY[await getLocale()];
+  const copy = TARASSACO_COPY[await getLocale()];
   return {
     title: copy.metaTitle,
     description: copy.metaDescription,
-    alternates: { canonical: "/xperiments/hands" },
+    alternates: { canonical: "/graphic-designs/tarassaco" },
   };
 }
 
 // The demo tree is client-only (`ssr: false`, see client.tsx), so the locale is
 // resolved here — the last server component on the route — and its copy handed
-// down as one prop. Same arrangement as the sibling Tarassaco / Vortex demos.
-export default async function HandsPage() {
-  return <HandsClient copy={HANDS_COPY[await getLocale()]} />;
+// down as one prop.
+export default async function TarassacoPage() {
+  return <TarassacoClient copy={TARASSACO_COPY[await getLocale()]} />;
 }

@@ -1,5 +1,7 @@
 # Merge demos — shared rules for the three build sessions
 
+> Routes moved in round 2: the demos now live at `/graphic-designs/<id>`, in `src/app/(immersive)/graphic-designs/<id>/` — see `round2/01-routes.md`.
+
 Three new demos are being built **in parallel**, each by its own Claude Code
 session, in the **same working tree** (`C:\Users\Utente\Desktop\albertomarocco.dev`).
 A fourth session — the **director**, `albertomarocco-dev-b1` in `ListAgents` —
