@@ -52,26 +52,9 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
         ],
       },
-      // The 2026 demo covers, same contract: the file never changes without a
-      // rename, so it should not be revalidated on every visit to the index.
-      {
-        source: "/darkroom/:path*",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-        ],
-      },
-      {
-        source: "/hands/:path*",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-        ],
-      },
-      {
-        source: "/wall/:path*",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-        ],
-      },
+      // The demo covers need no rule: they are static imports
+      // (src/assets/covers → /_next/static/media/<hash>), which Next already
+      // serves immutable under a content hash.
     ];
   },
   async redirects() {

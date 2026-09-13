@@ -1,10 +1,23 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 
 import { Footer } from "@/components/Footer";
 import { getDictionary, getLocale } from "@/lib/i18n";
 import { pageMetadata } from "@/lib/seo";
+
+// The covers are imported, not served from /public: a static import gives every
+// file a content-hashed URL under /_next/static/media/, so the year-long
+// `immutable` cache is safe (a re-shot cover is a new URL, not a stale hit —
+// the three 2026 covers had been overwritten in place under that header) and
+// next/image knows the intrinsic size. Re-shoot a cover: overwrite the file
+// here, the hash does the rest. Vortex is an 800 × 1000 capture of the running
+// piece, like the others (was img_001.webp cropped by object-fit).
+import vortexCover from "@/assets/covers/vortex.webp";
+import tarassacoCover from "@/assets/covers/tarassaco.svg";
+import darkroomCover from "@/assets/covers/darkroom.webp";
+import handsCover from "@/assets/covers/hands.webp";
+import wallCover from "@/assets/covers/wall.webp";
 
 // `generateMetadata` rather than a static object: the title and description come
 // from the active dictionary, so they have to be resolved per request. The route
@@ -24,36 +37,22 @@ export async function generateMetadata(): Promise<Metadata> {
 // Add to this list as new merged sets ship — the page scales.
 // Structural only: the title/meta/description of each card live in the
 // dictionary, keyed by `id` (dict.gd.demos), the same split as lib/work.ts.
-const DEMOS = [
-  {
-    id: "vortex",
-    href: "/graphic-designs/vortex",
-    cover: "/vortex/images/img_001.webp",
-  },
-  {
-    id: "tarassaco",
-    href: "/graphic-designs/tarassaco",
-    cover: "/tarassaco/cover.svg",
-  },
+const DEMOS: { id: string; href: string; cover: StaticImageData }[] = [
+  { id: "vortex", href: "/graphic-designs/vortex", cover: vortexCover },
+  { id: "tarassaco", href: "/graphic-designs/tarassaco", cover: tarassacoCover },
   // The three 2026 demos (briefs in reference/briefs/). Each owns its route
-  // folder and public/<id>/; the cover path is fixed here so the build sessions
-  // only ever replace the file, never this list.
-  {
-    id: "darkroom",
-    href: "/graphic-designs/darkroom",
-    cover: "/darkroom/cover.webp",
-  },
-  {
-    id: "hands",
-    href: "/graphic-designs/hands",
-    cover: "/hands/cover.webp",
-  },
-  {
-    id: "wall",
-    href: "/graphic-designs/wall",
-    cover: "/wall/cover.webp",
-  },
+  // folder; the cover file lives in src/assets/covers/<id>.webp.
+  { id: "darkroom", href: "/graphic-designs/darkroom", cover: darkroomCover },
+  { id: "hands", href: "/graphic-designs/hands", cover: handsCover },
+  { id: "wall", href: "/graphic-designs/wall", cover: wallCover },
 ];
+
+// What the cover box really measures, per breakpoint (globals.css .gd-demo):
+// under 560 px the card is one column and the cover spans it (viewport minus
+// the wrap's and the card's padding — 88vw is the safe ceiling); up to 785 px
+// the cover column is 28vw (clamp(120px, 28vw, 220px) hits 220 there); above,
+// 220 px. The old "40vw" served 156 px into a 309-css-px box on a phone.
+const COVER_SIZES = "(max-width: 560px) 88vw, (max-width: 785px) 28vw, 220px";
 
 export default async function GraphicDesigns() {
   const dict = getDictionary(await getLocale());
@@ -76,28 +75,24 @@ export default async function GraphicDesigns() {
               <li key={d.id}>
                 <Link href={d.href} className="gd-demo">
                   <span className="gd-demo-cover">
-                    {/* Was a CSS background-image, so the 197KB source webp was
-                        served untouched into a ~220px box. `sizes` lets the
-                        optimizer pick a sensibly small variant; the SVG cover has
-                        nothing to optimize and is passed through instead.
-                        The first cover is above the fold and measures as the LCP
-                        element, so it gets a preload link in <head>. `preload`, not
-                        `priority` — the latter is deprecated as of Next 16. Only
-                        the first: preloading both would compete for bandwidth with
-                        the actual LCP. */}
+                    {/* `sizes` lets the optimizer pick the variant the box really
+                        needs (COVER_SIZES); the SVG cover has nothing to optimize
+                        and is passed through instead. The first cover is above
+                        the fold and measures as the LCP element, so it gets a
+                        preload link in <head> (`preload`, not `priority` — the
+                        latter is deprecated as of Next 16) and no `loading`; the
+                        rest are lazy: the third card onward sits below a 900 px
+                        fold and the browser's own distance threshold still
+                        fetches the nearer ones before they scroll in. */}
                     <Image
                       src={d.cover}
                       alt=""
                       aria-hidden="true"
                       fill
-                      sizes="(max-width: 720px) 40vw, 220px"
+                      sizes={COVER_SIZES}
                       preload={i === 0}
-                      // Five cards now, and every optimised cover is a few KB:
-                      // lazy-loading the ones below the fold only buys a visible
-                      // pop-in as the index is scrolled. The first is preloaded
-                      // (it is the LCP element), the rest merely eager.
-                      loading={i === 0 ? undefined : "eager"}
-                      unoptimized={d.cover.endsWith(".svg")}
+                      loading={i === 0 ? undefined : "lazy"}
+                      unoptimized={d.cover.src.endsWith(".svg")}
                       style={{ objectFit: "cover" }}
                     />
                   </span>
