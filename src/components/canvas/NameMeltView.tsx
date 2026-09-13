@@ -26,9 +26,12 @@ void MeltMaterial;
  * looking at the genuine DOM text and the view draws nothing; the swap happens
  * at <1px of displacement onto a pixel-aligned copy, so it never pops.
  *
- * The cursor is the only input. Scroll intent belongs to the sequence machine
- * (HomeSequence) and deliberately does not reach the name: the name answers the
- * hand, the page answers the wheel.
+ * The hand is the only input — a mouse via pointer events, a finger via touch
+ * events (see onTouch below for why not pointer events there). Scroll intent
+ * belongs to the sequence machine (HomeSequence) and deliberately does not
+ * reach the name: the name answers the hand, the page answers the wheel. On
+ * touch the two overlap by design — a finger sweeping the name both scrubs the
+ * opening and melts the glyphs under it.
  *
  * Hot paths are allocation- and setState-free: the pointer handler writes refs,
  * the envelopes decay in useFrame, uniforms are mutated in place — the same
@@ -74,7 +77,8 @@ const RASTER_DEBOUNCE_MS = 150;
 
 type MeltIO = {
   h1: HTMLElement | null;
-  /** live tracker rect (viewport coords; the home never scrolls) */
+  /** live tracker rect, viewport coords — refreshed on scroll (flow mode
+   * unlocks the document once the opening has composed) */
   rect: { left: number; top: number; width: number; height: number };
   em: number; // h1 font-size px — radius/strength scale with it
   tex: THREE.CanvasTexture | null;
@@ -356,33 +360,72 @@ export function NameMeltView() {
     };
     watchDpr();
 
-    // Pointer -> refs. Touch is excluded: on the home, touch-drag already
-    // belongs to the intro state machine, and overloading it with a second
-    // meaning would muddy both. (Touch devices don't mount this at all — the
-    // gate is hover-capable pointers — this guards hybrids.)
-    const onMove = (e: PointerEvent) => {
-      if (e.pointerType === "touch") return;
+    // Flow mode (phones, narrow windows) unlocks the document once the opening
+    // has composed, so the tracker's viewport rect moves with the scroll — its
+    // size (and the raster) does not. One layout read per scroll frame, the
+    // same the drei tracker already pays; the home never scrolls otherwise.
+    const onScroll = () => {
+      const r = wrap.getBoundingClientRect();
+      io.rect.left = r.left;
+      io.rect.top = r.top;
+    };
+
+    // Hand -> refs. Viewport coords in, tracker UV out.
+    const at = (x: number, y: number) => {
       const r = io.rect;
       if (!r.width) return;
       const inside =
-        e.clientX >= r.left &&
-        e.clientX <= r.left + r.width &&
-        e.clientY >= r.top &&
-        e.clientY <= r.top + r.height;
+        x >= r.left &&
+        x <= r.left + r.width &&
+        y >= r.top &&
+        y <= r.top + r.height;
       io.inside = inside;
       if (!inside) return;
-      io.targetX = (e.clientX - r.left) / r.width;
-      io.targetY = 1 - (e.clientY - r.top) / r.height; // flip to UV (y up)
+      io.targetX = (x - r.left) / r.width;
+      io.targetY = 1 - (y - r.top) / r.height; // flip to UV (y up)
       io.moveAt = performance.now();
+    };
+    // Mouse and pen only — the finger takes the touch path below.
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType !== "touch") at(e.clientX, e.clientY);
+    };
+    // Finger: touch events, not pointer events. The browser ends the pointer
+    // stream (pointercancel) the moment a touch turns into a pan, and on the
+    // home a finger is nearly always panning (HomeSequence scrubs on it, flow
+    // mode scrolls on it) — touchmove keeps streaming through both. Passive
+    // and no touch-action, so scroll and pinch-zoom are untouched. touchstart
+    // too, so a tap pulses; lifting the finger reads as leaving (fast decay),
+    // like a mouse sweeping off the name.
+    const onTouch = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (t) at(t.clientX, t.clientY);
+    };
+    const onTouchStart = (e: TouchEvent) => {
+      onTouch(e);
+      io.smoothX = io.targetX; // land under the finger, no streak from the last touch
+      io.smoothY = io.targetY;
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length === 0) io.inside = false;
     };
 
     window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouch, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    window.addEventListener("touchcancel", onTouchEnd, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
 
     return () => {
       disposed = true;
       ro.disconnect();
       window.removeEventListener("resize", requestRaster);
       window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouch);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
+      window.removeEventListener("scroll", onScroll);
       mq?.removeEventListener("change", onDpr);
       if (debounce != null) window.clearTimeout(debounce);
       h1.classList.remove("is-melting");

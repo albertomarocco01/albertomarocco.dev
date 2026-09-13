@@ -1613,11 +1613,12 @@ html.home-live .teaser.is-in {
 }
 /* The <img>: the figure until the canvas takes over (`is-live`, set by
    FigureView once its texture is up), and the figure for good under reduced
-   motion / no WebGL. Toned and bottom-faded to the shader's own values so the
-   crossfade between the two never pops. */
+   motion / no WebGL. Toned and bottom-faded to the shader's own values (its
+   breeze averages out to this tone) so the crossfade between the two never
+   pops. */
 .about-figure-img {
   opacity: var(--fig-dim);
-  filter: saturate(0.78) brightness(0.9);
+  filter: saturate(0.55) brightness(0.58);
   -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--fig-fade));
   mask-image: linear-gradient(to top, transparent, #000 var(--fig-fade));
   transition: opacity 0.8s var(--ease);

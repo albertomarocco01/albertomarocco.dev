@@ -23,10 +23,14 @@ import { BLOB_COUNT, FIELD_GLSL } from "./field-glsl";
  * via field-state.ts, and the position maths is repeated in screen space
  * (u_rect maps this view's UV back into the viewport the field uses).
  *
- * The photo is toned into the palette (a touch desaturated and darkened, so
- * the cold-white orbs read as the light source) and dissolved into the void
- * over its bottom `u_bottom` — the CSS on the fallback <img> mirrors both, so
- * the DOM → GPU handover never pops. No colour management, deliberately: the
+ * The photo is sunk into the room: desaturated and well under the ink's own
+ * brightness (the cold-white orbs are the light source, the person stands in
+ * their shadow), dissolved into the void over its bottom `u_bottom`, and under
+ * a breeze — a slow domain-warped haze drifts across the figure, dipping and
+ * lifting its brightness like mist in a draught and veiling it a little where
+ * it is thickest, while the same field sways the silhouette by a pixel or two.
+ * The CSS on the fallback <img> mirrors the tone (the haze averages out to it),
+ * so the DOM → GPU handover never pops. No colour management, deliberately: the
  * texture is sampled raw and written raw, exactly like the field shader.
  */
 
@@ -54,6 +58,7 @@ const fragmentShader = /* glsl */ `
   uniform vec3  u_blobs[${BLOB_COUNT}]; // the field's orbs this frame: xy centre, z core radius
   uniform float u_reveal;   // 0..1 — the figure's own fade-in (× the page's dim on phones)
   uniform float u_bottom;   // dissolve the bottom this fraction of the box into the void
+  uniform float u_time;     // seconds — the breeze drifts on it (FigureView advances it on every frame the field renders)
 
   // The field's own hash + look constants — the very text the field shader
   // compiles (FIELD_GLSL, field-glsl.ts), so the near orbs repainted here can
@@ -62,16 +67,50 @@ const fragmentShader = /* glsl */ `
   #define BLOB_COUNT ${BLOB_COUNT}
   // ---- this material's own ----
   #define FRONT_DEPTH 1.0                 // orbs whose parallax depth exceeds this pass in front of the figure (≈ half of them)
-  #define TONE_SAT 0.78                   // photo saturation kept (matches the <img>'s saturate(.78))
-  #define TONE_MUL vec3(0.88, 0.895, 0.92) // photo brightness, a hair cool (matches brightness(.9))
+  #define TONE_SAT 0.55                   // photo saturation kept (matches the <img>'s saturate(.55))
+  #define TONE_MUL vec3(0.56, 0.58, 0.63)  // photo brightness, a hair cool (matches brightness(.58))
+  // The breeze. Scale is in cells over the box's height, so both figures get
+  // the same size of mist whatever their aspect; speed is cells per second.
+  #define HAZE_SCALE  2.6
+  #define HAZE_SPEED  0.12
+  #define HAZE_WARP   0.9                  // domain warp — the curl in the drift
+  #define HAZE_DARK   0.24                 // brightness dip in the thick of the haze
+  #define HAZE_LIGHT  0.08                 // brightness lift in the clear of it
+  #define MIST_COLOR  vec3(0.34, 0.36, 0.42) // the veil's own colour — the room's cold grey
+  #define MIST_AMOUNT 0.18                 // how much of the veil lies over the thick haze
+  #define HAZE_SWAY   0.0025               // the silhouette breathes: uv sway, fraction of the box
+
+  float vnoise(vec2 p){
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
+               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+  }
+  float fbm(vec2 p){
+    float v = 0.0, a = 0.5;
+    for (int k = 0; k < 3; k++) { v += a * vnoise(p); p = p * 2.03 + 17.0; a *= 0.5; }
+    return v;
+  }
 
   void main(){
-    vec4 tex = texture2D(u_tex, vUv);
+    // The haze, in the box's own space (cells over its height): a warp field
+    // curls a slow, mostly sideways drift, and its density is spread to 0..1.
+    float ar = u_rect.z * u_aspect / max(u_rect.w, 1e-4); // the box's aspect on screen
+    vec2 q = vec2(vUv.x * ar, vUv.y) * HAZE_SCALE;
+    float t = u_time * HAZE_SPEED;
+    vec2 w = vec2(fbm(q * 0.6 + vec2(t * 0.4, -t * 0.15)),
+                  fbm(q * 0.6 + vec2(-t * 0.2, t * 0.3) + 5.2));
+    float h = smoothstep(0.28, 0.62, fbm(q + (w - 0.5) * HAZE_WARP + vec2(t, t * 0.2)));
+
+    vec4 tex = texture2D(u_tex, vUv + (w - 0.5) * HAZE_SWAY);
     // Uploaded premultiplied (FigureView.tsx) so the mip/bilinear taps along
     // the silhouette stay clean; back to straight colour for the toning.
     vec3 rgb = clamp(tex.rgb / max(tex.a, 1e-4), 0.0, 1.0);
     float luma = dot(rgb, vec3(0.299, 0.587, 0.114));
     vec3 fig = mix(vec3(luma), rgb, TONE_SAT) * TONE_MUL;
+    // The breeze over it: the thick of the haze dims and veils, the clear lifts.
+    fig *= mix(1.0 + HAZE_LIGHT, 1.0 - HAZE_DARK, h);
+    fig = mix(fig, MIST_COLOR, h * MIST_AMOUNT);
     float a = tex.a * u_reveal * smoothstep(0.0, max(u_bottom, 1e-3), vUv.y);
 
     // Where this fragment sits on screen, in the field's own space.
@@ -121,6 +160,7 @@ export const FigureMaterial = shaderMaterial(
     u_blobs: Array.from({ length: BLOB_COUNT }, () => new THREE.Vector3()),
     u_reveal: 0,
     u_bottom: 0.08,
+    u_time: 0,
   },
   vertexShader,
   fragmentShader,
@@ -143,6 +183,7 @@ export type FigureMaterialImpl = THREE.ShaderMaterial & {
     u_blobs: { value: THREE.Vector3[] };
     u_reveal: { value: number };
     u_bottom: { value: number };
+    u_time: { value: number };
   };
 };
 

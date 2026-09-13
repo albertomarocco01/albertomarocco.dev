@@ -287,24 +287,24 @@ const en: Dictionary = {
       path: {
         eyebrow: "01 — path",
         headline: {
-          pre: "Computer Science graduate, ",
+          pre: "Computer scientist by training, ",
           em: "creative technologist",
-          post: " by vocation.",
+          post: " by choice.",
         },
-        body: "University of Turin, 2025. I work at the seam between web engineering and immersive visuals: full-stack sites that perform, real-time interfaces, generative loops for LED walls. I make sites that perform and installations that breathe — and this one runs my own generative work, live, as the proof.",
+        body: "Computer Science degree, University of Turin, 2025. I work where web engineering meets real-time graphics: full-stack sites built to a performance budget, interfaces that follow your hand, generative loops for LED walls and installations. This site is the first example — the light moving behind these lines is a shader of mine, and the browser draws it live.",
         meta: "turin · full-stack · webgl · touchdesigner",
         figureAlt:
           "Alberto Marocco on graduation day — laurel wreath, thesis in hand",
-        links: { websites: "the websites", xperiments: "the experiments" },
+        links: { websites: "the websites", xperiments: "the xperiments" },
       },
       discipline: {
         eyebrow: "02 — calisthenics",
         headline: {
-          pre: "Endurance athlete, ",
-          em: "coach",
-          post: " by conviction.",
+          pre: "Athlete first, ",
+          em: "then coach",
+          post: ".",
         },
-        body: "Off the screen I compete in calisthenics, Endurance discipline: max-rep sets and timed rounds, won with pacing and a technique that never slips. I train, I compete, and I coach a small group of athletes at every level — from the first clean pull-up to a competition prep.",
+        body: "Away from the screen I do calisthenics and compete in endurance: max-rep sets and timed rounds, where what counts is pacing and a technique that holds to the last rep. I also coach a small group of athletes, in Turin and online — from the first clean pull-up to a competition prep.",
         meta: "endurance · turin · athlete & coach",
         figureAlt:
           "Alberto Marocco holding a planche on the parallettes at a calisthenics competition",
@@ -312,7 +312,7 @@ const en: Dictionary = {
         coaching: [
           {
             term: "endurance",
-            detail: "Competition prep, pacing, rep density.",
+            detail: "Competition prep: pacing, rep density, managing fatigue.",
           },
           {
             term: "foundations",
@@ -320,7 +320,7 @@ const en: Dictionary = {
           },
           {
             term: "programming",
-            detail: "Tailored plans, in Turin or online.",
+            detail: "Tailored plans, in person in Turin or online.",
           },
         ],
         cta: "get in touch",
@@ -328,11 +328,11 @@ const en: Dictionary = {
       contact: {
         eyebrow: "03 — contact",
         headline: {
-          pre: "Write, call, ",
-          em: "find me",
+          pre: "Have a project in mind? ",
+          em: "Let's talk",
           post: ".",
         },
-        body: "Open to collaborations and commissions from 2026 — web, installations, LED — and to new athletes to coach. One message is enough.",
+        body: "Available for new projects — sites, installations, LED walls — in Turin and remotely, and for new athletes to coach. One line is enough.",
         labels: {
           email: "email",
           phone: "phone",
@@ -499,11 +499,11 @@ const it: Dictionary = {
       path: {
         eyebrow: "01 — percorso",
         headline: {
-          pre: "Laureato in Informatica, ",
+          pre: "Informatico per formazione, ",
           em: "creative technologist",
-          post: " per vocazione.",
+          post: " per scelta.",
         },
-        body: "Università di Torino, 2025. Lavoro nel punto d'incontro tra ingegneria web e visual immersive: siti full-stack che rendono, interfacce in tempo reale, loop generativi per led wall. Realizzo siti che rendono e installazioni che respirano — e questo sito manda in scena dal vivo il mio lavoro generativo: è la prova.",
+        body: "Laurea in Informatica all'Università di Torino, 2025. Lavoro dove l'ingegneria web incontra la grafica in tempo reale: siti full-stack costruiti su un budget di performance, interfacce che seguono la mano, loop generativi per led wall e installazioni. Questo sito è il primo esempio — la luce che si muove dietro queste righe è un mio shader, e il browser lo disegna dal vivo.",
         meta: "torino · full-stack · webgl · touchdesigner",
         figureAlt:
           "Alberto Marocco il giorno della laurea — corona d'alloro, tesi in mano",
@@ -512,11 +512,11 @@ const it: Dictionary = {
       discipline: {
         eyebrow: "02 — calisthenics",
         headline: {
-          pre: "Atleta di endurance, ",
-          em: "coach",
-          post: " per convinzione.",
+          pre: "Prima atleta, ",
+          em: "poi coach",
+          post: ".",
         },
-        body: "Fuori dallo schermo gareggio nel calisthenics, disciplina Endurance: serie massimali e round a tempo, vinti con il ritmo e con una tecnica che non cede. Mi alleno, gareggio e seguo un piccolo gruppo di atleti di ogni livello — dalla prima trazione pulita alla preparazione di una gara.",
+        body: "Fuori dallo schermo faccio calisthenics e gareggio nell'endurance: serie massimali e round a tempo, dove contano il ritmo e una tecnica che regge fino all'ultima ripetizione. Alleno anche un piccolo gruppo di atleti, a Torino e online — dalla prima trazione pulita alla preparazione di una gara.",
         meta: "endurance · torino · atleta & coach",
         figureAlt:
           "Alberto Marocco in planche sulle parallele, durante una gara di calisthenics",
@@ -524,27 +524,27 @@ const it: Dictionary = {
         coaching: [
           {
             term: "endurance",
-            detail: "Preparazione gare, ritmo, densità di ripetizioni.",
+            detail: "Preparazione gare: ritmo, densità, gestione della fatica.",
           },
           {
             term: "basi",
-            detail: "Prima trazione, primo dip: tecnica prima del volume.",
+            detail: "Prima trazione, primo dip: la tecnica prima del volume.",
           },
           {
             term: "programmazione",
-            detail: "Piani su misura, a Torino oppure online.",
+            detail: "Piani su misura, in presenza a Torino o online.",
           },
         ],
-        cta: "parliamone",
+        cta: "scrivimi",
       },
       contact: {
         eyebrow: "03 — contatti",
         headline: {
-          pre: "Scrivimi, chiamami, ",
-          em: "trovami",
+          pre: "Hai un progetto in mente? ",
+          em: "Parliamone",
           post: ".",
         },
-        body: "Aperto a collaborazioni e commissioni dal 2026 — web, installazioni, led — e a nuovi atleti da seguire. Basta un messaggio.",
+        body: "Disponibile per nuovi progetti — siti, installazioni, led wall — a Torino e da remoto, e per nuovi atleti da allenare. Basta una riga.",
         labels: {
           email: "email",
           phone: "telefono",

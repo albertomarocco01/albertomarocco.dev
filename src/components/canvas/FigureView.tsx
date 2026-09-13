@@ -149,6 +149,9 @@ function FigureScene({
 
     const delta = Math.min(raw, DT_MAX);
     reveal.current += (1 - reveal.current) * Math.min(1, delta * REVEAL_RATE);
+    // The breeze drifts on the field's own cadence (~30fps at rest); it never
+    // asks for a frame of its own.
+    m.uniforms.u_time.value += delta;
 
     // Where the box sits on screen, in the field's UV (y up). Read every frame:
     // the panel track slides it, and the field's orbs are viewport-fixed.

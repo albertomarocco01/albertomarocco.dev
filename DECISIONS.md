@@ -219,9 +219,28 @@ the look was reasoned from the shader math, not machine-verified visually.)
   carries a `contact →` link to `/about#contact` (`CONTACT.contactHref`)
   instead; the driver lands it on the third panel with no slide, the in-flow
   fallback jumps to the section's `id`.
-- **The calisthenics copy is placeholder.** Bio, the three coaching rows and
-  the contact note are plausible stand-ins in both languages (see "NEED REAL
-  VALUES" below).
+- **The copy was rewritten, once, for tone.** The first pass read as filler
+  ("sites that perform" twice, "coach by conviction", "write, call, find me",
+  "commissioni" for commissions). The three panels now carry one idea each —
+  *computer scientist by training, creative technologist by choice* / *athlete
+  first, then coach* / *have a project in mind? let's talk* — and the bodies
+  keep to the facts already on the page (the degree, the tools, the discipline,
+  Turin + online); nothing new was claimed. The coaching rows and the reply-time
+  note are still stand-ins (see "NEED REAL VALUES" below).
+- **The cut-outs are sunk into the room, under a breeze.** Daylight photos on
+  the void read as pasted on: both figures are now desaturated to 0.55 and
+  brought to ~0.58 of their brightness (below the ink's own), a hair cool, so
+  the orbs stay the light source and the person stands in their shadow. Over
+  that, `figure-material.ts` drifts a domain-warped fbm haze across the figure
+  (cells sized on the box's height, so both photos get the same mist; mostly
+  sideways, ~20 s to cross): the thick of it dims the figure by a quarter and
+  veils it with the room's cold grey, the clear of it lifts it a little, and
+  the same warp field sways the silhouette by a pixel or two. It rides the
+  field's own ~30fps clock (`u_time` advances on whatever frames the field
+  renders) and never asks for a frame of its own. The fallback `<img>` gets
+  the tone only (`saturate(.55) brightness(.58)`), which is what the haze
+  averages to, so the handover still doesn't pop. Every number is a
+  `#define` at the top of the shader (HAZE_*, MIST_*, TONE_*).
 - **The canvas paints the cut-outs, so the orbs pass in front of the person.**
   The field is one fixed layer under the page, so a DOM `<img>` could only ever
   sit in front of every orb. Each `<figure>` hosts a drei `<View>` (index 2 —
@@ -256,12 +275,13 @@ the look was reasoned from the shader math, not machine-verified visually.)
 
 ## Content / placeholders — NEED REAL VALUES
 
-- **/about, second panel (calisthenics):** the bio, the meta line, the three
-  coaching rows (endurance / foundations / programming) and the CTA are
-  placeholder copy in `dictionary.ts` (`about.panels.discipline`), EN and IT.
+- **/about, second panel (calisthenics):** the three coaching rows (endurance /
+  foundations / programming) in `dictionary.ts` (`about.panels.discipline`)
+  describe a plausible offer, EN and IT — confirm what the coaching actually
+  covers.
 - **/about, third panel (contacts):** the note under the rows ("replies within
-  a couple of days · en / it") and the availability line in the body are
-  placeholders (`about.panels.contact`).
+  a couple of days · en / it") and the "in Turin and remotely" line in the body
+  are stand-ins (`about.panels.contact`).
 - **Baldisthenics link** (`CONTACT.baldisthenics`) points at
   `baldisport.com/baldisthenics`, which as of 2026-09-02 serves Baldisport's
   "sito in costruzione" placeholder — the deep link may not exist yet. The
