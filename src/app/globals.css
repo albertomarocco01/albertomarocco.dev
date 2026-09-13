@@ -38,12 +38,18 @@ html {
      scrollbar appears or disappears. */
   scrollbar-gutter: stable;
 }
-/* The immersive demos ((immersive)/layout.tsx wraps them in `.immersive`) own
-   the whole viewport and never scroll: release the reserved gutter there, or a
-   `position: fixed; inset: 0` stage is a gutter narrower than the viewport,
-   off-centre by half of it, with a dead band on the right (measured 1425 px on
-   a 1440 px window). `display: contents` keeps the wrapper out of the box tree. */
-html:has(.immersive) {
+/* Pages that own the whole viewport and never scroll release the reserved
+   gutter, or every `position: fixed; inset: 0` layer (a demo stage, the field
+   canvas, the topbar scrim) is a gutter narrower than the viewport, with a black
+   band on the right under classic scrollbars (measured 1425 px on a 1440 px
+   window). The immersive demos ((immersive)/layout.tsx wraps them in
+   `.immersive`), the locked home — until flow mode hands it back to the
+   document (`home-scroll`) — and the locked /about. No shift either way: none
+   of them has a scrollbar to make room for. `display: contents` keeps the
+   `.immersive` wrapper out of the box tree. */
+html:has(.immersive),
+html.home-live:not(.home-scroll),
+html.about-live {
   scrollbar-gutter: auto;
 }
 .immersive {
