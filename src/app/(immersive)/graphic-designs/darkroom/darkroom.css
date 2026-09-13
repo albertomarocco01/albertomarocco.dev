@@ -7,6 +7,13 @@
   The exit link mirrors `.vortex-exit` / `.tara-exit` so the demos share one
   chrome; the cursor is restored for the whole immersive group by globals.css.
   The tray itself is the WebGL canvas; the DOM only writes over it.
+
+  Legibility and touch: nothing in the mono register goes under 0.7rem
+  (11.2 px); keyboard focus is a 2 px ring in the opaque amber (--ring), never a
+  colour change alone; `touch-action` lives on the canvas and keeps pinch-zoom
+  (one finger stirs, two fingers are the browser's); on coarse pointers the exit
+  link takes a 44 px hit area through an invisible ::before inset, and the
+  brush path's only control, `next print →`, is 44 px tall everywhere.
 */
 
 /* ---- scope base ---- */
@@ -22,13 +29,15 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+/* the tray takes one-finger drags (no pan, no double-tap zoom); a pinch stays
+   the page's zoom (WCAG 1.4.4) — the chrome above the canvas keeps every gesture */
 .darkroom-canvas canvas {
   display: block;
+  touch-action: pinch-zoom;
 }
 
 /* ---- the rim: a 1 px hairline inset at ~2 % suggests the tray ---- */
@@ -64,10 +73,15 @@
   top: 1.4rem;
   left: 1.4rem;
 }
+/* the only control of the brush path: a real 44 px target, on every pointer */
 .darkroom-next {
   bottom: calc(1.35rem + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem 1.2rem;
 }
 .darkroom-exit:hover,
 .darkroom-exit:focus-visible,
@@ -75,7 +89,22 @@
 .darkroom-next:focus-visible {
   color: var(--ink);
   border-color: var(--ink-dim);
-  outline: none;
+}
+.darkroom-exit:focus-visible,
+.darkroom-next:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+@media (pointer: coarse) {
+  .darkroom-exit::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -6px;
+    right: -6px;
+    height: 44px;
+    transform: translateY(-50%);
+  }
 }
 
 /* ---- title cover (very first idle state only) ---- */
@@ -105,7 +134,7 @@
 }
 .darkroom-title-sub {
   font-family: var(--mono);
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   letter-spacing: 0.42em;
   text-transform: lowercase;
   color: var(--ink-dim);
@@ -140,7 +169,7 @@
 }
 .darkroom-hint-keys {
   font-family: var(--mono);
-  font-size: 0.6rem;
+  font-size: 0.7rem;
   letter-spacing: 0.22em;
   text-indent: 0.22em;
   text-transform: lowercase;
