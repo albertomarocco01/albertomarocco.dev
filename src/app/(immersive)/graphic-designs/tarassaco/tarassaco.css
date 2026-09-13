@@ -25,7 +25,8 @@
   overflow: hidden;
   background-color: #000;
   color: #fff;
-  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--serif);
+  font-weight: 300;
   cursor: auto; /* restore the pointer over the site-wide `body { cursor: none }` */
   isolation: isolate;
   /* press-and-hold blows: no one-finger pan to cancel the pointer, no
@@ -104,27 +105,22 @@
 /* ---- spacing ---- */
 .tarassaco .mt-4 { margin-top: 1rem; }
 .tarassaco .px-8 { padding-left: 2rem; padding-right: 2rem; }
-.tarassaco .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
 
 /* ---- transforms ---- */
 .tarassaco .-translate-y-1\/2 { transform: translateY(-50%); }
 
 /* ---- colours / borders ---- */
 .tarassaco .bg-black { background-color: #000; }
-.tarassaco .bg-white { background-color: #fff; }
 .tarassaco .text-white { color: #fff; }
-.tarassaco .text-black { color: #000; }
 .tarassaco .text-gray-400 { color: #9ca3af; }
 .tarassaco .bg-white\/30 { background-color: rgba(255, 255, 255, 0.3); }
-.tarassaco .border { border-width: 1px; border-style: solid; border-color: currentColor; }
-.tarassaco .border-white\/30 { border-color: rgba(255, 255, 255, 0.3); }
 
 /* ---- typography ---- */
 .tarassaco .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
 .tarassaco .text-base { font-size: 1rem; line-height: 1.5rem; }
 .tarassaco .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
 .tarassaco .font-mono {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--mono);
 }
 .tarassaco .uppercase { text-transform: uppercase; }
 .tarassaco .tracking-wide { letter-spacing: 0.025em; }
@@ -148,9 +144,6 @@
 .tarassaco .overflow-visible { overflow: visible; }
 
 /* ---- transitions / animations ---- */
-.tarassaco .transition-all {
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-}
 .tarassaco .transition-opacity {
   transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -167,12 +160,6 @@
   50% { opacity: 0.5; }
 }
 
-/* ---- interactive states ---- */
-.tarassaco .hover\:bg-white:hover { background-color: #fff; }
-.tarassaco .hover\:text-black:hover { color: #000; }
-.tarassaco .disabled\:opacity-50:disabled { opacity: 0.5; }
-.tarassaco .disabled\:cursor-wait:disabled { cursor: wait; }
-
 /* ---- responsive (md: 768px) ---- */
 @media (min-width: 768px) {
   .tarassaco .md\:text-2xl { font-size: 1.5rem; line-height: 2rem; }
@@ -184,11 +171,12 @@
 /* ---- persistent demo chrome: title + exit + directional blow hints ---- */
 /* Fixed to the viewport (no transformed ancestor between here and .tarassaco).
    Title is a bottom cover-label — bigger + glowing, seated above the gate's
-   footer notice, not at the top like the sibling Vortex demo. */
+   consent notice (.tara-privacy: bottom 2rem, up to three lines at 1.9 on a
+   desktop, so it reaches ~6rem), not at the top like the sibling demos. */
 .tarassaco .tara-title {
   position: fixed;
   left: 50%;
-  bottom: 4.5rem;
+  bottom: 7.5rem;
   transform: translateX(-50%);
   z-index: 60;
   display: flex;
@@ -213,51 +201,124 @@
     0 0 60px rgba(255, 255, 255, 0.2);
 }
 .tarassaco .tara-title-sub {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: clamp(0.6rem, 1.4vw, 0.78rem);
   letter-spacing: 0.6em;
   text-indent: 0.6em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   color: rgba(255, 255, 255, 0.5);
 }
 
-/* Phones: the gate's consent notice (bottom: 2rem, inline-styled in GateScene)
-   wraps to four lines there and reaches ~5.5rem up — straight through the
-   title's sub-line at 4.5rem, so the two render on top of each other on the
-   first screen a visitor sees. Lift the title clear of it. */
+/* Phones: the gate's consent notice (.tara-privacy, bottom: 2rem) wraps to
+   four lines there and reaches ~5.5rem up — straight through the title's
+   sub-line at 4.5rem, so the two render on top of each other on the first
+   screen a visitor sees. Lift the title clear of it. */
 @media (max-width: 560px) {
   .tarassaco .tara-title {
     bottom: 9rem;
   }
 }
 
+/* The site-wide exit idiom (.vortex-exit in globals.css, copied like the other
+   demos do): lowercase mono, dim ink on a hairline, top-left. Keyboard focus
+   gets the site's amber ring rather than the idiom's outline: none; on touch
+   the padding grows so the target reaches 44 px. */
 .tarassaco .tara-exit {
   position: fixed;
-  top: 2rem;
-  left: 2rem;
+  top: 1.4rem;
+  left: 1.4rem;
   z-index: 60;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 0.72rem;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
   text-decoration: none;
-  padding: 0.5rem 0.85rem;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  transition: color 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  padding: 0.5rem 0.9rem;
+  transition:
+    color 0.4s var(--ease),
+    border-color 0.4s var(--ease);
 }
-.tarassaco .tara-exit:hover {
-  color: #000;
-  background: #fff;
-  border-color: #fff;
+.tarassaco .tara-exit:hover,
+.tarassaco .tara-exit:focus-visible {
+  color: var(--ink);
+  border-color: var(--ink-dim);
+}
+.tarassaco .tara-exit:focus-visible,
+.tarassaco .tara-gate-btn:focus-visible,
+.tarassaco .tara-error-btn:focus-visible,
+.tarassaco .tara-error-alt:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+@media (pointer: coarse) {
+  .tarassaco .tara-exit {
+    padding: 0.85rem 1rem;
+  }
+}
+
+/* ---- gate: one lowercase mono button, the consent line under it ---- */
+.tarassaco .tara-gate-btn {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: lowercase;
+  color: var(--ink);
+  padding: 0.9rem 1.4rem;
+  border: 1px solid var(--hairline-hot);
+  border-radius: 2px;
+  background: transparent;
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+  transition:
+    color 0.4s var(--ease),
+    border-color 0.4s var(--ease);
+}
+.tarassaco .tara-gate-btn:hover,
+.tarassaco .tara-gate-btn:focus-visible {
+  color: #fff;
+  border-color: var(--ink-dim);
+}
+.tarassaco .tara-gate-btn:disabled {
+  cursor: wait;
+  color: var(--ink-dim);
+}
+.tarassaco .tara-gate-icons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.tarassaco .tara-privacy {
+  position: absolute;
+  bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0 1.5rem;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.9;
+  letter-spacing: 0.14em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+  max-width: 38rem;
+  margin-inline: auto;
+  text-wrap: balance;
 }
 
 /* Directional prompt under each mini-dandelion (west: left, east: right). */
 .tarassaco .tara-hint {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--mono);
   font-size: 0.72rem;
   letter-spacing: 0.26em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   white-space: nowrap;
   color: rgba(255, 255, 255, 0.75);
   text-shadow: 0 0 14px rgba(255, 255, 255, 0.45);
@@ -290,35 +351,41 @@
 }
 .tarassaco .tara-error-title {
   margin: 0;
-  font-size: 0.8rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
   letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+  text-transform: lowercase;
+  color: var(--ink);
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
 }
 .tarassaco .tara-error-body {
   margin: 0;
-  font-size: 0.92rem;
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: 0.98rem;
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--ink-dim);
 }
 .tarassaco .tara-error-btn {
   align-self: center;
   cursor: pointer;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 0.72rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
   letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: #fff;
+  text-transform: lowercase;
+  color: var(--ink);
   padding: 0.7rem 1.2rem;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid var(--hairline-hot);
+  border-radius: 2px;
   background: transparent;
-  transition: color 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+  transition:
+    color 0.4s var(--ease),
+    border-color 0.4s var(--ease);
 }
-.tarassaco .tara-error-btn:hover {
-  color: #000;
-  background: #fff;
-  border-color: #fff;
+.tarassaco .tara-error-btn:hover,
+.tarassaco .tara-error-btn:focus-visible {
+  color: #fff;
+  border-color: var(--ink-dim);
 }
 .tarassaco .tara-error-actions {
   display: flex;
@@ -343,7 +410,6 @@
 .tarassaco .tara-error-alt:focus-visible {
   color: var(--ink);
   border-bottom-color: var(--ink-dim);
-  outline: none;
 }
 
 /* ---- HUD after the gate: what drives the wind + how to blow without it ---- */

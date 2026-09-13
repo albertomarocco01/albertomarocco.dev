@@ -12,11 +12,7 @@ export function GateScene({ copy, onStart }: { copy: TarassacoCopy; onStart: () 
 
   return (
     <div className="absolute inset-0 flex items-center justify-center z-50 bg-black">
-      <button 
-        onClick={handleClick}
-        disabled={loading}
-        className="flex items-center gap-4 text-sm font-mono tracking-[0.5em] text-white glow-text uppercase border border-white/30 px-8 py-4 hover:bg-white hover:text-black transition-all disabled:opacity-50 disabled:cursor-wait"
-      >
+      <button type="button" onClick={handleClick} disabled={loading} className="tara-gate-btn">
         {loading ? (
           <>
             <span>{copy.initializing}</span>
@@ -25,34 +21,17 @@ export function GateScene({ copy, onStart }: { copy: TarassacoCopy; onStart: () 
         ) : (
           <>
             <span>{copy.enable}</span>
-            <div className="flex items-center gap-2">
+            <span className="tara-gate-icons">
               <Mic size={18} />
               <Camera size={18} />
-            </div>
+            </span>
           </>
         )}
       </button>
 
       {/* Consent / privacy notice. Even though processing is 100% local, EU/IT
           law expects an informed notice before activating camera + microphone. */}
-      <p
-        style={{
-          position: "absolute",
-          bottom: "2rem",
-          left: 0,
-          right: 0,
-          textAlign: "center",
-          padding: "0 1.5rem",
-          margin: 0,
-          fontSize: "0.66rem",
-          letterSpacing: "0.18em",
-          textTransform: "uppercase",
-          color: "rgba(255,255,255,0.45)",
-          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-        }}
-      >
-        {copy.privacy}
-      </p>
+      <p className="tara-privacy">{copy.privacy}</p>
     </div>
   );
 }
