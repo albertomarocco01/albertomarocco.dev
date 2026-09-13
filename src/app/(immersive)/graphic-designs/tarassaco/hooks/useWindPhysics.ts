@@ -17,6 +17,17 @@ export const SENSOR_TIMEOUT_MS = 9000;
 // a node it settles once, this far downwind, over this long, and is gone.
 export const REDUCED_SETTLE_PX = 60;
 export const REDUCED_SETTLE_MS = 500;
+// The wind front advances this many px per 60 Hz frame while blowing — the
+// sweep that launches the words left to right (or right to left). 90 crosses
+// a 1440 px screen in ~0.27 s and a phone in ~0.07 s.
+export const WIND_FRONT_SPEED = 90;
+// A word flies once (S12): one CSS transition, no per-frame writes. Distance
+// and duration scale with the blow's force over the word's mass.
+export const WORD_FLY_PX = 700;
+export const WORD_FLY_MS = 1800;
+// Drift back home after RECOVERY_TIMEOUT_MS of silence. The words' side is
+// the .physics-recover rule in tarassaco.css (3 s) — keep the two equal.
+export const RECOVERY_SETTLE_MS = 3000;
 // =================================
 
 /** What drives the wind right now — shown in the HUD. */
@@ -33,9 +44,24 @@ export interface PhysicsState {
   rot: number;
   vRot: number;
   isRecovering: boolean;
-  /** reduced motion: settled once already, waits for recovery */
+  /** flown (or settled, under reduced motion) once already — waits for recovery */
   launched: boolean;
 }
+
+/**
+ * A wind target that is not a DOM element — the dandelion's seeds, drawn on a
+ * canvas by GlowingDandelion. The hook integrates it like it used to integrate
+ * the SVG groups and hands it the result: set() every frame while it moves,
+ * ease() for the one-shot paths (recovery, reduced motion). Its screen origin
+ * comes through registerNode like everything else's.
+ */
+export interface WindParticle {
+  kind: 'particle';
+  set(dx: number, dy: number, rot: number, opacity: number): void;
+  ease(dx: number, dy: number, rot: number, opacity: number, ms: number): void;
+}
+export type WindTarget = HTMLElement | SVGElement | WindParticle;
+const isParticle = (t: WindTarget): t is WindParticle => (t as WindParticle).kind === 'particle';
 
 export interface WindPhysicsOptions {
   enabled: boolean;
@@ -75,7 +101,7 @@ export function useWindPhysics({
   micThresholdOverride,
   sceneKey
 }: WindPhysicsOptions) {
-  const nodesRef = useRef<Map<HTMLElement | SVGElement, PhysicsState>>(new Map());
+  const nodesRef = useRef<Map<WindTarget, PhysicsState>>(new Map());
   const requestRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -130,7 +156,7 @@ export function useWindPhysics({
   useEffect(() => { disableRecoveryRef.current = disableRecovery; }, [disableRecovery]);
   useEffect(() => { micThresholdOverrideRef.current = micThresholdOverride; }, [micThresholdOverride]);
 
-  const registerNode = useCallback((el: HTMLElement | SVGElement | null, x: number, y: number) => {
+  const registerNode = useCallback((el: WindTarget | null, x: number, y: number) => {
     if (!el) return;
     const existing = nodesRef.current.get(el);
     if (existing) {
@@ -353,10 +379,30 @@ export function useWindPhysics({
 
     // Reduced motion: one short transition downwind and gone. The recovery path
     // (.physics-recover, a cut under the same media query) brings it back.
-    const settleOnce = (el: HTMLElement | SVGElement, state: PhysicsState, dir: 1 | -1) => {
+    const settleOnce = (el: WindTarget, state: PhysicsState, dir: 1 | -1) => {
       state.launched = true;
+      const dx = dir * REDUCED_SETTLE_PX;
+      const dy = -REDUCED_SETTLE_PX * 0.3;
+      if (isParticle(el)) { el.ease(dx, dy, 0, 0, REDUCED_SETTLE_MS); return; }
       el.style.transition = `transform ${REDUCED_SETTLE_MS}ms var(--ease), opacity ${REDUCED_SETTLE_MS}ms var(--ease)`;
-      el.style.transform = `translate(${dir * REDUCED_SETTLE_PX}px, ${-REDUCED_SETTLE_PX * 0.3}px) rotate(0deg)`;
+      el.style.transform = `translate(${dx}px, ${dy}px) rotate(0deg)`;
+      el.style.opacity = '0';
+    };
+
+    // A word's one flight (S12): distance, lift, spin and duration from the
+    // blow's force over the word's mass, a strong ease-out standing in for the
+    // drag the per-frame integration used to apply. Written once; the browser
+    // animates it. The front's sweep decides when each word goes.
+    const launchWord = (el: HTMLElement | SVGElement, state: PhysicsState, dir: 1 | -1, power: number) => {
+      state.launched = true;
+      const p = Math.min(power / 6, 2); // keyboard ≈ 0.5–1.3, a loud blow up to 2
+      const dx = dir * WORD_FLY_PX * (0.7 + 0.3 * p) * (0.85 + Math.random() * 0.3);
+      const dy = -Math.abs(dx) * (0.15 + Math.random() * 0.25);
+      const rot = (Math.random() - 0.5) * 180 * (0.5 + 0.5 * p);
+      const ms = Math.round(WORD_FLY_MS * (1 - 0.3 * Math.min(p, 1)));
+      state.dx = dx; state.dy = dy; state.rot = rot;
+      el.style.transition = `transform ${ms}ms var(--ease), opacity ${ms}ms var(--ease)`;
+      el.style.transform = `translate(${dx}px, ${dy}px) rotate(${rot}deg)`;
       el.style.opacity = '0';
     };
 
@@ -393,6 +439,8 @@ export function useWindPhysics({
     // The physics loop runs regardless of acquisition: mic + face when start()
     // got them, SPACE / press-and-hold otherwise. Sensor handles are read from
     // refs every frame, so a late grant (or a retry) joins in without a restart.
+    // Per frame it integrates only the seeds (canvas particles, one draw); a
+    // word gets one CSS transition the moment the front reaches it (S12).
     let lastDetect = 0; // throttles face detection to ~30fps
     // The integration below was written per-frame, so every constant was
     // implicitly tuned for 60Hz: on a 144Hz display the text blew away 2.4x
@@ -486,13 +534,13 @@ export function useWindPhysics({
 
           if (activeMouths.length > 0) {
             activeMouths.forEach(x => {
-              if (x < 0.5) windFrontX_LTR += 180 * dt;
-              else windFrontX_RTL -= 180 * dt;
+              if (x < 0.5) windFrontX_LTR += WIND_FRONT_SPEED * dt;
+              else windFrontX_RTL -= WIND_FRONT_SPEED * dt;
             });
           } else {
             // Fallback if no face but blowing (e.g. camera covered)
-            if (allowedDirectionRef.current === 'left') windFrontX_LTR += 180 * dt;
-            else windFrontX_RTL -= 180 * dt;
+            if (allowedDirectionRef.current === 'left') windFrontX_LTR += WIND_FRONT_SPEED * dt;
+            else windFrontX_RTL -= WIND_FRONT_SPEED * dt;
           }
         } else {
           blowStartTimeRef.current = 0;
@@ -512,9 +560,13 @@ export function useWindPhysics({
             state.vx = 0; state.vy = 0; state.vRot = 0;
             state.dx = 0; state.dy = 0; state.rot = 0;
             state.isRecovering = true;
-            el.classList.add('physics-recover');
-            el.style.transform = `translate(0px, 0px) rotate(0deg)`;
-            el.style.opacity = '1';
+            if (isParticle(el)) {
+              el.ease(0, 0, 0, 1, reducedMotionRef.current ? 10 : RECOVERY_SETTLE_MS);
+            } else {
+              el.classList.add('physics-recover');
+              el.style.transform = `translate(0px, 0px) rotate(0deg)`;
+              el.style.opacity = '1';
+            }
           });
         }
 
@@ -526,64 +578,54 @@ export function useWindPhysics({
 
           nodesRef.current.forEach((state, el) => {
             if (state.isRecovering) {
-              el.classList.remove('physics-recover');
+              if (!isParticle(el)) el.classList.remove('physics-recover');
               state.isRecovering = false;
               state.launched = false;
             }
 
+            // The winds that can reach this node: one per detected mouth, or
+            // the scene's direction when no face is tracked.
+            const dirs = activeMouths.length > 0
+              ? activeMouths.map((x) => x < 0.5)
+              : [allowedDirectionRef.current === 'left'];
+            const reached = (isLTR: boolean) =>
+              isLTR ? state.originalX < windFrontX_LTR : state.originalX > windFrontX_RTL;
+
+            // Reduced motion: settle once, no integration.
             if (reducedMotionRef.current) {
               if (forceBase > 0 && !state.launched) {
-                const dirs = activeMouths.length > 0
-                  ? activeMouths.map((x) => x < 0.5)
-                  : [allowedDirectionRef.current === 'left'];
-                for (const isLTR of dirs) {
-                  const frontX = isLTR ? windFrontX_LTR : windFrontX_RTL;
-                  if (isLTR ? state.originalX < frontX : state.originalX > frontX) {
-                    settleOnce(el, state, isLTR ? 1 : -1);
-                    break;
-                  }
-                }
+                const isLTR = dirs.find(reached);
+                if (isLTR !== undefined) settleOnce(el, state, isLTR ? 1 : -1);
               }
               return;
             }
 
+            // Words: one flight per blow, the moment the front reaches them.
+            if (!isParticle(el)) {
+              if (forceBase > 0 && !state.launched) {
+                const isLTR = dirs.find(reached);
+                if (isLTR !== undefined) launchWord(el, state, isLTR ? 1 : -1, forceBase / state.mass);
+              }
+              return;
+            }
+
+            // Seeds: the integration, drawn by the flower's canvas.
             let ax = 0;
             let ay = 0;
             let aRot = 0;
 
             if (forceBase > 0) {
-              if (activeMouths.length > 0) {
-                activeMouths.forEach(mouthX => {
-                  const isLTR = mouthX < 0.5;
-                  const frontX = isLTR ? windFrontX_LTR : windFrontX_RTL;
-                  const inRange = isLTR ? (state.originalX < frontX) : (state.originalX > frontX);
-
-                  if (inRange) {
-                    const dist = isLTR ? (frontX - state.originalX) : (state.originalX - frontX);
-                    const distFactor = Math.max(0.1, dist / window.innerWidth);
-                    const dir = isLTR ? 1 : -1;
-
-                    ax += (dir * forceBase * distFactor) / state.mass;
-                    ay -= (forceBase * 0.4 * distFactor) / state.mass * (Math.random() - 0.2);
-                    aRot += (Math.random() - 0.5) * forceBase * 6 / state.mass;
-                  }
-                });
-              } else {
-                // Fallback
-                const isLTR = allowedDirectionRef.current === 'left';
+              const tracked = activeMouths.length > 0;
+              dirs.forEach((isLTR) => {
+                if (!reached(isLTR)) return;
                 const frontX = isLTR ? windFrontX_LTR : windFrontX_RTL;
-                const inRange = isLTR ? (state.originalX < frontX) : (state.originalX > frontX);
-
-                if (inRange) {
-                  const dist = isLTR ? (frontX - state.originalX) : (state.originalX - frontX);
-                  const distFactor = Math.max(0.1, dist / window.innerWidth);
-                  const dir = isLTR ? 1 : -1;
-
-                  ax += (dir * forceBase * distFactor) / state.mass;
-                  ay -= (forceBase * 0.4 * distFactor) / state.mass;
-                  aRot += (Math.random() - 0.5) * forceBase * 6 / state.mass;
-                }
-              }
+                const dist = isLTR ? (frontX - state.originalX) : (state.originalX - frontX);
+                const distFactor = Math.max(0.1, dist / window.innerWidth);
+                const dir = isLTR ? 1 : -1;
+                ax += (dir * forceBase * distFactor) / state.mass;
+                ay -= (forceBase * 0.4 * distFactor) / state.mass * (tracked ? Math.random() - 0.2 : 1);
+                aRot += (Math.random() - 0.5) * forceBase * 6 / state.mass;
+              });
 
               // Turbolenza incrociata
               if (activeMouths.some(x => x < 0.5) && activeMouths.some(x => x >= 0.5)) {
@@ -607,9 +649,8 @@ export function useWindPhysics({
             state.rot += state.vRot * dt;
 
             if (Math.abs(state.vx) > 0.05 || Math.abs(state.vy) > 0.05 || Math.abs(state.dx) > 0.5) {
-              el.style.transform = `translate(${state.dx}px, ${state.dy}px) rotate(${state.rot}deg)`;
               const distTraveled = Math.sqrt(state.dx * state.dx + state.dy * state.dy);
-              el.style.opacity = Math.max(0, 1 - distTraveled / 600).toFixed(3);
+              el.set(state.dx, state.dy, state.rot, Math.max(0, 1 - distTraveled / 600));
             }
           });
         }

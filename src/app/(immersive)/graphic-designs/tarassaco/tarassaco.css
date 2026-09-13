@@ -11,8 +11,8 @@
 
   Kept GLOBAL-by-contract (referenced as string literals in JS, not via CSS
   Modules): `physics-recover` (toggled by the wind hook), `glow-text`, `glow-svg`.
-  `physics-node` is a JS query hook only and needs no style. They stay scoped to
-  `.tarassaco` but keep their exact names so classList/querySelector still match.
+  They stay scoped to `.tarassaco` but keep their exact names so classList still
+  matches. (The seeds are canvas particles since round 3 — no `physics-node`.)
 */
 
 /* ---- scope base (was the Vite app's body) ---- */
@@ -70,6 +70,8 @@
   filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9))
     drop-shadow(0 0 12px rgba(255, 255, 255, 0.5));
 }
+/* A word's drift back home after the wind stops. 3 s = RECOVERY_SETTLE_MS in
+   useWindPhysics.ts, which drives the seeds' identical drift — keep equal. */
 .tarassaco .physics-recover {
   transition: transform 3s cubic-bezier(0.25, 1, 0.5, 1), opacity 3s ease !important;
 }
@@ -445,6 +447,18 @@
   .tarassaco .tara-hold-touch {
     display: inline;
   }
+}
+
+/* ---- the dandelion's seeds: one canvas over the whole viewport ---- */
+/* Drawn by GlowingDandelion at the flower's screen position; viewport-sized so
+   a seed can fly across the page the way the SVG's overflow: visible let it.
+   Painted inside the flower's z-20 container, so over the poem. */
+.tarassaco .tara-seeds {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 /* ---- phones (keep equal to PHONE_MAX_WIDTH in tarassaco.config.ts) ---- */

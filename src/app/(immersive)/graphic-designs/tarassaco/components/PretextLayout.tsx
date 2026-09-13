@@ -202,6 +202,9 @@ export function PretextLayout({
               left: `${node.x}px`, 
               display: 'inline-block',
               whiteSpace: 'pre',
+              // Pre-promoted: a word flies as one CSS transition, and building 148
+              // layers the frame the wind arrives was a 60 ms hitch; here the
+              // cost lands at layout, once per scene.
               willChange: 'transform, opacity',
             }}
           >

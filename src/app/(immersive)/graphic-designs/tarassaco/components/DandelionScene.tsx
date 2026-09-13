@@ -2,11 +2,13 @@ import { PretextLayout } from './PretextLayout';
 import { GlowingDandelion } from './GlowingDandelion';
 import { flowerLayout } from '../tarassaco.config';
 import type { TarassacoCopy } from '../copy';
+import type { WindTarget } from '../hooks/useWindPhysics';
 
 interface DandelionSceneProps {
   copy: TarassacoCopy;
   windowWidth: number;
-  registerNode: (el: HTMLElement | SVGElement | null, x: number, y: number) => void;
+  /** words and the flower's seed particles alike (useWindPhysics) */
+  registerNode: (el: WindTarget | null, x: number, y: number) => void;
   clearNodes: () => void;
 }
 
