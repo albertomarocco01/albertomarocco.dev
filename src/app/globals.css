@@ -14,6 +14,7 @@
   --hairline: rgba(199, 196, 188, 0.09);
   --hairline-hot: rgba(199, 196, 188, 0.22);
   --accent: rgba(176, 120, 70, 0.55); /* amber — the single accent, used with restraint */
+  --ring: #b07846; /* the same amber, opaque: keyboard focus (~5:1 on the void) */
 
   --serif: var(--font-fraunces), Georgia, "Times New Roman", serif;
   --mono: var(--font-mono), ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
@@ -331,6 +332,27 @@ footer.foot a,
 .wrap:focus {
   outline: none;
 }
+/* Keyboard focus: one amber ring for every control of the site, in place of
+   the old colour-only lift (--ink-dim → --ink, ~2.2:1 between the two states —
+   too weak to find focus by). `outline` follows each element's own
+   border-radius, and a mouse click never matches `:focus-visible`, so pointers
+   see nothing. The demos style their own controls. */
+:is(
+    .topbar a,
+    .locale-opt,
+    .teaser,
+    .row,
+    .gd-back,
+    .gd-demo,
+    .about-cta,
+    .about-pager button,
+    a.contact-val,
+    footer.foot a,
+    .bubble-ctl-actions button
+  ):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
 
 .topbar {
   position: fixed;
@@ -395,7 +417,6 @@ footer.foot a,
 .topbar a:hover,
 .topbar a:focus-visible {
   color: var(--ink);
-  outline: none;
 }
 /* The wordmark reads as the mark, not as one nav item among five. */
 .topbar .wordmark {
@@ -444,7 +465,6 @@ footer.foot a,
 .locale-opt:hover,
 .locale-opt:focus-visible {
   color: var(--ink);
-  outline: none;
 }
 
 /* Topbar on phones. Four routes plus the wordmark and the EN/IT switch cannot
@@ -863,9 +883,6 @@ footer.foot a,
 /* No transition delays here: the 01 → 02 → 03 stagger is the driver's — each
    tile has its own threshold on the scrub, so scroll pace *is* the stagger,
    forwards and back. */
-.teaser:focus-visible {
-  outline: none;
-}
 .teaser-idx {
   display: block;
   font-family: var(--mono);
@@ -1332,9 +1349,6 @@ footer.foot a,
 .row.open .reveal-media {
   transform: scale(1);
 }
-.row:focus-visible {
-  outline: none;
-}
 .row:focus-visible .row-title,
 .row:focus-visible .row-idx {
   color: var(--ink-dim);
@@ -1369,7 +1383,6 @@ footer.foot a,
 .gd-back:hover,
 .gd-back:focus-visible {
   color: var(--ink);
-  outline: none;
 }
 @media (hover: none) {
   .gd-back {
@@ -1582,7 +1595,6 @@ footer.foot a,
 .about-cta:hover,
 .about-cta:focus-visible {
   color: var(--ink-dim);
-  outline: none;
 }
 .about-cta:hover .arrow,
 .about-cta:focus-visible .arrow {
@@ -1727,7 +1739,6 @@ html.about-live .about-pager {
 .about-pager button:hover,
 .about-pager button:focus-visible {
   color: var(--ink-dim);
-  outline: none;
 }
 .about-pager button[aria-current="true"] {
   color: var(--ink);
@@ -2005,7 +2016,6 @@ a.contact-val:hover,
 a.contact-val:focus-visible {
   font-style: italic;
   color: var(--ink);
-  outline: none;
 }
 .contact-row:hover .contact-key {
   color: var(--ink);
@@ -2060,7 +2070,6 @@ footer.foot a {
 footer.foot a:hover,
 footer.foot a:focus-visible {
   color: var(--ink);
-  outline: none;
 }
 /* The way to /about's contact panel — the one call in the row, so it takes the
    ink the rest reach on hover, and its arrow slides the way the CTAs' do. */
@@ -2336,7 +2345,6 @@ html.home-live .foot.curtain.is-up {
 .bubble-ctl-actions button:focus-visible {
   color: var(--ink);
   border-color: var(--hairline-hot);
-  outline: none;
 }
 
 /* ---- reduced motion: no shader, instant transitions, no entrance, no custom cursor ---- */
@@ -2555,7 +2563,6 @@ html.home-live .foot.curtain.is-up {
 .gd-demo:focus-visible {
   border-color: var(--hairline-hot);
   background: rgba(255, 255, 255, 0.03);
-  outline: none;
 }
 .gd-demo-cover {
   position: relative; /* containing block for the <Image fill> inside */
