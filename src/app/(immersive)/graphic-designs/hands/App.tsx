@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { HINT_SESSION_KEY, ONBOARDING_MS, OPEN } from "./hands.config";
 import { createInput } from "./engine/input";
@@ -64,6 +64,7 @@ export default function App({ copy }: { copy: HandsCopy }) {
   const router = useRouter();
   const input = useMemo(() => createInput("pointer"), []);
   const stageRef = useRef<HTMLDivElement>(null);
+  const captionRef = useRef<HTMLDivElement>(null);
   const reticles = useRef<ReticleHandles>({ els: [null, null] });
   const worldRef = useRef<World | null>(null);
   const guideTimer = useRef<Timer>(null);
@@ -218,7 +219,7 @@ export default function App({ copy }: { copy: HandsCopy }) {
     (bottom: number) => {
       clear(captionTimer);
       clear(hintTimer);
-      const top = Math.min(0.86, bottom);
+      const top = Math.min(OPEN.captionMaxTop, bottom);
       const d = device();
       const hintText = d === "hand" ? copy.hintCloseHand : d === "touch" ? copy.hintCloseTouch : copy.hintClosePointer;
       captionTimer.current = setTimeout(() => {
@@ -238,6 +239,20 @@ export default function App({ copy }: { copy: HandsCopy }) {
     },
     [copy, device],
   );
+  // The caption wants to sit under the print's lower edge; on a short viewport
+  // (a landscape phone) that leaves no room for its two lines, so the block is
+  // pulled up until it ends OPEN.captionEdgePx above the bottom — over the
+  // print's edge if it must. Measured, not guessed: the block's own height.
+  useLayoutEffect(() => {
+    const el = captionRef.current;
+    const stage = stageRef.current;
+    if (!el || !stage) return;
+    const H = stage.clientHeight;
+    if (!H) return;
+    const margin = parseFloat(getComputedStyle(el).marginTop) || 0;
+    const maxTop = (H - el.offsetHeight - margin - OPEN.captionEdgePx) / H;
+    el.style.top = `${(Math.min(caption.top, maxTop) * 100).toFixed(1)}%`;
+  }, [caption]);
   const closeCaption = useCallback(() => {
     clear(captionTimer);
     clear(hintTimer);
@@ -309,11 +324,7 @@ export default function App({ copy }: { copy: HandsCopy }) {
       <Reticles register={registerReticles} />
 
       {/* Under the opened print: one line at random, and — once — how to close it. */}
-      <div
-        className={`hands-caption${caption.on ? " is-on" : ""}`}
-        style={{ top: `${(caption.top * 100).toFixed(1)}%` }}
-        aria-hidden="true"
-      >
+      <div ref={captionRef} className={`hands-caption${caption.on ? " is-on" : ""}`} aria-hidden="true">
         <span className="hands-caption-text">{caption.text}</span>
         <span className={`hands-caption-hint${hint.on ? " is-on" : ""}`}>{hint.text}</span>
       </div>

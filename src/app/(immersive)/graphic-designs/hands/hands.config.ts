@@ -210,6 +210,10 @@ export const OPEN = {
   /** caption: fades in this long after the open (flight + a beat); the first-time hint stays hintMs */
   captionDelayMs: 900,
   hintMs: 3000,
+  /** the caption block never sits higher than this share of the viewport … */
+  captionMaxTop: 0.86,
+  /** … and always ends at least this many px above the viewport's bottom edge (its two lines fit) */
+  captionEdgePx: 12,
 } as const;
 
 /* ---- pointer ---------------------------------------------------------- */
