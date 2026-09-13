@@ -7,6 +7,13 @@
   The exit link mirrors `.vortex-exit` / `.tara-exit` so the demos share one
   chrome. Layers, bottom to top: canvas (0) · reticles (10) · gate veil (40) ·
   title (50) · WebGL fallback (55) · exit + legend (60) · error (70).
+
+  Legibility and touch: nothing in the mono register goes under 0.7rem
+  (11.2 px); keyboard focus is a 2 px ring in the opaque amber (--ring), never a
+  colour change alone; on coarse pointers every control has a ≥ 44 px hit area
+  — an invisible ::before inset on the text-like ones (exit, "or use the
+  pointer", "try the camera again"), a min-height on the bordered buttons — so
+  the visible design does not move.
 */
 
 /* ---- scope base ---- */
@@ -26,10 +33,15 @@
   /* the space: #000 at the edges, the site's near-black at the centre — no
      floor, no room, no fog; the canvas above it is transparent */
   background: radial-gradient(70% 60% at 50% 50%, #0a0a0c, #000 78%);
-  outline: none;
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+}
+/* the stage is the focusable application: a keyboard visitor sees where they
+   are — a 2 px amber ring just inside the viewport edge; mouse focus shows none */
+.hands-stage:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
 }
 .hands-canvas {
   position: absolute !important;
@@ -127,7 +139,7 @@
 }
 .hands-caption-text {
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   letter-spacing: 0.22em;
   text-transform: lowercase;
   color: var(--ink-dim);
@@ -135,7 +147,7 @@
 }
 .hands-caption-hint {
   font-family: var(--mono);
-  font-size: 0.6rem;
+  font-size: 0.7rem;
   letter-spacing: 0.2em;
   text-transform: lowercase;
   color: var(--ink-ghost);
@@ -151,7 +163,6 @@
     gap: 0.45rem;
   }
   .hands-caption-text {
-    font-size: 0.6rem;
     letter-spacing: 0.14em;
     line-height: 1.8;
     white-space: normal;
@@ -186,7 +197,10 @@
 .hands-exit:focus-visible {
   color: var(--ink);
   border-color: var(--ink-dim);
-  outline: none;
+}
+.hands-exit:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
 }
 
 /* ---- gate (idle state): a veil over the drifting prints ---- */
@@ -232,7 +246,7 @@
 }
 .hands-title-sub {
   font-family: var(--mono);
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   letter-spacing: 0.42em;
   text-indent: 0.42em;
   text-transform: lowercase;
@@ -274,7 +288,10 @@
 .hands-gate-btn:focus-visible {
   border-color: var(--ink-dim);
   background: rgba(199, 196, 188, 0.04);
-  outline: none;
+}
+.hands-gate-btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
 }
 .hands-gate-btn:disabled {
   cursor: progress;
@@ -302,9 +319,10 @@
   }
 }
 .hands-gate-alt {
+  position: relative;
   cursor: pointer;
   font-family: var(--mono);
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   letter-spacing: 0.22em;
   text-transform: lowercase;
   color: var(--ink-dim);
@@ -320,7 +338,10 @@
 .hands-gate-alt:focus-visible {
   color: var(--ink);
   border-bottom-color: var(--ink-dim);
-  outline: none;
+}
+.hands-gate-alt:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
 }
 .hands-privacy {
   position: absolute;
@@ -331,7 +352,7 @@
   padding: 0 1.5rem;
   text-align: center;
   font-family: var(--mono);
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   line-height: 1.9;
   letter-spacing: 0.14em;
   text-transform: lowercase;
@@ -365,7 +386,7 @@
 }
 .hands-legend-line {
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   letter-spacing: 0.22em;
   text-transform: lowercase;
   color: var(--ink-dim);
@@ -373,7 +394,7 @@
 }
 .hands-legend-keys {
   font-family: var(--mono);
-  font-size: 0.6rem;
+  font-size: 0.7rem;
   letter-spacing: 0.2em;
   text-transform: lowercase;
   color: var(--ink-ghost);
@@ -392,7 +413,6 @@
     background: radial-gradient(ellipse 75% 120% at 50% 100%, rgba(0, 0, 0, 0.88), transparent 100%);
   }
   .hands-legend-line {
-    font-size: 0.62rem;
     letter-spacing: 0.16em;
     line-height: 1.9;
   }
@@ -455,9 +475,10 @@
   gap: 0.8rem;
 }
 .hands-error-alt {
+  position: relative;
   cursor: pointer;
   font-family: var(--mono);
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   letter-spacing: 0.2em;
   text-transform: lowercase;
   color: var(--ink-dim);
@@ -473,13 +494,16 @@
 .hands-error-alt:focus-visible {
   color: var(--ink);
   border-bottom-color: var(--ink-dim);
-  outline: none;
+}
+.hands-error-alt:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
 }
 .hands-error-btn {
   align-self: center;
   cursor: pointer;
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   letter-spacing: 0.22em;
   text-transform: lowercase;
   color: var(--ink);
@@ -495,7 +519,30 @@
 .hands-error-btn:focus-visible {
   border-color: var(--ink-dim);
   background: rgba(199, 196, 188, 0.04);
-  outline: none;
+}
+.hands-error-btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+/* ---- coarse pointers: every control reaches 44 px without moving ---- */
+@media (pointer: coarse) {
+  /* text-like controls keep their look; an invisible inset takes the tap */
+  .hands-exit::before,
+  .hands-gate-alt::before,
+  .hands-error-alt::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -6px;
+    right: -6px;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+  .hands-gate-btn,
+  .hands-error-btn {
+    min-height: 44px;
+  }
 }
 
 /* ---- development skeleton overlay ---- */
