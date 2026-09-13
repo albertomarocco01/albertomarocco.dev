@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, useLayoutEffect, createRef } from 'react';
+import React, { Suspense, useMemo, useRef, useEffect, useLayoutEffect, useState, createRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import gsap from 'gsap';
@@ -28,6 +28,14 @@ const _tmpVec = new THREE.Vector3();
 const RM_DURATION = 0.01;
 const rmDur = (d, reduce) => (reduce ? RM_DURATION : d);
 const rmStagger = (d, reduce) => (reduce ? 0 : d);
+
+// The 54 textures used to be one Suspense boundary and one commit: 1.7 MB
+// requested at once and a ~650 ms task when they all landed (audit S2). Now
+// every card is its own boundary — each commits the frame its texture arrives —
+// the first ring waits for the canvas's first frame (so the renderer and the
+// composer set up in a task of their own), and each further ring mounts once
+// the loader has gone quiet after the one before, on idle (useRingStage, read
+// in VortexScene), fading in. The veil lifts with the first ring.
 
 /**
  * CylinderLayer — one concentric cylinder that rotates independently.
@@ -61,22 +69,24 @@ function CylinderLayer({ layer, cards, phase, onCardClick }) {
   return (
     <group ref={groupRef} name={`Cylinder-${layer.index}`}>
       {cards.map((card) => (
-        <VortexCard
-          key={card.id}
-          imageData={card.imageData}
-          position={card.position}
-          rotation={card.rotation}
-          ringRadius={card.ringRadius}
-          cardWidth={card.cardWidth}
-          cardHeight={card.cardHeight}
-          phase={phase}
-          interactive={phase === 'idle'}
-          outerGroupRef={card.outerGroupRef}
-          animGroupRef={card.animGroupRef}
-          meshRef={card.meshRef}
-          materialRef={card.materialRef}
-          onCardClick={phase === 'idle' ? () => onCardClick(card.id) : undefined}
-        />
+        <Suspense key={card.id} fallback={null}>
+          <VortexCard
+            imageData={card.imageData}
+            position={card.position}
+            rotation={card.rotation}
+            ringRadius={card.ringRadius}
+            cardWidth={card.cardWidth}
+            cardHeight={card.cardHeight}
+            phase={phase}
+            interactive={phase === 'idle'}
+            fadeIn={layer.index > 0}
+            outerGroupRef={card.outerGroupRef}
+            animGroupRef={card.animGroupRef}
+            meshRef={card.meshRef}
+            materialRef={card.materialRef}
+            onCardClick={phase === 'idle' ? () => onCardClick(card.id) : undefined}
+          />
+        </Suspense>
       ))}
     </group>
   );
@@ -171,6 +181,7 @@ function CarouselRing({ images, phase, onCarouselImageClick, ringRef }) {
   useEffect(() => {
     if (phase !== 'carousel') return;
 
+    const tweens = [];
     selectedCards.forEach((_, i) => {
       const refs = cardRefs[i];
       if (!refs?.animGroupRef.current) return;
@@ -179,18 +190,23 @@ function CarouselRing({ images, phase, onCarouselImageClick, ringRef }) {
       const targetZ = isActive ? carouselConfig.activeCardOffsetZ : 0;
       const targetS = isActive ? carouselConfig.activeCardScale : 1;
 
-      gsap.to(refs.animGroupRef.current.position, {
+      tweens.push(gsap.to(refs.animGroupRef.current.position, {
         z: targetZ,
         duration: rmDur(carouselConfig.selectorDuration, reduceMotion),
         ease: carouselConfig.selectorEase,
-      });
-      gsap.to(refs.animGroupRef.current.scale, {
+      }));
+      tweens.push(gsap.to(refs.animGroupRef.current.scale, {
         x: targetS, y: targetS, z: targetS,
         duration: rmDur(carouselConfig.selectorDuration, reduceMotion),
         ease: carouselConfig.selectorEase,
-      });
+      }));
     });
+    // Killed on the next step and on unmount (audit B24).
+    return () => tweens.forEach((t) => t.kill());
   }, [activeIndex, phase, selectedCards, carouselConfig, cardRefs, reduceMotion]);
+
+  // The selector tween too, if the ring goes while it is still turning.
+  useEffect(() => () => rotationTweenRef.current?.kill(), []);
 
   // ── Auto-Play: Passa alla card successiva (autoPlayDelay secondi) ──
   useEffect(() => {
@@ -282,6 +298,7 @@ function CarouselRing({ images, phase, onCarouselImageClick, ringRef }) {
 export function VortexLayout({
   phase,
   selectedCardId,
+  ringStage = 1,
   carouselImages,
   setCarouselImages,
   onCardSelect,
@@ -291,6 +308,14 @@ export function VortexLayout({
 }) {
   const timelineRef = useRef(null);
   const reduceMotion = useReducedMotion();
+  // One frame of nothing first: the cards commit after the canvas has drawn.
+  const [firstFrame, setFirstFrame] = useState(false);
+  const framed = useRef(false);
+  useFrame(() => {
+    if (framed.current) return;
+    framed.current = true;
+    setFirstFrame(true);
+  });
   // Wrapper around the vortex rings, and the carousel ring group. The return
   // animation needs both: see the RETURN effect.
   const vortexGroupRef = useRef(null);
@@ -503,7 +528,7 @@ export function VortexLayout({
   return (
     <group name="VortexLayout">
       <group ref={vortexGroupRef} visible={phase !== 'carousel' && phase !== 'gallery'}>
-        {layoutData.map((entry) => (
+        {firstFrame && layoutData.filter((entry) => entry.layer.index < ringStage).map((entry) => (
           <CylinderLayer
             key={entry.layer.index}
             layer={entry.layer}

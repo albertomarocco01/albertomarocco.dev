@@ -13,6 +13,11 @@ import { useReducedMotion } from '../utils/reducedMotion.js';
 // dissolves the rest) — only the durations and staggers collapse.
 const RM_DURATION = 0.01;
 
+// Scratch vectors for the HUD anchor, reused every frame (audit S2: a Vector3
+// and a camera.position.clone() per frame while the card was docked).
+const _offset = new THREE.Vector3();
+const _target = new THREE.Vector3();
+
 // ── Deterministic seeded PRNG (Mulberry32) ──
 // Keeps the gallery layout pure across renders (no StrictMode double-render
 // drift) and stable across canvas resizes (same count → same slots, so cards
@@ -180,15 +185,15 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected, c
       // Position top-left with padding
       const padX = cardWidth * 1.3 * 0.5 + 1.0; 
       const padY = cardHeight * 1.3 * 0.5 + 1.0;
-      const offset = new THREE.Vector3(-width / 2 + padX, height / 2 - padY, -dist);
-      
+      _offset.set(-width / 2 + padX, height / 2 - padY, -dist);
+
       // Rotate offset by camera rotation and add camera position
-      offset.applyQuaternion(camera.quaternion);
-      const targetPos = camera.position.clone().add(offset);
+      _offset.applyQuaternion(camera.quaternion);
+      _target.copy(camera.position).add(_offset);
       const targetQuat = camera.quaternion; // Flat to screen
 
       // Lerp/slerp from start position to the dynamic HUD target to handle the transition smoothly
-      groupRef.current.position.copy(hudAnchor.current.startPos).lerp(targetPos, hudAnchor.current.progress);
+      groupRef.current.position.copy(hudAnchor.current.startPos).lerp(_target, hudAnchor.current.progress);
       groupRef.current.quaternion.copy(hudAnchor.current.startQuat).slerp(targetQuat, hudAnchor.current.progress);
       return; // Skip bobbing
     }
@@ -225,9 +230,9 @@ function FloatingCard({ imageData, finalPosition, rotation, index, isSelected, c
       >
         <div style={{
           color:          'rgba(255,255,255,0.7)',
-          fontSize:       '8px',
-          fontFamily:     "'Inter', sans-serif",
-          fontWeight:     600,
+          fontSize:       '0.75rem', // was 8px — under the 12 px floor (I13)
+          fontFamily:     'var(--mono)',
+          fontWeight:     400,
           letterSpacing:  '0.1em',
           textTransform:  'uppercase',
           background:     'rgba(0,0,0,0.4)',

@@ -5,6 +5,7 @@ import gsap from 'gsap';
 import { SCENE_CONFIG } from '../config/scene.config.js';
 import { buildCurvedCardGeometry, calculateBendStrength } from '../utils/curvedCardGeometry.js';
 import { useReducedMotion } from '../utils/reducedMotion.js';
+import { trackTexture } from '../utils/textures.js';
 
 // three calls `object.raycast(raycaster, intersects)` unconditionally — it never
 // checks `object.visible`, so a hidden card keeps swallowing pointer events. A
@@ -38,6 +39,9 @@ export function VortexCard({
   phase,
   interactive = false,
   onCardClick,
+  // Outer-ring cards mount while the vortex already turns (they load on idle,
+  // see VortexLayout): fade in instead of popping.
+  fadeIn = false,
   // Refs exposed to parent for animation control
   outerGroupRef,    // Controls world position/rotation
   animGroupRef,     // Controls floating offset
@@ -72,6 +76,7 @@ export function VortexCard({
       anisotropy: 4,
       generateMipmaps: true,
     });
+    trackTexture(texture); // freed when the experience unmounts (utils/textures.js)
   }, [texture]);
 
   // ── Curved geometry ────────────────────────────────────────────
@@ -142,12 +147,29 @@ export function VortexCard({
   // ── Hover ──────────────────────────────────────────────────────
   const { hover } = SCENE_CONFIG.cards;
 
-  // ── Cursor Cleanup ───────────────────────────────────────────
+  // ── Cursor + hover-tween cleanup ─────────────────────────────
+  // A hover tween left running on an unmounted card kept ticking a detached
+  // group (audit B24).
   useEffect(() => {
+    const canvas = gl.domElement;
+    const group = hoverGroupRef.current; // set by r3f before effects run
     return () => {
-      setCanvasCursor(gl.domElement, '');
+      setCanvasCursor(canvas, '');
+      if (group) {
+        gsap.killTweensOf(group.scale);
+        gsap.killTweensOf(group.position);
+      }
     };
   }, [gl]);
+
+  // ── Fade-in for late cards ───────────────────────────────────
+  useEffect(() => {
+    const mat = materialRef.current;
+    if (!fadeIn || !mat) return;
+    mat.opacity = 0;
+    const tween = gsap.to(mat, { opacity: 1, duration: reduceMotion ? 0.01 : 0.9, ease: 'power2.out' });
+    return () => tween.kill();
+  }, [fadeIn, materialRef, reduceMotion]);
 
   const handlePointerOver = useCallback((e) => {
     // Touch fires pointerover with no matching pointerout → cards would stick at
