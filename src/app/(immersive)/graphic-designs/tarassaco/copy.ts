@@ -56,9 +56,9 @@ export interface TarassacoCopy {
 }
 
 const en: TarassacoCopy = {
-  metaTitle: "Tarassaco — Dandelion Wind",
+  metaTitle: "Tarassaco · Dandelion Wind",
   metaDescription:
-    "Blow into your microphone to scatter the text like dandelion seeds. An interactive editorial experiment that runs entirely in your browser — nothing is recorded or sent anywhere.",
+    "Blow into the microphone and the text scatters like dandelion seeds. An editorial experiment that runs entirely in your browser — nothing is recorded or sent.",
   aria: "Tarassaco — a poem scattered by your breath. Blow into the microphone and the words and the dandelion seeds fly away; with the camera, the side of the screen your mouth points at sets the wind's direction. Without sensors, hold Space or keep a finger on the screen. Escape exits.",
   exit: "← exit the demo",
   enable: "enable camera and microphone",
@@ -88,9 +88,9 @@ const en: TarassacoCopy = {
 };
 
 const it: TarassacoCopy = {
-  metaTitle: "Tarassaco — Dandelion Wind",
+  metaTitle: "Tarassaco · Dandelion Wind",
   metaDescription:
-    "Soffia nel microfono per disperdere il testo come i semi di un tarassaco. Un esperimento editoriale interattivo che gira tutto nel tuo browser — niente viene registrato o inviato da nessuna parte.",
+    "Soffia nel microfono e il testo vola via come semi di tarassaco. Un esperimento editoriale che gira tutto nel browser — niente viene registrato o inviato.",
   aria: "Tarassaco — una poesia dispersa dal tuo respiro. Soffia nel microfono e le parole e i semi del tarassaco volano via; con la fotocamera, il lato dello schermo verso cui punta la bocca decide la direzione del vento. Senza sensori, tieni premuto Spazio o tieni il dito sullo schermo. Esc esce.",
   exit: "← esci dalla demo",
   enable: "attiva fotocamera e microfono",

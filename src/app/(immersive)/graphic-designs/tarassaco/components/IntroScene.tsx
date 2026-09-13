@@ -29,20 +29,22 @@ export function IntroScene({ word, registerNode, clearNodes, onRevealComplete, r
   }, [reducedMotion]);
 
   useEffect(() => {
-    if (progress === 100) {
-      clearNodes();
-      // Small delay to ensure React has rendered the final text before measuring
-      setTimeout(() => {
-        if (containerRef.current) {
-          const spans = containerRef.current.querySelectorAll('span');
-          spans.forEach(span => {
-            const rect = span.getBoundingClientRect();
-            registerNode(span, rect.left, rect.top);
-          });
-          onRevealComplete();
-        }
-      }, 50);
-    }
+    if (progress !== 100) return;
+    clearNodes();
+    // Small delay to ensure React has rendered the final text before measuring.
+    // Cleared on unmount (Escape during the intro) so it cannot register nodes
+    // of a scene that is gone, or unlock the next one.
+    const timer = setTimeout(() => {
+      if (containerRef.current) {
+        const spans = containerRef.current.querySelectorAll('span');
+        spans.forEach(span => {
+          const rect = span.getBoundingClientRect();
+          registerNode(span, rect.left, rect.top);
+        });
+        onRevealComplete();
+      }
+    }, 50);
+    return () => clearTimeout(timer);
   }, [progress, registerNode, clearNodes, onRevealComplete]);
 
   const filled = Math.floor(progress / 10);
