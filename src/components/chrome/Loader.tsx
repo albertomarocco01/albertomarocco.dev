@@ -34,6 +34,14 @@ const SAFETY_MS = 2000;
 let veilPlayed = false;
 
 /**
+ * Has the veil already run in this page load? For chrome that pays its own
+ * opening beat once per load and not on every remount (Shell's topbar entrance).
+ */
+export function hasVeilPlayed(): boolean {
+  return veilPlayed;
+}
+
+/**
  * The veil has finished dissolving. Park it — and retire the CSS `veil-out`
  * fail-safe while doing so.
  *

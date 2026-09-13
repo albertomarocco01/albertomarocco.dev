@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLenis } from "lenis/react";
@@ -8,6 +8,7 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { useApp } from "@/components/providers/AppProvider";
 import { LocaleToggle } from "@/components/chrome/LocaleToggle";
+import { hasVeilPlayed } from "@/components/chrome/Loader";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import {
   registerGsap,
@@ -57,16 +58,28 @@ export function Shell({
   // the class without ever calling setState in the hot loop (same hot-path
   // discipline as Cursor.tsx).
   const tuckedRef = useRef(false);
+  // Had the veil already played when this Shell mounted? Only on a remount
+  // within the page load — back from an immersive route, which remounts the
+  // whole (site) layout. The opening is paid once per load, like the veil's own
+  // beat: on such a remount the bar shows outright instead of hiding for 1.15s
+  // and fading back in while the veil does its fast dissolve. Read once, at
+  // mount, deliberately: by the time `entered` flips on a first load the veil
+  // has *just* played, and reading it then would skip the real opening. Lazy
+  // initialiser, so the module flag is read on the client at mount and never
+  // again; it is false on the server and on a fresh load alike, so the
+  // hydrated markup matches.
+  const [entranceDone] = useState(hasVeilPlayed);
 
   // The entrance now auto-plays on load (no gate to click). The white field
   // blooms once via CSS (`html.entering`, a 1.8s brightness pulse — see
   // globals.css) and the topbar eases in over it on the signature `field` ease.
   // The hero is deliberately NOT animated: it paints as static server HTML and
   // stays visible from first paint, so the opening never costs LCP. Skipped
-  // entirely under reduced motion — content is shown instantly by CSS.
+  // entirely under reduced motion — content is shown instantly by CSS — and on
+  // a remount after the veil has played (see `entranceDone`).
   useGSAP(
     () => {
-      if (!entered || reducedMotion) return;
+      if (!entered || reducedMotion || entranceDone) return;
       registerGsap();
       const root = document.documentElement;
       root.classList.add("entering");
@@ -89,7 +102,7 @@ export function Shell({
         ease: FIELD_EASE,
       });
     },
-    { dependencies: [entered, reducedMotion] },
+    { dependencies: [entered, reducedMotion, entranceDone] },
   );
 
   // Wordmark: real link to "/" so it navigates home from any route. On the home
