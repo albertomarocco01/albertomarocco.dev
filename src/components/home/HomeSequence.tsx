@@ -516,6 +516,16 @@ export function HomeSequence() {
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // A key on a control is that control's: Space on the locale toggle or
+      // Enter on a teaser must not also scrub the sequence (same guard as
+      // AboutSequence). Focus outside the hero has already composed the page
+      // through the focusin hatch below, so nothing is lost.
+      const t = e.target;
+      if (
+        t instanceof HTMLElement &&
+        /^(a|button|input|textarea|select)$/i.test(t.tagName)
+      )
+        return;
       switch (e.key) {
         case " ":
           input(e.shiftKey ? -KEY_PAGE : KEY_PAGE);
