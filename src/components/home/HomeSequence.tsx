@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/components/providers/AppProvider";
+import { isControl, singleTouchY, wheelDeltaPx } from "@/lib/scroll-intent";
 
 /**
  * Driver for the whole home page — one viewport, three movements, no document
@@ -99,8 +100,6 @@ const SPAN_VH = 0.72;
  *  the wheel's cadence, and a full-screen drag still covers three. Touch only:
  *  the wheel/key paths above are untouched. */
 const TOUCH_MULT = 0.9;
-/** deltaMode 1 (lines) → px; 40px ≈ one Chrome wheel notch's worth per 3 lines. */
-const LINE_PX = 40;
 const KEY_STEP = 0.12; // ArrowDown / ArrowUp
 const KEY_PAGE = 0.3; // Space / PageDown / PageUp
 // Compose if the sequence never got going, ~1.6× the slowest honest path to
@@ -502,22 +501,16 @@ export function HomeSequence() {
     // (data-lenis-prevent), so every listener is passive — we only *read* the
     // input the lock has already neutralised. Pinch-zoom stays native.
     const onWheel = (e: WheelEvent) => {
-      const px =
-        e.deltaMode === 1
-          ? e.deltaY * LINE_PX
-          : e.deltaMode === 2
-            ? e.deltaY * window.innerHeight
-            : e.deltaY;
-      input(px / span());
+      input(wheelDeltaPx(e) / span());
     };
 
     let touchY: number | null = null;
     const onTouchStart = (e: TouchEvent) => {
-      touchY = e.touches.length === 1 ? e.touches[0].clientY : null;
+      touchY = singleTouchY(e);
     };
     const onTouchMove = (e: TouchEvent) => {
-      if (touchY == null || e.touches.length !== 1) return; // pinch — not ours
-      const y = e.touches[0].clientY;
+      const y = singleTouchY(e);
+      if (touchY == null || y == null) return; // pinch — not ours
       input(((touchY - y) * TOUCH_MULT) / span());
       touchY = y;
     };
@@ -534,12 +527,7 @@ export function HomeSequence() {
       // Enter on a teaser must not also scrub the sequence (same guard as
       // AboutSequence). Focus outside the hero has already composed the page
       // through the focusin hatch below, so nothing is lost.
-      const t = e.target;
-      if (
-        t instanceof HTMLElement &&
-        /^(a|button|input|textarea|select)$/i.test(t.tagName)
-      )
-        return;
+      if (isControl(e.target)) return;
       switch (e.key) {
         case " ":
           input(e.shiftKey ? -KEY_PAGE : KEY_PAGE);

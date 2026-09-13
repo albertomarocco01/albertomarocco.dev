@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react
 import { WORK_SECTIONS, type Work } from "@/lib/work";
 import type { WorkText } from "@/lib/i18n";
 import { TIMING } from "@/lib/motion";
+import { isTouchOnly } from "@/lib/scroll-intent";
 import { useApp } from "@/components/providers/AppProvider";
 import { Row } from "./Row";
 
@@ -35,7 +36,7 @@ export function WorkRows({
   const closeTimer = useRef<number | null>(null);
 
   useEffect(() => {
-    touch.current = window.matchMedia("(hover: none)").matches;
+    touch.current = isTouchOnly();
     return () => {
       if (openTimer.current) clearTimeout(openTimer.current);
       if (closeTimer.current) clearTimeout(closeTimer.current);

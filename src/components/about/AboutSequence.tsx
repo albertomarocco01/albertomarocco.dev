@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useApp } from "@/components/providers/AppProvider";
 import { holdTracking } from "@/lib/track-motion";
+import { isControl, singleTouchY, wheelDeltaPx } from "@/lib/scroll-intent";
 
 /**
  * Driver for /about — three full-height panels (the path, the discipline, the
@@ -39,11 +40,11 @@ import { holdTracking } from "@/lib/track-motion";
  *
  * Reduced motion: no lock, no listeners, no class — the CSS scoped to
  * `about-live` collapses to an ordinary three-section document that scrolls.
- * Same for JS off or a broken chunk. The media query is read here as well as
- * taken from AppProvider, whose flag starts false and settles a beat later:
- * without that the driver would mount for that beat, lock the document and
- * scroll it to the top — undoing the browser's own `#contact` jump. The one
- * thing the in-flow page still does is make that jump again once entered.
+ * Same for JS off or a broken chunk. AppProvider's flag is the real value from
+ * the first client render (use-reduced-motion.ts), so the driver never mounts
+ * for a beat, locks and scrolls to the top under a visitor who asked for none
+ * — which would undo the browser's own `#contact` jump. The one thing the
+ * in-flow page still does is make that jump again once entered.
  */
 
 /** Fewer panels than this and there is nothing to page. */
@@ -58,8 +59,6 @@ const WHEEL_STEP = 40;
 const WHEEL_GAP_MS = 320;
 /** Finger travel (px) that reads as one intent. */
 const TOUCH_STEP = 48;
-/** deltaMode 1 (lines) → px; 40px ≈ one Chrome wheel notch's worth per 3 lines. */
-const LINE_PX = 40;
 const HASH_PANEL: Record<string, number> = { "#contact": 2, "#contatti": 2 };
 
 export function AboutSequence() {
@@ -71,10 +70,7 @@ export function AboutSequence() {
   const idxRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const rm =
-      reducedMotion ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (rm) {
+    if (reducedMotion) {
       // In flow: an arrival on `#contact` (the footer's link) has to land on
       // the section, and the browser's own jump can race hydration.
       if (entered && HASH_PANEL[location.hash] != null) {
@@ -196,12 +192,7 @@ export function AboutSequence() {
     let lastAbs = 0;
     let tail = false; // inside the inertia tail of the gesture that moved us
     const onWheel = (e: WheelEvent) => {
-      const px =
-        e.deltaMode === 1
-          ? e.deltaY * LINE_PX
-          : e.deltaMode === 2
-            ? e.deltaY * window.innerHeight
-            : e.deltaY;
+      const px = wheelDeltaPx(e);
       const now = performance.now();
       const abs = Math.abs(px);
       // A new gesture: a pause, or a delta that *grows* (inertia only decays).
@@ -230,12 +221,13 @@ export function AboutSequence() {
     let touchY: number | null = null;
     let touchDone = false;
     const onTouchStart = (e: TouchEvent) => {
-      touchY = e.touches.length === 1 ? e.touches[0].clientY : null;
+      touchY = singleTouchY(e);
       touchDone = false;
     };
     const onTouchMove = (e: TouchEvent) => {
-      if (touchY == null || touchDone || e.touches.length !== 1) return; // pinch — not ours
-      const dy = touchY - e.touches[0].clientY;
+      const y = singleTouchY(e);
+      if (touchY == null || touchDone || y == null) return; // pinch — not ours
+      const dy = touchY - y;
       if (Math.abs(dy) < TOUCH_STEP) return;
       touchDone = true;
       if (busy) return;
@@ -247,10 +239,9 @@ export function AboutSequence() {
     // ---- keys ----
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const t = e.target;
-      // Space on a button is its click; leave it to the button.
-      const onControl =
-        t instanceof HTMLElement && /^(button|input|textarea|select)$/i.test(t.tagName);
+      // Space on a control is its click; leave it to the control. The arrows
+      // still page from a link — that is this page's keyboard model.
+      const onControl = isControl(e.target);
       // Every key moves focus along with the track (see `go`), so from a
       // link on the panel just left, Tab continues on the panel arrived at.
       switch (e.key) {
