@@ -32,7 +32,12 @@ export function Cursor() {
     dot.style.transform = `translate(${mx}px,${my}px) translate(-50%,-50%)`;
     ring.style.transform = `translate(${rx}px,${ry}px) translate(-50%,-50%)`;
 
+    // Touch (a touch laptop, a tablet with a mouse) never drives the marks: the
+    // finger is its own pointer, and the dot jumping under it is noise.
     const onMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      dot.classList.remove("is-out");
+      ring.classList.remove("is-out");
       mx = e.clientX;
       my = e.clientY;
       dot.style.transform = `translate(${mx}px,${my}px) translate(-50%,-50%)`;
@@ -57,20 +62,30 @@ export function Cursor() {
     // mount: elements rendered after navigation (e.g. the /graphic-designs rows)
     // would otherwise never grow the ring. pointerover bubbles, so one listener
     // covers everything, present and future.
-    const SELECTOR = "a, button, .row, .g-enter";
+    const SELECTOR = "a, button, .row";
     const onOver = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
       const el = e.target as Element | null;
       ring.classList.toggle("is-hot", !!el?.closest?.(SELECTOR));
+    };
+    // No related target = the pointer left the document. The marks fade out
+    // rather than stand where it crossed the edge; the next move brings them back.
+    const onOut = (e: PointerEvent) => {
+      if (e.pointerType === "touch" || e.relatedTarget) return;
+      dot.classList.add("is-out");
+      ring.classList.add("is-out");
     };
 
     window.addEventListener("pointermove", onMove, { passive: true });
     document.addEventListener("pointerover", onOver, { passive: true });
+    document.addEventListener("pointerout", onOut, { passive: true });
     raf = requestAnimationFrame(loop);
 
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerover", onOver);
+      document.removeEventListener("pointerout", onOut);
     };
   }, [reducedMotion]);
 

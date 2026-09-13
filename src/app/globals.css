@@ -286,6 +286,12 @@ html.home-live body {
   border-color: var(--ink-dim);
   opacity: 1;
 }
+/* The pointer has left the window (Cursor.tsx): the marks go with it instead of
+   standing where it crossed the edge. After `.is-hot` so it wins over it. */
+.cur-dot.is-out,
+.cur-ring.is-out {
+  opacity: 0;
+}
 @media (hover: none) {
   .cur-dot,
   .cur-ring {
