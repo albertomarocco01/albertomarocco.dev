@@ -1,28 +1,30 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
 
-export const alt = "Alberto Marocco — Creative Technologist";
+import { SITE_NAME } from "@/lib/seo";
+
+export const alt = `${SITE_NAME} — Creative Technologist`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-// Fetch Fraunces as TTF (Google serves truetype to unrecognised UAs, which is
-// what Satori needs). Subsetted to the glyphs we render.
-async function loadFraunces(text: string): Promise<ArrayBuffer> {
-  const url = `https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300&text=${encodeURIComponent(
-    text,
-  )}`;
-  const css = await (await fetch(url)).text();
-  const src = css.match(
-    /src: url\((.+?)\) format\('(?:opentype|truetype)'\)/,
-  )?.[1];
-  if (!src) throw new Error("Could not resolve Fraunces font source");
-  return (await fetch(src)).arrayBuffer();
-}
+// Fraunces 300 as a TrueType file Satori can read, vendored once under
+// src/assets/fonts/ and read from disk at module scope (the docs' own pattern):
+// the previous version fetched the Google Fonts CSS at build time, regexed a
+// TTF URL out of it and threw on a mismatch, so an offline build — or a change
+// in Google's CSS — failed the whole build. The file is the same TTF Google
+// served (`Fraunces:opsz,wght@9..144,300`), subset to printable ASCII plus the
+// accented vowels and the · — – ’ marks, 25 KB. Add glyphs → re-subset it, the
+// recipe is in DECISIONS ("OG image fonts").
+const fraunces = await readFile(
+  join(process.cwd(), "src/assets/fonts/fraunces-300-latin.ttf"),
+);
 
 export default async function Image() {
   const name = "Alberto Marocco";
   const eyebrow = "creative technologist · turin";
+  // The domain spelling, lowercase, as an address (DECISIONS: brand spelling).
   const domain = "albertomarocco.dev";
-  const font = await loadFraunces(`${name}${eyebrow}${domain}·.`);
 
   return new ImageResponse(
     (
@@ -77,6 +79,9 @@ export default async function Image() {
         </div>
       </div>
     ),
-    { ...size, fonts: [{ name: "Fraunces", data: font, weight: 300, style: "normal" }] },
+    {
+      ...size,
+      fonts: [{ name: "Fraunces", data: fraunces, weight: 300, style: "normal" }],
+    },
   );
 }
