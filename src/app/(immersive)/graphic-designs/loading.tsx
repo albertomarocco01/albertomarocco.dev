@@ -1,7 +1,5 @@
-"use client";
-
 import { LOADER_TAG } from "@/lib/boundary-copy";
-import { useLocale } from "@/lib/use-locale";
+import { getLocale } from "@/lib/i18n";
 
 /**
  * Enables partial prefetching for the five demo routes under /graphic-designs/*
@@ -10,12 +8,16 @@ import { useLocale } from "@/lib/use-locale";
  * MediaPipe wasm + model, so there is a genuine wait to fill with something
  * other than white.
  *
- * A Client Component, deliberately: reading the cookie with `getLocale()` would
- * make this fallback request-dependent and forfeit the prefetch it exists for.
- * `useLocale` reads the locale off `<html lang>` after hydration instead, and
- * the word is the veil's own (`dict.loader.tag` is composed from LOADER_TAG).
+ * A Server Component that reads the locale cookie: the word is right from the
+ * first byte. It used to be a Client Component reading `<html lang>` after
+ * hydration, which server-rendered "caricamento" for everyone and swapped it
+ * to "loading" a beat later for EN visitors. The whole tree is dynamic anyway
+ * (the root layout awaits `cookies()`), so a prefetch already runs request-time
+ * code and still carries this fallback — verified on the dev server with an
+ * `RSC: 1` + `Next-Router-Prefetch: 1` request.
  */
-export default function DemoLoading() {
+export default async function DemoLoading() {
+  const locale = await getLocale();
   return (
     <div
       aria-busy="true"
@@ -27,13 +29,14 @@ export default function DemoLoading() {
         justifyContent: "center",
         background: "#000",
         color: "#e8e4dd",
-        font: "0.72rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+        fontFamily: "var(--mono)",
+        fontSize: "0.72rem",
         letterSpacing: "0.24em",
         textTransform: "lowercase",
         opacity: 0.5,
       }}
     >
-      {LOADER_TAG[useLocale()]}
+      {LOADER_TAG[locale]}
     </div>
   );
 }

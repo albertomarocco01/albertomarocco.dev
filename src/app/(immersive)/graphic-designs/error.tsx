@@ -14,11 +14,14 @@ import { useLocale } from "@/lib/use-locale";
  * /graphic-designs/*); the retry/ref labels come
  * from boundary-copy.ts, the shared dictionary's own strings. See
  * (site)/error.tsx for why the locale is read off `<html lang>` rather than
- * passed in.
+ * passed in. Unlike loading.tsx this cannot be a Server Component (an error
+ * boundary is client-side by definition), but it also never flashes: a
+ * boundary's fallback is rendered on the client from scratch, not hydrated, so
+ * `useLocale` returns the real value on its first render.
  */
 const COPY = {
   en: {
-    body: "This demo couldn’t start. It needs WebGL, and the camera or microphone where the experience asks for them.",
+    body: "This demo couldn't start. It needs WebGL, and the camera or microphone where the experience asks for them.",
     back: "← back to the index",
   },
   it: {
@@ -51,7 +54,9 @@ export default function DemoError({
         textAlign: "center",
         background: "#000",
         color: "#e8e4dd",
-        font: "0.82rem/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+        fontFamily: "var(--mono)",
+        fontSize: "0.82rem",
+        lineHeight: 1.7,
         letterSpacing: "0.06em",
       }}
     >
