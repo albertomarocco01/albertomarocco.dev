@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useLenis } from "lenis/react";
@@ -153,7 +159,9 @@ export function Row({
   const head = (
     <div className="row-head">
       <span className="row-idx">{work.index}</span>
-      <span className="row-title">{work.title}</span>
+      <span className="row-title" id={`${work.id}-title`}>
+        {work.title}
+      </span>
       <span className="row-meta">
         {text.meta}
         <span className="arrow" aria-hidden="true">
@@ -206,18 +214,14 @@ export function Row({
               </span>
             </span>
           </div>
-        ) : (
-          !isGen && (
-            <div
-              className="reveal-media"
-              style={{ background: work.mediaGradient }}
-              aria-hidden="true"
-            />
-          )
-        )}
+        ) : null}
         <div className="reveal-caption">
           <span className="c-desc">{text.description}</span>
-          {!hasPreview && <span className="c-cue">{text.cue}</span>}
+          {!hasPreview && (
+            <span className="c-cue" id={`${work.id}-cue`}>
+              {text.cue}
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -247,16 +251,31 @@ export function Row({
     );
   }
 
+  // A gen row is a disclosure, not a link — but a <button> may only hold
+  // phrasing content and this one holds the head grid, the reveal box and
+  // drei's tracker div; and its name was everything inside it (index, title,
+  // meta, description, cue) read out in one breath. So: a div with the button
+  // role, focusable, Enter/Space as its click, named by the title and the cue
+  // alone ("Liminal Field, live · webgl"). The `.row` focus ring and the
+  // hover/focus handlers are class- and prop-based and carry over unchanged.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault(); // Space would scroll the page
+    e.currentTarget.click();
+  };
   return (
-    <button
+    <div
       className={className}
-      type="button"
+      role="button"
+      tabIndex={0}
       aria-expanded={isOpen}
+      aria-labelledby={`${work.id}-title ${work.id}-cue`}
       onClick={onClick}
+      onKeyDown={onKeyDown}
       {...handlers}
     >
       {head}
       {reveal}
-    </button>
+    </div>
   );
 }

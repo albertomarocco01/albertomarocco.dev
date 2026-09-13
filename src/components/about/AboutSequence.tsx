@@ -59,7 +59,8 @@ const WHEEL_STEP = 40;
 const WHEEL_GAP_MS = 320;
 /** Finger travel (px) that reads as one intent. */
 const TOUCH_STEP = 48;
-const HASH_PANEL: Record<string, number> = { "#contact": 2, "#contatti": 2 };
+/** The one hash the site produces (Footer's link, the panel-2 CTA). */
+const HASH_PANEL: Record<string, number> = { "#contact": 2 };
 
 export function AboutSequence() {
   const { entered, reducedMotion } = useApp();

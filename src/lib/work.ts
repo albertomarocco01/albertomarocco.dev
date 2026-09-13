@@ -3,9 +3,9 @@
 // rendered list.
 // `gen` rows host the live WebGL aura, each in its own colour family (amber /
 // teal / violet — the same domain-warped smoke, different tints). `web` rows
-// show a still media plate (or a real site preview) and link out / route
-// internally. No stock imagery anywhere — gen rows render Alberto's own shader
-// live, and the previews are captures of his actual shipped sites.
+// show a real site preview and link out. No stock imagery anywhere — gen rows
+// render Alberto's own shader live, and the previews are captures of his
+// actual shipped sites.
 
 import type { StaticImageData } from "next/image";
 import viniMontarello from "@/assets/work/vini-montarello.webp";
@@ -29,9 +29,8 @@ export interface Work {
   href?: string;
   /** open in a new tab (external) */
   external?: boolean;
-  /** CSS background for the still media plate on `web` rows (fallback) */
-  mediaGradient?: string;
-  /** optimized site preview on `web` rows — shown via next/image, not a plate */
+  /** the site preview on `web` rows (a static import: next/image knows its
+   *  size, the URL is content-hashed) */
   image?: StaticImageData;
 }
 
@@ -52,7 +51,6 @@ export const WORK_SECTIONS: WorkSection[] = [
         type: "web",
         href: "https://vinimontarello.it",
         external: true,
-        mediaGradient: "linear-gradient(135deg,#1a1410,#0e0c0a 55%,#241a12)",
         image: viniMontarello,
       },
       {
@@ -62,7 +60,6 @@ export const WORK_SECTIONS: WorkSection[] = [
         type: "web",
         href: "https://www.torettoblend.com",
         external: true,
-        mediaGradient: "linear-gradient(135deg,#1c0e04,#0b0705 55%,#2a1508)",
         image: torettoBlend,
       },
     ],
@@ -97,6 +94,3 @@ export const WORK_SECTIONS: WorkSection[] = [
     ],
   },
 ];
-
-/** Flat list of every work, in display order — for any consumer that needs it. */
-export const WORK: Work[] = WORK_SECTIONS.flatMap((s) => s.items);

@@ -38,6 +38,11 @@ const PANEL_FOCUS = { outline: "none" } as CSSProperties;
 
 const PANEL_IDS = ["01", "02", "03"] as const;
 
+// The pager buttons read "01 / 02 / 03" — as an accessible name that is a
+// bare number. "section 01" until the dictionary carries `about.pagerItem`
+// (asked of C); the key is read if present so the fallback retires itself.
+const PAGER_ITEM: Record<string, string> = { en: "section", it: "sezione" };
+
 /** Eyebrow, headline (with its italic run) and body of one panel. */
 function PanelCopy({
   text,
@@ -83,9 +88,12 @@ function PanelCopy({
 // behind (AboutFigure.tsx). Everything here is static server HTML: the driver
 // only toggles classes.
 export default async function About() {
-  const dict = getDictionary(await getLocale());
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
   const { about, footer } = dict;
   const { path, discipline, contact } = about.panels;
+  const pagerItem =
+    (about as { pagerItem?: string }).pagerItem ?? PAGER_ITEM[locale];
   return (
     <>
       <main className="about-stage">
@@ -248,6 +256,7 @@ export default async function About() {
             <button
               type="button"
               key={label}
+              aria-label={`${pagerItem} ${label}`}
               aria-current={i === 0 ? "true" : undefined}
             >
               {label}
