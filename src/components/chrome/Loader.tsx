@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
@@ -83,6 +83,9 @@ export function Loader({ tag }: { tag: string }) {
   // yet", which is what separates a real route change from this effect's own
   // first run (and from StrictMode's remount, which keeps the ref).
   const prevPath = useRef<string | null>(null);
+  // The navigation sweep's 0→100 fill, kept across sweeps so an interrupted
+  // one can hand its progress to the next.
+  const navProg = useRef({ v: 0 });
 
   // Reveal the home: unlock scroll + fire the site entrance. Idempotent.
   const reveal = useCallback(() => {
@@ -162,45 +165,56 @@ export function Loader({ tag }: { tag: string }) {
   //
   // No scroll lock, unlike the first load: the router resets the scroll itself,
   // and freezing the page for the length of a sweep is worse than not covering
-  // it. useGSAP's scoped context does the rest — a second navigation reverts the
-  // in-flight sweep before starting its own, so rapid clicks never stack.
-  useGSAP(
-    () => {
-      if (reducedMotion) return;
-      const prev = prevPath.current;
-      prevPath.current = pathname;
-      // Mount (prev === null), or a re-run that isn't a route change at all.
-      if (prev === null || prev === pathname) return;
-      // The first load's own timeline still owns the veil until it has revealed
-      // the page; only after that does a sweep make sense.
-      if (!veilPlayed) return;
+  // it.
+  //
+  // One sweep at a time. A plain layout effect rather than useGSAP: with
+  // dependencies and no `revertOnUpdate`, useGSAP never reverts between runs,
+  // so a second click stacked a second timeline on the same veil (it flickered
+  // back up mid-fade). Reverting instead would snap the veil to its pre-sweep
+  // state and fade it in again. So the cleanup *kills* the in-flight sweep and
+  // the next one takes the veil from wherever it was left.
+  useLayoutEffect(() => {
+    if (reducedMotion) return;
+    const prev = prevPath.current;
+    prevPath.current = pathname;
+    // Mount (prev === null), or a re-run that isn't a route change at all.
+    if (prev === null || prev === pathname) return;
+    // The first load's own timeline still owns the veil until it has revealed
+    // the page; only after that does a sweep make sense.
+    if (!veilPlayed) return;
 
-      const root = rootRef.current;
-      const fill = fillRef.current;
-      const count = countRef.current;
-      if (!root || !fill || !count) return;
-      registerGsap();
+    const root = rootRef.current;
+    const fill = fillRef.current;
+    const count = countRef.current;
+    if (!root || !fill || !count) return;
+    registerGsap();
 
-      const prog = { v: 0 };
-      const paint = () => {
-        fill.style.transform = `scaleX(${prog.v / 100})`;
-        count.textContent = String(Math.round(prog.v)).padStart(3, "0");
-      };
-      paint();
-      // Re-assert both, in case a sweep somehow lands before the first load's
-      // timeline has parked the veil. Idempotent.
-      park(root);
+    // A finished fill starts over; one cut short by this navigation carries on
+    // from where it is, so the bar never jumps back under a visible veil.
+    const prog = navProg.current;
+    if (prog.v >= 100) prog.v = 0;
+    const paint = () => {
+      fill.style.transform = `scaleX(${prog.v / 100})`;
+      count.textContent = String(Math.round(prog.v)).padStart(3, "0");
+    };
+    paint();
+    // Re-assert both, in case a sweep somehow lands before the first load's
+    // timeline has parked the veil — and take the veil off that timeline's
+    // fade if it is still running. Idempotent.
+    park(root);
+    gsap.killTweensOf(root);
 
-      gsap
-        .timeline({ onUpdate: paint })
-        .to(root, { autoAlpha: 1, duration: NAV_IN, ease: FIELD_EASE })
-        // From 0, so the bar is already moving as the veil arrives — a single
-        // gesture rather than fade-then-fill.
-        .to(prog, { v: 100, duration: NAV_FILL, ease: FIELD_EASE }, 0)
-        .to(root, { autoAlpha: 0, duration: NAV_OUT, ease: FIELD_EASE });
-    },
-    { dependencies: [pathname, reducedMotion] },
-  );
+    const tl = gsap
+      .timeline({ onUpdate: paint })
+      .to(root, { autoAlpha: 1, duration: NAV_IN, ease: FIELD_EASE })
+      // Together with the fade-in, so the bar is already moving as the veil
+      // arrives — a single gesture rather than fade-then-fill.
+      .to(prog, { v: 100, duration: NAV_FILL, ease: FIELD_EASE }, 0)
+      .to(root, { autoAlpha: 0, duration: NAV_OUT, ease: FIELD_EASE });
+    return () => {
+      tl.kill();
+    };
+  }, [pathname, reducedMotion]);
 
   // Lock scroll while the veil is up, and arm the safety dismissal. The lock is
   // released by `reveal()` (and on cleanup); the safety timeout force-dismisses
