@@ -38,8 +38,8 @@ export const VIDEO_CONSTRAINTS: MediaTrackConstraints = {
   facingMode: "user",
 };
 export const VIDEO_ASPECT = 4 / 3;
-export const MEDIAPIPE_WASM = "/mediapipe/wasm";
-export const HAND_MODEL = "/mediapipe/hand_landmarker.task";
+export const MEDIAPIPE_WASM = "/mediapipe/1.0.1/wasm";
+export const HAND_MODEL = "/mediapipe/1.0.1/hand_landmarker.task";
 /** Whole camera path (permission → model → first frame) must be up within this. */
 export const INIT_TIMEOUT_MS = 8000;
 /** After the model is up, the reticles get this long to find the hands. */
