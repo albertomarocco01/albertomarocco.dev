@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useReducedMotion } from '@/lib/use-reduced-motion';
 import { useWindPhysics, type SensorMode } from './hooks/useWindPhysics';
 import { GateScene } from './components/GateScene';
 import { IntroScene } from './components/IntroScene';
@@ -22,6 +23,10 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
   const canInteract = unlockedScene === scene;
   const [sensorsError, setSensorsError] = useState<null | 'denied' | 'timeout'>(null);
   const [mode, setMode] = useState<SensorMode>('keyboard');
+  // Reduced motion: reveals are instant and the wind settles each word once
+  // instead of integrating it every frame (see useWindPhysics). Read
+  // synchronously, so the very first scene already takes the still path.
+  const reducedMotion = useReducedMotion();
 
   // Also the late path: a prompt answered after the timeout dialog (or after
   // "continue without") still hands the wind to the sensors, off the gate once.
@@ -71,6 +76,7 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
     onSensorsReady: handleSensorsReady,
     onSensorsError: setSensorsError,
     onModeChange: setMode,
+    reducedMotion,
     allowedDirection,
     sustainedDurationMs,
     disableRecovery,
@@ -113,7 +119,7 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
   }, [router]);
 
   return (
-    <div className="tara-root">
+    <div className="tara-root" role="application" aria-label={copy.aria}>
       
       {/* start() inside the click: the permission prompt and the audio resume
           need the user gesture. */}
@@ -122,15 +128,15 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
       )}
       
       {scene === '1-intro' && (
-        <IntroScene word={copy.intro} registerNode={registerNode} clearNodes={clearNodes} onRevealComplete={handleRevealComplete} />
+        <IntroScene word={copy.intro} registerNode={registerNode} clearNodes={clearNodes} onRevealComplete={handleRevealComplete} reducedMotion={reducedMotion} />
       )}
 
       {scene === '2-west' && (
-        <WestScene copy={copy} registerNode={registerNode} clearNodes={clearNodes} windowWidth={windowWidth} onRevealComplete={handleRevealComplete} />
+        <WestScene copy={copy} registerNode={registerNode} clearNodes={clearNodes} windowWidth={windowWidth} onRevealComplete={handleRevealComplete} reducedMotion={reducedMotion} />
       )}
 
       {scene === '3-east' && (
-        <EastScene copy={copy} registerNode={registerNode} clearNodes={clearNodes} windowWidth={windowWidth} onRevealComplete={handleRevealComplete} />
+        <EastScene copy={copy} registerNode={registerNode} clearNodes={clearNodes} windowWidth={windowWidth} onRevealComplete={handleRevealComplete} reducedMotion={reducedMotion} />
       )}
 
       {scene === '4-main' && (
@@ -190,6 +196,7 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
           <span aria-live="polite">
             {mode === 'face' ? copy.modeFace
               : mode === 'face-cpu' ? copy.modeFaceCpu
+              : mode === 'face-lost' ? copy.contextLost
               : mode === 'mic' ? copy.modeMic
               : copy.modeKeyboard}
           </span>

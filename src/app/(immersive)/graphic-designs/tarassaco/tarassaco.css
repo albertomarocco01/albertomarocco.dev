@@ -418,3 +418,20 @@
     transform: translateX(-50%);
   }
 }
+
+/* ---- reduced motion: this demo's own path ---- */
+/* Nothing loops: the hint pulses and the gate spinner stop, the intro bar is
+   full at once and the tutorials are whole at once (IntroScene / PretextLayout
+   read the flag), and the wind settles each word and seed once — a 0.5 s
+   transition a little way downwind — instead of integrating it every frame
+   (useWindPhysics). Recovery, a 3 s drift back home, becomes a cut. */
+@media (prefers-reduced-motion: reduce) {
+  .tarassaco .animate-pulse,
+  .tarassaco .animate-spin,
+  .tarassaco .tara-hint {
+    animation: none;
+  }
+  .tarassaco .physics-recover {
+    transition-duration: 0.01s !important;
+  }
+}

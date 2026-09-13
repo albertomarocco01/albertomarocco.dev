@@ -13,10 +13,14 @@ export const RECOVERY_TIMEOUT_MS = 2000;   // Milliseconds of silence before flu
 // Counted from the gate click. A permission prompt left open never settles
 // getUserMedia, so this is the only thing that gets the visitor off the gate.
 export const SENSOR_TIMEOUT_MS = 9000;
+// Reduced motion: no per-frame integration — the first frame the wind reaches
+// a node it settles once, this far downwind, over this long, and is gone.
+export const REDUCED_SETTLE_PX = 60;
+export const REDUCED_SETTLE_MS = 500;
 // =================================
 
 /** What drives the wind right now — shown in the HUD. */
-export type SensorMode = 'face' | 'face-cpu' | 'mic' | 'keyboard';
+export type SensorMode = 'face' | 'face-cpu' | 'face-lost' | 'mic' | 'keyboard';
 
 export interface PhysicsState {
   vx: number;
@@ -29,6 +33,8 @@ export interface PhysicsState {
   rot: number;
   vRot: number;
   isRecovering: boolean;
+  /** reduced motion: settled once already, waits for recovery */
+  launched: boolean;
 }
 
 export interface WindPhysicsOptions {
@@ -38,6 +44,8 @@ export interface WindPhysicsOptions {
   onSensorsReady?: () => void;
   onSensorsError?: (reason: 'denied' | 'timeout') => void;
   onModeChange?: (mode: SensorMode) => void;
+  /** prefers-reduced-motion: settle nodes once instead of integrating them */
+  reducedMotion?: boolean;
   allowedDirection?: 'left' | 'right' | 'both';
   sustainedDurationMs?: number;
   disableRecovery?: boolean;
@@ -60,6 +68,7 @@ export function useWindPhysics({
   onSensorsReady,
   onSensorsError,
   onModeChange,
+  reducedMotion = false,
   allowedDirection = 'both',
   sustainedDurationMs = 1000,
   disableRecovery = false,
@@ -100,8 +109,10 @@ export function useWindPhysics({
   const sustainedDurationMsRef = useRef(sustainedDurationMs);
   const disableRecoveryRef = useRef(disableRecovery);
   const micThresholdOverrideRef = useRef(micThresholdOverride);
+  const reducedMotionRef = useRef(reducedMotion);
 
   useEffect(() => { canInteractRef.current = canInteract; }, [canInteract]);
+  useEffect(() => { reducedMotionRef.current = reducedMotion; }, [reducedMotion]);
   useEffect(() => {
     onBlowSustainedRef.current = onBlowSustained;
   }, [onBlowSustained]);
@@ -131,7 +142,8 @@ export function useWindPhysics({
         originalX: x, originalY: y,
         mass: 0.8 + Math.random() * 1.5,
         rot: 0, vRot: 0,
-        isRecovering: false
+        isRecovering: false,
+        launched: false,
       });
     }
   }, []);
@@ -339,6 +351,15 @@ export function useWindPhysics({
     // so give the keyboard a firm, steady synthetic level.
     const KEY_BLOW_RMS = MIC_THRESHOLD + 0.08;
 
+    // Reduced motion: one short transition downwind and gone. The recovery path
+    // (.physics-recover, a cut under the same media query) brings it back.
+    const settleOnce = (el: HTMLElement | SVGElement, state: PhysicsState, dir: 1 | -1) => {
+      state.launched = true;
+      el.style.transition = `transform ${REDUCED_SETTLE_MS}ms var(--ease), opacity ${REDUCED_SETTLE_MS}ms var(--ease)`;
+      el.style.transform = `translate(${dir * REDUCED_SETTLE_PX}px, ${-REDUCED_SETTLE_PX * 0.3}px) rotate(0deg)`;
+      el.style.opacity = '0';
+    };
+
     // MediaPipe/TFLite spray benign INFO + warning lines to the console, routed
     // through console.error (Emscripten's printErr) — which Next's dev overlay
     // counts as an "Issue". The first line ("Created TensorFlow Lite XNNPACK
@@ -426,7 +447,7 @@ export function useWindPhysics({
             faceLandmarker.close();
             faceLandmarkerRef.current = null;
             mouthXPositionsRef.current = [];
-            onModeChangeRef.current?.('mic');
+            onModeChangeRef.current?.('face-lost');
           }
         }
 
@@ -507,6 +528,23 @@ export function useWindPhysics({
             if (state.isRecovering) {
               el.classList.remove('physics-recover');
               state.isRecovering = false;
+              state.launched = false;
+            }
+
+            if (reducedMotionRef.current) {
+              if (forceBase > 0 && !state.launched) {
+                const dirs = activeMouths.length > 0
+                  ? activeMouths.map((x) => x < 0.5)
+                  : [allowedDirectionRef.current === 'left'];
+                for (const isLTR of dirs) {
+                  const frontX = isLTR ? windFrontX_LTR : windFrontX_RTL;
+                  if (isLTR ? state.originalX < frontX : state.originalX > frontX) {
+                    settleOnce(el, state, isLTR ? 1 : -1);
+                    break;
+                  }
+                }
+              }
+              return;
             }
 
             let ax = 0;

@@ -9,9 +9,10 @@ interface WestSceneProps {
   clearNodes: () => void;
   windowWidth: number;
   onRevealComplete: () => void;
+  reducedMotion?: boolean;
 }
 
-export function WestScene({ copy, registerNode, clearNodes, windowWidth, onRevealComplete }: WestSceneProps) {
+export function WestScene({ copy, registerNode, clearNodes, windowWidth, onRevealComplete, reducedMotion = false }: WestSceneProps) {
   const [showDandelion, setShowDandelion] = useState(false);
   const text = copy.west;
 
@@ -37,6 +38,7 @@ export function WestScene({ copy, registerNode, clearNodes, windowWidth, onRevea
           enableReveal={true}
           revealMode="ltr"
           onRevealComplete={handleRevealComplete}
+          reducedMotion={reducedMotion}
         />
       </div>
     </div>

@@ -14,6 +14,8 @@ interface PretextLayoutProps {
   enableReveal?: boolean;
   revealMode?: 'ltr' | 'rtl';
   onRevealComplete?: () => void;
+  /** prefers-reduced-motion: the text is whole at once, no typewriter */
+  reducedMotion?: boolean;
 }
 
 interface WordData {
@@ -32,10 +34,12 @@ export function PretextLayout({
   exclusionHeight = 0, 
   minTextWidth = 200,
   registerNode,
-  enableReveal = false,
+  enableReveal: enableRevealProp = false,
   revealMode = 'ltr',
-  onRevealComplete
+  onRevealComplete,
+  reducedMotion = false,
 }: PretextLayoutProps) {
+  const enableReveal = enableRevealProp && !reducedMotion;
   const containerRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<WordData[]>([]);
   const [containerHeight, setContainerHeight] = useState(0);

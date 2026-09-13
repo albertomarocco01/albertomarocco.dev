@@ -6,13 +6,16 @@ interface IntroSceneProps {
   registerNode: (el: HTMLElement | null, x: number, y: number) => void;
   clearNodes: () => void;
   onRevealComplete: () => void;
+  /** prefers-reduced-motion: the bar is full at once, no 2.5 s fill */
+  reducedMotion?: boolean;
 }
 
-export function IntroScene({ word, registerNode, clearNodes, onRevealComplete }: IntroSceneProps) {
-  const [progress, setProgress] = useState(0);
+export function IntroScene({ word, registerNode, clearNodes, onRevealComplete, reducedMotion = false }: IntroSceneProps) {
+  const [progress, setProgress] = useState(reducedMotion ? 100 : 0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (reducedMotion) return;
     const interval = setInterval(() => {
       setProgress(p => {
         if (p >= 100) {
@@ -23,7 +26,7 @@ export function IntroScene({ word, registerNode, clearNodes, onRevealComplete }:
       });
     }, 50);
     return () => clearInterval(interval);
-  }, []);
+  }, [reducedMotion]);
 
   useEffect(() => {
     if (progress === 100) {

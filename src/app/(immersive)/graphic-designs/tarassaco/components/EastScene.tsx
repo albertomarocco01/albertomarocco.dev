@@ -9,9 +9,10 @@ interface EastSceneProps {
   clearNodes: () => void;
   windowWidth: number;
   onRevealComplete: () => void;
+  reducedMotion?: boolean;
 }
 
-export function EastScene({ copy, registerNode, clearNodes, windowWidth, onRevealComplete }: EastSceneProps) {
+export function EastScene({ copy, registerNode, clearNodes, windowWidth, onRevealComplete, reducedMotion = false }: EastSceneProps) {
   const [showDandelion, setShowDandelion] = useState(false);
   const text = copy.east;
 
@@ -37,6 +38,7 @@ export function EastScene({ copy, registerNode, clearNodes, windowWidth, onRevea
           enableReveal={true}
           revealMode="rtl"
           onRevealComplete={handleRevealComplete}
+          reducedMotion={reducedMotion}
         />
       </div>
     </div>
