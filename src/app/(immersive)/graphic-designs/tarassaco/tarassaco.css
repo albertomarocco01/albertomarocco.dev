@@ -26,6 +26,12 @@
   overflow-x: hidden;
   cursor: auto; /* restore the pointer over the site-wide `body { cursor: none }` */
   isolation: isolate;
+  /* press-and-hold blows: no one-finger pan to cancel the pointer, no
+     long-press callout or text selection — pinch-zoom stays */
+  touch-action: pinch-zoom;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .tarassaco ::selection {
   background: #fff;
@@ -307,18 +313,63 @@
   background: #fff;
   border-color: #fff;
 }
-.tarassaco .tara-kbd-hint {
+.tarassaco .tara-error-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+}
+.tarassaco .tara-error-alt {
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+  border-bottom: 1px solid transparent;
+  padding: 0.6rem 0.4rem;
+  transition:
+    color 0.4s var(--ease),
+    border-color 0.4s var(--ease);
+}
+.tarassaco .tara-error-alt:hover,
+.tarassaco .tara-error-alt:focus-visible {
+  color: var(--ink);
+  border-bottom-color: var(--ink-dim);
+  outline: none;
+}
+
+/* ---- HUD after the gate: what drives the wind + how to blow without it ---- */
+.tarassaco .tara-mode {
   position: fixed;
   left: 50%;
-  bottom: 1.75rem;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
   pointer-events: none;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 0.66rem;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
+  text-align: center;
   white-space: nowrap;
-  color: rgba(255, 255, 255, 0.55);
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+  color: var(--ink-dim);
+}
+.tarassaco .tara-mode > :first-child {
+  color: var(--ink);
+}
+.tarassaco .tara-hold-touch {
+  display: none;
+}
+@media (hover: none) and (pointer: coarse) {
+  .tarassaco .tara-hold-key {
+    display: none;
+  }
+  .tarassaco .tara-hold-touch {
+    display: inline;
+  }
 }

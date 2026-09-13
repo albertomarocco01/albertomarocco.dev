@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useWindPhysics } from './hooks/useWindPhysics';
+import { useWindPhysics, type SensorMode } from './hooks/useWindPhysics';
 import { GateScene } from './components/GateScene';
 import { IntroScene } from './components/IntroScene';
 import { WestScene } from './components/WestScene';
@@ -21,23 +21,18 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
   const [unlockedScene, setUnlockedScene] = useState<Scene | null>(null);
   const canInteract = unlockedScene === scene;
   const [sensorsError, setSensorsError] = useState<null | 'denied' | 'timeout'>(null);
-  const [keyboardMode, setKeyboardMode] = useState(false);
+  const [mode, setMode] = useState<SensorMode>('keyboard');
 
+  // Also the late path: a prompt answered after the timeout dialog (or after
+  // "continue without") still hands the wind to the sensors, off the gate once.
   const handleSensorsReady = useCallback(() => {
-    setScene('1-intro');
+    setSensorsError(null);
+    setScene((prev) => (prev === '0-gate' ? '1-intro' : prev));
   }, []);
 
-  const handleSensorsError = useCallback(
-    (reason: 'denied' | 'timeout' | 'unsupported') => {
-      setSensorsError(reason === 'timeout' ? 'timeout' : 'denied');
-    },
-    [],
-  );
-
-  // Fallback path: skip the sensors and drive the whole experience from the
-  // keyboard (SPACE = blow). Dismisses the error and advances off the gate.
-  const enterKeyboardMode = useCallback(() => {
-    setKeyboardMode(true);
+  // Fallback path: no sensors, SPACE or press-and-hold blows. Dismisses the
+  // error and advances off the gate.
+  const continueWithout = useCallback(() => {
     setSensorsError(null);
     setScene((prev) => (prev === '0-gate' ? '1-intro' : prev));
   }, []);
@@ -69,12 +64,13 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
   const micThresholdOverride = (scene === '2-west' || scene === '3-east') ? 0.005 : undefined; // Super sensitive for tutorials
 
   // Sensors are hoisted to the root. They stay alive during the scene transition.
-  const { registerNode, clearNodes } = useWindPhysics({
+  const { registerNode, clearNodes, start } = useWindPhysics({
     enabled: sensorsEnabled,
     canInteract,
     onBlowSustained: handleBlowSustained,
     onSensorsReady: handleSensorsReady,
-    onSensorsError: handleSensorsError,
+    onSensorsError: setSensorsError,
+    onModeChange: setMode,
     allowedDirection,
     sustainedDurationMs,
     disableRecovery,
@@ -119,7 +115,11 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center overflow-hidden relative selection:bg-white selection:text-black">
       
-      {scene === '0-gate' && <GateScene copy={copy} onStart={() => setSensorsEnabled(true)} />}
+      {/* start() inside the click: the permission prompt and the audio resume
+          need the user gesture. */}
+      {scene === '0-gate' && (
+        <GateScene copy={copy} onStart={() => { setSensorsEnabled(true); start(); }} />
+      )}
       
       {scene === '1-intro' && (
         <IntroScene word={copy.intro} registerNode={registerNode} clearNodes={clearNodes} onRevealComplete={handleRevealComplete} />
@@ -154,8 +154,9 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
         </div>
       )}
 
-      {/* Sensor failure: don't soft-lock on the gate — explain and offer the
-          keyboard. Also the accessible path for anyone who can't blow. */}
+      {/* Sensor failure or an unanswered prompt: never soft-lock on the gate —
+          explain, offer Space / press-and-hold, and a retry. Also the
+          accessible path for anyone who can't blow. */}
       {sensorsError && (
         <div
           className="tara-error"
@@ -168,16 +169,32 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
               {sensorsError === 'timeout' ? copy.errTimeout : copy.errDenied}
             </p>
             <p className="tara-error-body">{copy.errBody}</p>
-            <button type="button" className="tara-error-btn" onClick={enterKeyboardMode}>
-              {copy.errButton}
-            </button>
+            <div className="tara-error-actions">
+              <button type="button" className="tara-error-btn" onClick={continueWithout} autoFocus>
+                {copy.errButton}
+              </button>
+              <button
+                type="button"
+                className="tara-error-alt"
+                onClick={() => { setSensorsError(null); start(); }}
+              >
+                {copy.errRetry}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {keyboardMode && scene !== '0-gate' && (
-        <div className="tara-kbd-hint" aria-hidden="true">
-          {copy.keyboardHint}
+      {scene !== '0-gate' && (
+        <div className="tara-mode">
+          <span aria-live="polite">
+            {mode === 'face' ? copy.modeFace
+              : mode === 'face-cpu' ? copy.modeFaceCpu
+              : mode === 'mic' ? copy.modeMic
+              : copy.modeKeyboard}
+          </span>
+          <span className="tara-hold-key" aria-hidden="true">{copy.holdKey}</span>
+          <span className="tara-hold-touch" aria-hidden="true">{copy.holdTouch}</span>
         </div>
       )}
     </div>

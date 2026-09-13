@@ -37,8 +37,14 @@ export interface TarassacoCopy {
   errDenied: string;
   errBody: string;
   errButton: string;
-  /** persistent hint once keyboard mode is on */
-  keyboardHint: string;
+  errRetry: string;
+  /** HUD after the gate: what drives the wind, then how to blow without sensors */
+  modeFace: string;
+  modeFaceCpu: string;
+  modeMic: string;
+  modeKeyboard: string;
+  holdKey: string;
+  holdTouch: string;
 }
 
 const en: TarassacoCopy = {
@@ -60,9 +66,15 @@ const en: TarassacoCopy = {
   errTimeout: "The sensors aren't responding",
   errDenied: "Camera or microphone unavailable",
   errBody:
-    "Allow the camera and microphone to blow for real — or carry on with the keyboard.",
-  errButton: "Continue — press SPACE to blow",
-  keyboardHint: "press SPACE to blow",
+    "Allow the camera and microphone to blow for real — or carry on without them: hold Space, or keep a finger on the screen.",
+  errButton: "continue without them",
+  errRetry: "try again",
+  modeFace: "camera + microphone",
+  modeFaceCpu: "camera (cpu) + microphone",
+  modeMic: "microphone",
+  modeKeyboard: "no sensors",
+  holdKey: "hold space to blow",
+  holdTouch: "touch and hold to blow",
 };
 
 const it: TarassacoCopy = {
@@ -84,9 +96,15 @@ const it: TarassacoCopy = {
   errTimeout: "I sensori non rispondono",
   errDenied: "Fotocamera o microfono non disponibili",
   errBody:
-    "Consenti fotocamera e microfono per soffiare davvero — oppure continua con la tastiera.",
-  errButton: "Continua — premi SPAZIO per soffiare",
-  keyboardHint: "premi SPAZIO per soffiare",
+    "Consenti fotocamera e microfono per soffiare davvero — oppure continua senza: tieni premuto Spazio, o tieni il dito sullo schermo.",
+  errButton: "continua senza",
+  errRetry: "riprova",
+  modeFace: "fotocamera + microfono",
+  modeFaceCpu: "fotocamera (cpu) + microfono",
+  modeMic: "microfono",
+  modeKeyboard: "senza sensori",
+  holdKey: "tieni premuto spazio per soffiare",
+  holdTouch: "tieni il dito sullo schermo per soffiare",
 };
 
 export const TARASSACO_COPY: Record<Locale, TarassacoCopy> = { en, it };

@@ -1,15 +1,22 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+import { hasWebGL2 } from '@/lib/webgl-caps';
 
 // === TWEAK PHYSICS & MIC HERE ===
 // ⬇️ MODIFICA QUESTO VALORE PER LA SENSIBILITÀ DEL MICROFONO ⬇️
 // Più è basso (es. 0.01), più è sensibile. Più è alto (es. 0.1), più devi soffiare forte.
-export const MIC_THRESHOLD = 0.02;         
+export const MIC_THRESHOLD = 0.02;
 export const LOW_FREQ_THRESHOLD = 150;     // Minimum low-frequency energy to ignore sharp noises
 export const WIND_FORCE_MULTIPLIER = 80.0; // Aumentato drasticamente per far volare via tutto velocemente
 export const FRICTION_DRAG = 0.96;         // Leggermente aumentato per farli scivolare via più velocemente
 export const RECOVERY_TIMEOUT_MS = 2000;   // Milliseconds of silence before fluid CSS recovery kicks in
+// Counted from the gate click. A permission prompt left open never settles
+// getUserMedia, so this is the only thing that gets the visitor off the gate.
+export const SENSOR_TIMEOUT_MS = 9000;
 // =================================
+
+/** What drives the wind right now — shown in the HUD. */
+export type SensorMode = 'face' | 'face-cpu' | 'mic' | 'keyboard';
 
 export interface PhysicsState {
   vx: number;
@@ -29,7 +36,8 @@ export interface WindPhysicsOptions {
   canInteract?: boolean;
   onBlowSustained?: () => void;
   onSensorsReady?: () => void;
-  onSensorsError?: (reason: 'denied' | 'timeout' | 'unsupported') => void;
+  onSensorsError?: (reason: 'denied' | 'timeout') => void;
+  onModeChange?: (mode: SensorMode) => void;
   allowedDirection?: 'left' | 'right' | 'both';
   sustainedDurationMs?: number;
   disableRecovery?: boolean;
@@ -37,12 +45,21 @@ export interface WindPhysicsOptions {
   sceneKey?: string;
 }
 
-export function useWindPhysics({ 
-  enabled, 
+// Broadband blow is exactly what noiseSuppression / AGC / echoCancellation
+// strip out, so disable all three or the blow gets filtered before we hear it.
+const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
+  echoCancellation: false,
+  noiseSuppression: false,
+  autoGainControl: false,
+};
+
+export function useWindPhysics({
+  enabled,
   canInteract = true,
   onBlowSustained,
   onSensorsReady,
   onSensorsError,
+  onModeChange,
   allowedDirection = 'both',
   sustainedDurationMs = 1000,
   disableRecovery = false,
@@ -53,39 +70,50 @@ export function useWindPhysics({
   const requestRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<{
+    analyser: AnalyserNode;
+    time: Float32Array<ArrayBuffer>;
+    freq: Uint8Array<ArrayBuffer>;
+  } | null>(null);
   const lastBlowTimeRef = useRef<number>(0);
   const isRecoveringRef = useRef<boolean>(false);
-  
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const faceLandmarkerRef = useRef<FaceLandmarker | null>(null);
   const mouthXPositionsRef = useRef<number[]>([]);
-  const isKeyBlowingRef = useRef(false); // SPACE-held fallback / accessibility blow
+  const isKeyBlowingRef = useRef(false); // SPACE / press-and-hold fallback blow
+  // Every start() is an attempt; a newer attempt (retry) or the unmount bumps
+  // the counter, and anything an older attempt resolves late is dropped.
+  const attemptRef = useRef(0);
+  const readyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Scene Transition Refs
   const blowStartTimeRef = useRef<number>(0);
   const hasTriggeredSustainedRef = useRef<boolean>(false);
-  
+
   const canInteractRef = useRef(canInteract);
   const onBlowSustainedRef = useRef(onBlowSustained);
   const onSensorsReadyRef = useRef(onSensorsReady);
   const onSensorsErrorRef = useRef(onSensorsError);
+  const onModeChangeRef = useRef(onModeChange);
   const allowedDirectionRef = useRef(allowedDirection);
   const sustainedDurationMsRef = useRef(sustainedDurationMs);
   const disableRecoveryRef = useRef(disableRecovery);
   const micThresholdOverrideRef = useRef(micThresholdOverride);
 
   useEffect(() => { canInteractRef.current = canInteract; }, [canInteract]);
-  useEffect(() => { 
-    onBlowSustainedRef.current = onBlowSustained; 
+  useEffect(() => {
+    onBlowSustainedRef.current = onBlowSustained;
   }, [onBlowSustained]);
 
   useEffect(() => {
     hasTriggeredSustainedRef.current = false;
     blowStartTimeRef.current = 0;
   }, [sceneKey]);
-  
+
   useEffect(() => { onSensorsReadyRef.current = onSensorsReady; }, [onSensorsReady]);
   useEffect(() => { onSensorsErrorRef.current = onSensorsError; }, [onSensorsError]);
+  useEffect(() => { onModeChangeRef.current = onModeChange; }, [onModeChange]);
   useEffect(() => { allowedDirectionRef.current = allowedDirection; }, [allowedDirection]);
   useEffect(() => { sustainedDurationMsRef.current = sustainedDurationMs; }, [sustainedDurationMs]);
   useEffect(() => { disableRecoveryRef.current = disableRecovery; }, [disableRecovery]);
@@ -112,38 +140,186 @@ export function useWindPhysics({
     nodesRef.current.clear();
   }, []);
 
-  useEffect(() => {
-    if (!enabled) {
-      isRecoveringRef.current = true;
-      nodesRef.current.forEach((state, el) => {
-        state.vx = 0; state.vy = 0; state.vRot = 0;
-        state.dx = 0; state.dy = 0; state.rot = 0;
-        state.isRecovering = true;
-        el.classList.add('physics-recover');
-        el.style.transform = `translate(0px, 0px) rotate(0deg)`;
-        el.style.opacity = '1';
-      });
-      return;
+  // Stops every sensor handle: tracks (the recording light), the audio graph,
+  // the off-screen video, the FaceLandmarker (WASM heap + GPU delegate).
+  const release = useCallback(() => {
+    if (readyTimerRef.current) { clearTimeout(readyTimerRef.current); readyTimerRef.current = null; }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    audioRef.current = null;
+    const ctx = audioContextRef.current;
+    audioContextRef.current = null;
+    if (ctx && ctx.state !== 'closed') ctx.close().catch(() => {});
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.remove();
+      videoRef.current = null;
     }
+    faceLandmarkerRef.current?.close();
+    faceLandmarkerRef.current = null;
+    mouthXPositionsRef.current = [];
+  }, []);
+
+  useEffect(() => () => {
+    attemptRef.current++;
+    release();
+  }, [release]);
+
+  /**
+   * Acquire the sensors. Must be called synchronously from the click (gate
+   * button, dialog retry): getUserMedia and AudioContext.resume() both run
+   * before the first await, inside the user gesture — iOS Safari opens the
+   * prompt and starts audio only there. Camera + mic, then mic only, then the
+   * error dialog; the timeout is armed here too, so an unanswered prompt ends
+   * in the same dialog instead of an endless "initializing".
+   */
+  const start = useCallback(() => {
+    release();
+    const attempt = ++attemptRef.current;
+    const current = () => attempt === attemptRef.current;
+    let settled = false;
+
+    readyTimerRef.current = setTimeout(() => {
+      readyTimerRef.current = null;
+      if (current() && !settled) onSensorsErrorRef.current?.('timeout');
+    }, SENSOR_TIMEOUT_MS);
+
+    let audioContext: AudioContext | null = null;
+    try {
+      audioContext = new (window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      audioContext.resume().catch(() => {});
+      audioContextRef.current = audioContext;
+    } catch { /* no Web Audio: face tracking still needs the stream below */ }
+
+    const initFace = async () => {
+      try {
+        // Self-hosted, versioned by folder (see next.config.ts): the wasm and
+        // the float16 model of the pinned @mediapipe/tasks-vision@1.0.1.
+        const vision = await FilesetResolver.forVisionTasks("/mediapipe/1.0.1/wasm");
+        // GPU first; the CPU delegate when there is no WebGL2 or the GPU one
+        // fails to build. If both fail the wind stays on the microphone.
+        const delegates = hasWebGL2() ? (['GPU', 'CPU'] as const) : (['CPU'] as const);
+        for (const delegate of delegates) {
+          if (!current()) return;
+          try {
+            const faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+              baseOptions: {
+                modelAssetPath: "/mediapipe/1.0.1/face_landmarker.task",
+                delegate,
+              },
+              outputFaceBlendshapes: false,
+              runningMode: "VIDEO",
+              numFaces: 2
+            });
+            if (!current()) { faceLandmarker.close(); return; }
+            faceLandmarkerRef.current = faceLandmarker;
+            onModeChangeRef.current?.(delegate === 'GPU' ? 'face' : 'face-cpu');
+            return;
+          } catch (e) {
+            console.warn(`MediaPipe ${delegate} delegate failed:`, e);
+          }
+        }
+      } catch (e) {
+        console.error("MediaPipe Init Error:", e);
+      }
+    };
+
+    void (async () => {
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: AUDIO_CONSTRAINTS,
+          video: { facingMode: 'user', width: 640, height: 480 },
+        });
+      } catch {
+        // desktops with a mic but no camera → NotFoundError on the combined request
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
+        } catch {
+          stream = null;
+        }
+      }
+
+      // Superseded by a retry or unmounted during the prompt: stop any granted
+      // tracks so the recording indicator doesn't stay lit.
+      if (!current()) {
+        stream?.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      settled = true;
+      if (readyTimerRef.current) { clearTimeout(readyTimerRef.current); readyTimerRef.current = null; }
+
+      if (!stream) {
+        // Denied / no device / insecure origin: the dialog offers Space and
+        // press-and-hold, and a retry.
+        release(); // the AudioContext opened for the gesture
+        onSensorsErrorRef.current?.('denied');
+        return;
+      }
+      streamRef.current = stream;
+
+      if (audioContext && stream.getAudioTracks().length > 0) {
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 1024;
+        audioContext.createMediaStreamSource(stream).connect(analyser);
+        audioRef.current = {
+          analyser,
+          time: new Float32Array(analyser.fftSize),
+          freq: new Uint8Array(analyser.frequencyBinCount),
+        };
+      }
+
+      if (stream.getVideoTracks().length > 0) {
+        // Off-screen but renderable: iOS Safari refuses to decode/play a
+        // display:none or zero-size <video>. Keep it 1px + transparent. Nothing
+        // waits on it — face tracking starts once readyState allows.
+        const v = document.createElement('video');
+        v.srcObject = stream;
+        v.autoplay = true;
+        v.playsInline = true;
+        v.muted = true;
+        v.style.cssText =
+          'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;';
+        document.body.appendChild(v);
+        videoRef.current = v;
+        v.play().catch((e) => console.warn("Video play error:", e));
+        void initFace();
+      }
+
+      onModeChangeRef.current?.(audioRef.current ? 'mic' : 'keyboard');
+      onSensorsReadyRef.current?.();
+    })();
+  }, [release]);
+
+  useEffect(() => {
+    if (!enabled) return;
 
     let isMounted = true;
     let windFrontX_LTR = -300;
     let windFrontX_RTL = window.innerWidth + 300;
 
-    // Keyboard fallback: hold SPACE to "blow". Works with no camera/mic at all
-    // (permission denied, no device, insecure origin) and doubles as an
-    // accessibility path for anyone who can't blow into the mic. Armed only
-    // while the experience is enabled; the physics loop reads isKeyBlowingRef.
+    // Fallback blow: hold SPACE, or press and hold on the stage. Works with no
+    // camera/mic at all (permission denied, no device, insecure origin) and
+    // doubles as an accessibility path for anyone who can't blow into the mic.
+    // The physics loop reads isKeyBlowingRef.
     isKeyBlowingRef.current = false;
     const isBlowKey = (e: KeyboardEvent) =>
       e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar';
+    // A focused control keeps its own Space (the dialog's buttons activate on it).
+    const onControl = (t: EventTarget | null) =>
+      t instanceof Element && !!t.closest('a, button, input, textarea, select, [role="alertdialog"]');
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!isBlowKey(e)) return;
-      e.preventDefault(); // no page scroll, no re-firing the focused gate button
+      if (!isBlowKey(e) || onControl(e.target)) return;
+      e.preventDefault(); // no page scroll
       isKeyBlowingRef.current = true;
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (isBlowKey(e)) isKeyBlowingRef.current = false;
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      if (!e.isPrimary || e.button > 0 || onControl(e.target)) return;
+      isKeyBlowingRef.current = true;
     };
     // keyup never fires if the window loses focus mid-press (alt-tab, a click
     // into devtools), which latched the blow on forever: endless wind and
@@ -153,6 +329,9 @@ export function useWindPhysics({
     };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointerup', releaseKey);
+    window.addEventListener('pointercancel', releaseKey);
     window.addEventListener('blur', releaseKey);
     document.addEventListener('visibilitychange', releaseKey);
 
@@ -190,189 +369,50 @@ export function useWindPhysics({
     console.info = (...a: unknown[]) => { if (!isMpNoise(a[0])) consoleOriginals.info(...a); };
     console.log = (...a: unknown[]) => { if (!isMpNoise(a[0])) consoleOriginals.log(...a); };
 
-    const initMediaPipe = async () => {
-      try {
-        // Self-hosted from /public/mediapipe (the wasm folder copied from the
-        // pinned @mediapipe/tasks-vision@1.0.1 package + the float16 model).
-        // No third-party CDN at runtime: kills the @latest version-drift trap
-        // and the per-visit IP leak to jsdelivr/Google.
-        const vision = await FilesetResolver.forVisionTasks("/mediapipe/1.0.1/wasm");
+    // The physics loop runs regardless of acquisition: mic + face when start()
+    // got them, SPACE / press-and-hold otherwise. Sensor handles are read from
+    // refs every frame, so a late grant (or a retry) joins in without a restart.
+    let lastDetect = 0; // throttles face detection to ~30fps
+    // The integration below was written per-frame, so every constant was
+    // implicitly tuned for 60Hz: on a 144Hz display the text blew away 2.4x
+    // faster, and after a tab returned from the background the first frame's
+    // gap threw it off screen. `dt` is expressed in 60Hz frames so the tuning
+    // constants keep their meaning, and is clamped so a long stall (alt-tab,
+    // GC pause) can never integrate into a jump.
+    let lastFrame = performance.now();
+    const physicsLoop = () => {
         if (!isMounted) return;
-        const faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath: "/mediapipe/1.0.1/face_landmarker.task",
-            delegate: "GPU"
-          },
-          outputFaceBlendshapes: false,
-          runningMode: "VIDEO",
-          numFaces: 2
-        });
-        // Unmounted while the model loaded, or a prior instance is still around
-        // (re-enable toggled) — close before storing so the WASM heap / GPU
-        // delegate isn't orphaned and leaked.
-        if (!isMounted) { faceLandmarker.close(); return; }
-        faceLandmarkerRef.current?.close();
-        faceLandmarkerRef.current = faceLandmarker;
-        console.log("MediaPipe Face Landmarker Initialized");
-      } catch (e) {
-        console.error("MediaPipe Init Error:", e);
-      }
-    };
 
-    // Audio/video handles at effect scope so the physics loop can read them
-    // after the acquisition try/catch — they stay null in keyboard-only mode.
-    let analyser: AnalyserNode | null = null;
-    let timeDomainData: Float32Array<ArrayBuffer> | null = null;
-    let freqData: Uint8Array<ArrayBuffer> | null = null;
-    let video: HTMLVideoElement | null = null;
-    let readyFired = false;
-    let readyTimer: ReturnType<typeof setTimeout> | null = null;
-    const markReady = () => {
-      if (readyFired) return;
-      readyFired = true;
-      if (readyTimer) clearTimeout(readyTimer);
-      if (onSensorsReadyRef.current) onSensorsReadyRef.current();
-    };
-
-    // Broadband blow is exactly what noiseSuppression / AGC / echoCancellation
-    // strip out, so disable all three or the blow gets filtered before we hear it.
-    const AUDIO_CONSTRAINTS: MediaTrackConstraints = {
-      echoCancellation: false,
-      noiseSuppression: false,
-      autoGainControl: false,
-    };
-
-    const startSensors = async () => {
-      // getUserMedia runs FIRST, directly off the gate click, so the permission
-      // prompt opens inside the user-gesture window (iOS Safari is strict). Try
-      // camera+mic, then fall back to mic-only (desktops with a mic but no camera
-      // → NotFoundError on the combined request), then to keyboard-only — the
-      // demo must never hard-lock on the gate.
-      let stream: MediaStream | null = null;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: AUDIO_CONSTRAINTS,
-          video: { width: 640, height: 480 },
-        });
-      } catch {
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
-        } catch {
-          stream = null;
-        }
-      }
-
-      // Unmounted during the permission prompt: stop any granted tracks so the
-      // recording indicator doesn't stay lit, then bail.
-      if (!isMounted) {
-        stream?.getTracks().forEach((t) => t.stop());
-        return;
-      }
-
-      if (!stream) {
-        // No camera and no mic (denied / no device / insecure origin). Proceed in
-        // keyboard-only mode: advance the gate AND surface a hint so SPACE drives
-        // the wind — the experience never dead-ends on "INITIALIZING".
-        if (onSensorsErrorRef.current) onSensorsErrorRef.current('denied');
-        markReady();
-      } else {
-        streamRef.current = stream;
-
-        // Audio Setup
-        const audioContext = new (window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-        audioContextRef.current = audioContext;
-        // iOS Safari / the autoplay policy start the context 'suspended' until a
-        // gesture resumes it — without this rms stays 0 and no blow is ever
-        // detected. The gate click is our gesture.
-        if (audioContext.state === 'suspended') {
-          try { await audioContext.resume(); } catch { /* best effort */ }
-        }
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 1024;
-        audioContext.createMediaStreamSource(stream).connect(analyser);
-        timeDomainData = new Float32Array(analyser.fftSize);
-        freqData = new Uint8Array(analyser.frequencyBinCount);
-
-        if (stream.getVideoTracks().length > 0) {
-          // Video Setup. Off-screen but renderable: iOS Safari refuses to decode/
-          // play a display:none or zero-size <video>, which stalls
-          // onloadedmetadata and freezes the gate. Keep it 1px + transparent.
-          video = document.createElement('video');
-          const v = video;
-          v.srcObject = stream;
-          v.autoplay = true;
-          v.playsInline = true;
-          v.muted = true;
-          v.style.cssText =
-            'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;';
-          document.body.appendChild(v);
-          videoRef.current = v;
-
-          // Start playback, then notify ready — markReady on failure too, so a
-          // play() rejection can't hang the gate.
-          v.onloadedmetadata = () => {
-            v.play().then(markReady).catch((e) => { console.error("Video play error:", e); markReady(); });
-          };
-
-          // Load the face model in the background; mouth-direction detection
-          // switches on once faceLandmarkerRef is set. Mic-only blow works meanwhile.
-          initMediaPipe();
-        } else {
-          // Mic-only (no camera): nothing to wait on, proceed immediately.
-          markReady();
+        // 1. Audio Analysis (skipped without a mic)
+        let rms = 0;
+        let lowFreqAvg = 0;
+        const audio = audioRef.current;
+        if (audio) {
+          audio.analyser.getFloatTimeDomainData(audio.time);
+          audio.analyser.getByteFrequencyData(audio.freq);
+          let sumSquares = 0;
+          for (let i = 0; i < audio.time.length; i++) sumSquares += audio.time[i] * audio.time[i];
+          rms = Math.sqrt(sumSquares / audio.time.length);
+          let lowFreqSum = 0;
+          for (let i = 0; i < 15; i++) lowFreqSum += audio.freq[i];
+          lowFreqAvg = lowFreqSum / 15;
         }
 
-        // Give up if the sensors never signal ready (camera busy, model stalled)
-        // and offer the keyboard instead of hanging on the gate forever.
-        readyTimer = setTimeout(() => {
-          if (!readyFired) {
-            if (onSensorsErrorRef.current) onSensorsErrorRef.current('timeout');
-            markReady();
-          }
-        }, 9000);
-      }
+        const now = performance.now();
+        // Elapsed time in 60Hz frame units: dt === 1 reproduces the old
+        // per-frame behaviour exactly, so every tuned constant keeps its
+        // meaning. Capped at 3 frames (~50ms).
+        const dt = Math.min((now - lastFrame) / 16.667, 3);
+        lastFrame = now;
 
-      // The physics loop runs regardless of acquisition: mic + face when we have
-      // them, keyboard-only (SPACE) otherwise. Reads the effect-scoped analyser/
-      // video handles, which stay null when acquisition failed.
-      let lastDetect = 0; // throttles face detection to ~30fps
-      // The integration below was written per-frame, so every constant was
-      // implicitly tuned for 60Hz: on a 144Hz display the text blew away 2.4x
-      // faster, and after a tab returned from the background the first frame's
-      // gap threw it off screen. `dt` is expressed in 60Hz frames so the tuning
-      // constants keep their meaning, and is clamped so a long stall (alt-tab,
-      // GC pause) can never integrate into a jump.
-      let lastFrame = performance.now();
-      const physicsLoop = () => {
-          if (!isMounted) return;
-
-          // 1. Audio Analysis (skipped in keyboard-only mode, where analyser is null)
-          let rms = 0;
-          let lowFreqAvg = 0;
-          if (analyser && timeDomainData && freqData) {
-            analyser.getFloatTimeDomainData(timeDomainData);
-            analyser.getByteFrequencyData(freqData);
-            let sumSquares = 0;
-            for (let i = 0; i < timeDomainData.length; i++) sumSquares += timeDomainData[i] * timeDomainData[i];
-            rms = Math.sqrt(sumSquares / timeDomainData.length);
-            let lowFreqSum = 0;
-            for (let i = 0; i < 15; i++) lowFreqSum += freqData[i];
-            lowFreqAvg = lowFreqSum / 15;
-          }
-
-          const now = performance.now();
-          // Elapsed time in 60Hz frame units: dt === 1 reproduces the old
-          // per-frame behaviour exactly, so every tuned constant keeps its
-          // meaning. Capped at 3 frames (~50ms).
-          const dt = Math.min((now - lastFrame) / 16.667, 3);
-          lastFrame = now;
-
-          // 2. MediaPipe Analysis — throttled to ~30fps. Mouth direction doesn't
-          // need 60, and detectForVideo with numFaces:2 is the battery hog.
-          if (faceLandmarkerRef.current && video && video.readyState >= 2 && now - lastDetect >= 33) {
-            lastDetect = now;
-            const results = faceLandmarkerRef.current.detectForVideo(video, now);
+        // 2. MediaPipe Analysis — throttled to ~30fps. Mouth direction doesn't
+        // need 60, and detectForVideo with numFaces:2 is the battery hog.
+        const video = videoRef.current;
+        const faceLandmarker = faceLandmarkerRef.current;
+        if (faceLandmarker && video && video.readyState >= 2 && now - lastDetect >= 33) {
+          lastDetect = now;
+          try {
+            const results = faceLandmarker.detectForVideo(video, now);
             if (results.faceLandmarks && results.faceLandmarks.length > 0) {
               mouthXPositionsRef.current = results.faceLandmarks.map(landmarks => {
                 return 1 - landmarks[13].x; // Mirroring
@@ -380,191 +420,184 @@ export function useWindPhysics({
             } else {
               mouthXPositionsRef.current = [];
             }
+          } catch (e) {
+            // A delegate that built but cannot run: drop face tracking, keep the mic.
+            console.warn("MediaPipe detect failed, microphone only:", e);
+            faceLandmarker.close();
+            faceLandmarkerRef.current = null;
+            mouthXPositionsRef.current = [];
+            onModeChangeRef.current?.('mic');
+          }
+        }
+
+        // Directional Constraints
+        let activeMouths = mouthXPositionsRef.current;
+        let isValidBlow = true;
+
+        // Only a *detected* face pointing the wrong way invalidates a blow. With
+        // no face data (keyboard mode, or tracking not up yet) the blow stays
+        // valid and the allowedDirection fallback below drives it.
+        if (activeMouths.length > 0) {
+          if (allowedDirectionRef.current === 'left') {
+            activeMouths = activeMouths.filter(x => x < 0.5);
+            if (activeMouths.length === 0) isValidBlow = false;
+          } else if (allowedDirectionRef.current === 'right') {
+            activeMouths = activeMouths.filter(x => x >= 0.5);
+            if (activeMouths.length === 0) isValidBlow = false;
+          }
+        }
+
+        const currentMicThreshold = micThresholdOverrideRef.current ?? MIC_THRESHOLD;
+        const micBlow = rms > currentMicThreshold && lowFreqAvg > LOW_FREQ_THRESHOLD;
+        const isBlowing = canInteractRef.current && isValidBlow && (micBlow || isKeyBlowingRef.current);
+        // Force scales with mic loudness; the keyboard uses a fixed synthetic level.
+        const effectiveRms = micBlow ? rms : KEY_BLOW_RMS;
+
+        if (isBlowing) {
+          lastBlowTimeRef.current = now;
+          isRecoveringRef.current = false;
+
+          if (blowStartTimeRef.current === 0) blowStartTimeRef.current = now;
+          if (onBlowSustainedRef.current && !hasTriggeredSustainedRef.current && (now - blowStartTimeRef.current > sustainedDurationMsRef.current)) {
+            hasTriggeredSustainedRef.current = true;
+            onBlowSustainedRef.current();
           }
 
-          // Directional Constraints
-          let activeMouths = mouthXPositionsRef.current;
-          let isValidBlow = true;
-          
-          // Only a *detected* face pointing the wrong way invalidates a blow. With
-          // no face data (keyboard mode, or tracking not up yet) the blow stays
-          // valid and the allowedDirection fallback below drives it.
           if (activeMouths.length > 0) {
-            if (allowedDirectionRef.current === 'left') {
-              activeMouths = activeMouths.filter(x => x < 0.5);
-              if (activeMouths.length === 0) isValidBlow = false;
-            } else if (allowedDirectionRef.current === 'right') {
-              activeMouths = activeMouths.filter(x => x >= 0.5);
-              if (activeMouths.length === 0) isValidBlow = false;
-            }
-          }
-
-          const currentMicThreshold = micThresholdOverrideRef.current ?? MIC_THRESHOLD;
-          const micBlow = rms > currentMicThreshold && lowFreqAvg > LOW_FREQ_THRESHOLD;
-          const isBlowing = canInteractRef.current && isValidBlow && (micBlow || isKeyBlowingRef.current);
-          // Force scales with mic loudness; the keyboard uses a fixed synthetic level.
-          const effectiveRms = micBlow ? rms : KEY_BLOW_RMS;
-
-          if (isBlowing) {
-            lastBlowTimeRef.current = now;
-            isRecoveringRef.current = false;
-            
-            if (blowStartTimeRef.current === 0) blowStartTimeRef.current = now;
-            if (onBlowSustainedRef.current && !hasTriggeredSustainedRef.current && (now - blowStartTimeRef.current > sustainedDurationMsRef.current)) {
-              hasTriggeredSustainedRef.current = true;
-              onBlowSustainedRef.current();
-            }
-            
-            if (activeMouths.length > 0) {
-              activeMouths.forEach(x => {
-                if (x < 0.5) windFrontX_LTR += 180 * dt;
-                else windFrontX_RTL -= 180 * dt;
-              });
-            } else {
-              // Fallback if no face but blowing (e.g. camera covered)
-              if (allowedDirectionRef.current === 'left') windFrontX_LTR += 180 * dt;
+            activeMouths.forEach(x => {
+              if (x < 0.5) windFrontX_LTR += 180 * dt;
               else windFrontX_RTL -= 180 * dt;
-            }
-          } else {
-            blowStartTimeRef.current = 0;
-            windFrontX_LTR -= 200 * dt;
-            windFrontX_RTL += 200 * dt;
-          }
-          
-          windFrontX_LTR = Math.max(-500, Math.min(windFrontX_LTR, window.innerWidth + 500));
-          windFrontX_RTL = Math.max(-500, Math.min(windFrontX_RTL, window.innerWidth + 500));
-
-          const timeSinceLastBlow = now - lastBlowTimeRef.current;
-          const shouldRecover = timeSinceLastBlow > RECOVERY_TIMEOUT_MS && !disableRecoveryRef.current;
-
-          if (shouldRecover && !isRecoveringRef.current) {
-            isRecoveringRef.current = true;
-            nodesRef.current.forEach((state, el) => {
-              state.vx = 0; state.vy = 0; state.vRot = 0;
-              state.dx = 0; state.dy = 0; state.rot = 0;
-              state.isRecovering = true;
-              el.classList.add('physics-recover');
-              el.style.transform = `translate(0px, 0px) rotate(0deg)`;
-              el.style.opacity = '1';
             });
+          } else {
+            // Fallback if no face but blowing (e.g. camera covered)
+            if (allowedDirectionRef.current === 'left') windFrontX_LTR += 180 * dt;
+            else windFrontX_RTL -= 180 * dt;
           }
+        } else {
+          blowStartTimeRef.current = 0;
+          windFrontX_LTR -= 200 * dt;
+          windFrontX_RTL += 200 * dt;
+        }
 
-          if (!isRecoveringRef.current) {
-            // Use the *effective* threshold (mic override in tutorials), not the
-            // constant — else an override below MIC_THRESHOLD yields a negative
-            // forceBase and nothing moves. Clamp at 0 for safety.
-            const forceBase = isBlowing ? Math.max(0, effectiveRms - currentMicThreshold) * WIND_FORCE_MULTIPLIER : 0;
+        windFrontX_LTR = Math.max(-500, Math.min(windFrontX_LTR, window.innerWidth + 500));
+        windFrontX_RTL = Math.max(-500, Math.min(windFrontX_RTL, window.innerWidth + 500));
 
-            nodesRef.current.forEach((state, el) => {
-              if (state.isRecovering) {
-                el.classList.remove('physics-recover');
-                state.isRecovering = false;
-              }
+        const timeSinceLastBlow = now - lastBlowTimeRef.current;
+        const shouldRecover = timeSinceLastBlow > RECOVERY_TIMEOUT_MS && !disableRecoveryRef.current;
 
-              let ax = 0;
-              let ay = 0;
-              let aRot = 0;
+        if (shouldRecover && !isRecoveringRef.current) {
+          isRecoveringRef.current = true;
+          nodesRef.current.forEach((state, el) => {
+            state.vx = 0; state.vy = 0; state.vRot = 0;
+            state.dx = 0; state.dy = 0; state.rot = 0;
+            state.isRecovering = true;
+            el.classList.add('physics-recover');
+            el.style.transform = `translate(0px, 0px) rotate(0deg)`;
+            el.style.opacity = '1';
+          });
+        }
 
-              if (forceBase > 0) {
-                if (activeMouths.length > 0) {
-                  activeMouths.forEach(mouthX => {
-                    const isLTR = mouthX < 0.5;
-                    const frontX = isLTR ? windFrontX_LTR : windFrontX_RTL;
-                    const inRange = isLTR ? (state.originalX < frontX) : (state.originalX > frontX);
-                    
-                    if (inRange) {
-                      const dist = isLTR ? (frontX - state.originalX) : (state.originalX - frontX);
-                      const distFactor = Math.max(0.1, dist / window.innerWidth);
-                      const dir = isLTR ? 1 : -1;
-                      
-                      ax += (dir * forceBase * distFactor) / state.mass;
-                      ay -= (forceBase * 0.4 * distFactor) / state.mass * (Math.random() - 0.2);
-                      aRot += (Math.random() - 0.5) * forceBase * 6 / state.mass;
-                    }
-                  });
-                } else {
-                  // Fallback
-                  const isLTR = allowedDirectionRef.current === 'left';
+        if (!isRecoveringRef.current) {
+          // Use the *effective* threshold (mic override in tutorials), not the
+          // constant — else an override below MIC_THRESHOLD yields a negative
+          // forceBase and nothing moves. Clamp at 0 for safety.
+          const forceBase = isBlowing ? Math.max(0, effectiveRms - currentMicThreshold) * WIND_FORCE_MULTIPLIER : 0;
+
+          nodesRef.current.forEach((state, el) => {
+            if (state.isRecovering) {
+              el.classList.remove('physics-recover');
+              state.isRecovering = false;
+            }
+
+            let ax = 0;
+            let ay = 0;
+            let aRot = 0;
+
+            if (forceBase > 0) {
+              if (activeMouths.length > 0) {
+                activeMouths.forEach(mouthX => {
+                  const isLTR = mouthX < 0.5;
                   const frontX = isLTR ? windFrontX_LTR : windFrontX_RTL;
                   const inRange = isLTR ? (state.originalX < frontX) : (state.originalX > frontX);
-                  
+
                   if (inRange) {
                     const dist = isLTR ? (frontX - state.originalX) : (state.originalX - frontX);
                     const distFactor = Math.max(0.1, dist / window.innerWidth);
                     const dir = isLTR ? 1 : -1;
-                    
+
                     ax += (dir * forceBase * distFactor) / state.mass;
-                    ay -= (forceBase * 0.4 * distFactor) / state.mass;
+                    ay -= (forceBase * 0.4 * distFactor) / state.mass * (Math.random() - 0.2);
                     aRot += (Math.random() - 0.5) * forceBase * 6 / state.mass;
                   }
-                }
-                
-                // Turbolenza incrociata
-                if (activeMouths.some(x => x < 0.5) && activeMouths.some(x => x >= 0.5)) {
-                   const midPoint = window.innerWidth / 2;
-                   if (Math.abs(state.originalX - midPoint) < 250) {
-                     ay += (Math.random() - 0.5) * forceBase * 1.5;
-                   }
+                });
+              } else {
+                // Fallback
+                const isLTR = allowedDirectionRef.current === 'left';
+                const frontX = isLTR ? windFrontX_LTR : windFrontX_RTL;
+                const inRange = isLTR ? (state.originalX < frontX) : (state.originalX > frontX);
+
+                if (inRange) {
+                  const dist = isLTR ? (frontX - state.originalX) : (state.originalX - frontX);
+                  const distFactor = Math.max(0.1, dist / window.innerWidth);
+                  const dir = isLTR ? 1 : -1;
+
+                  ax += (dir * forceBase * distFactor) / state.mass;
+                  ay -= (forceBase * 0.4 * distFactor) / state.mass;
+                  aRot += (Math.random() - 0.5) * forceBase * 6 / state.mass;
                 }
               }
 
-              // Velocity is in px per 60Hz frame. Acceleration integrates over
-              // dt, drag compounds over dt (pow, not multiply — 0.96 twice is
-              // not 0.96 once), and position integrates over dt.
-              const drag = Math.pow(FRICTION_DRAG, dt);
-              state.vx = (state.vx + ax * dt) * drag;
-              state.vy = (state.vy + ay * dt) * drag;
-              state.vRot = (state.vRot + aRot * dt) * drag;
-
-              state.dx += state.vx * dt;
-              state.dy += state.vy * dt;
-              state.rot += state.vRot * dt;
-
-              if (Math.abs(state.vx) > 0.05 || Math.abs(state.vy) > 0.05 || Math.abs(state.dx) > 0.5) {
-                el.style.transform = `translate(${state.dx}px, ${state.dy}px) rotate(${state.rot}deg)`;
-                const distTraveled = Math.sqrt(state.dx * state.dx + state.dy * state.dy);
-                el.style.opacity = Math.max(0, 1 - distTraveled / 600).toFixed(3);
+              // Turbolenza incrociata
+              if (activeMouths.some(x => x < 0.5) && activeMouths.some(x => x >= 0.5)) {
+                 const midPoint = window.innerWidth / 2;
+                 if (Math.abs(state.originalX - midPoint) < 250) {
+                   ay += (Math.random() - 0.5) * forceBase * 1.5;
+                 }
               }
-            });
-          }
+            }
 
-          requestRef.current = requestAnimationFrame(physicsLoop);
-      };
+            // Velocity is in px per 60Hz frame. Acceleration integrates over
+            // dt, drag compounds over dt (pow, not multiply — 0.96 twice is
+            // not 0.96 once), and position integrates over dt.
+            const drag = Math.pow(FRICTION_DRAG, dt);
+            state.vx = (state.vx + ax * dt) * drag;
+            state.vy = (state.vy + ay * dt) * drag;
+            state.vRot = (state.vRot + aRot * dt) * drag;
 
-      physicsLoop();
+            state.dx += state.vx * dt;
+            state.dy += state.vy * dt;
+            state.rot += state.vRot * dt;
+
+            if (Math.abs(state.vx) > 0.05 || Math.abs(state.vy) > 0.05 || Math.abs(state.dx) > 0.5) {
+              el.style.transform = `translate(${state.dx}px, ${state.dy}px) rotate(${state.rot}deg)`;
+              const distTraveled = Math.sqrt(state.dx * state.dx + state.dy * state.dy);
+              el.style.opacity = Math.max(0, 1 - distTraveled / 600).toFixed(3);
+            }
+          });
+        }
+
+        requestRef.current = requestAnimationFrame(physicsLoop);
     };
 
-    startSensors();
+    physicsLoop();
 
     return () => {
       isMounted = false;
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointerup', releaseKey);
+      window.removeEventListener('pointercancel', releaseKey);
       window.removeEventListener('blur', releaseKey);
       document.removeEventListener('visibilitychange', releaseKey);
-      if (readyTimer) clearTimeout(readyTimer);
       // Restore the console methods we patched to swallow MediaPipe noise.
       console.error = consoleOriginals.error;
       console.warn = consoleOriginals.warn;
       console.info = consoleOriginals.info;
       console.log = consoleOriginals.log;
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
-      if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close().catch(e => console.error("AudioContext close error:", e));
-      }
-      if (videoRef.current) {
-        videoRef.current.pause();
-        videoRef.current.remove();
-      }
-      // Free the FaceLandmarker (WASM heap + GPU delegate) — never closed before,
-      // so every unmount / re-enable leaked one.
-      if (faceLandmarkerRef.current) {
-        faceLandmarkerRef.current.close();
-        faceLandmarkerRef.current = null;
-      }
     };
   }, [enabled]);
 
-  return { registerNode, clearNodes };
+  return { registerNode, clearNodes, start };
 }
