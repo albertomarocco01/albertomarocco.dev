@@ -205,8 +205,14 @@ export function Loader({ tag }: { tag: string }) {
   // Lock scroll while the veil is up, and arm the safety dismissal. The lock is
   // released by `reveal()` (and on cleanup); the safety timeout force-dismisses
   // the veil if GSAP never completed it.
+  //
+  // Only when the full veil is actually going to play. A remount within the
+  // page load (back from a demo) takes the fast path above, which has already
+  // called `reveal()` from its layout effect by the time this passive effect
+  // runs: locking here would add `loading` *after* its only release, and the
+  // safety timer would see `doneRef` set and leave it on for good.
   useEffect(() => {
-    if (reducedMotion) return;
+    if (reducedMotion || veilPlayed) return;
     const root = document.documentElement;
     root.classList.add("loading");
     const safety = window.setTimeout(() => {
