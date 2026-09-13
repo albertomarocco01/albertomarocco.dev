@@ -1689,7 +1689,7 @@ footer.foot a,
     clamp(1.4rem, 5vw, 5rem),
     calc((100% - 1280px) / 2 + clamp(1.4rem, 5vw, 5rem))
   );
-  bottom: clamp(1.4rem, 4vh, 2.4rem);
+  bottom: calc(clamp(1.4rem, 4vh, 2.4rem) + env(safe-area-inset-bottom, 0px));
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
@@ -1930,7 +1930,7 @@ html.about-live .about-figure {
   }
   html.about-live .about-pager {
     top: auto;
-    bottom: 1.1rem;
+    bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
     right: clamp(1.1rem, 5vw, 1.6rem);
     transform: none;
     flex-direction: row;
@@ -1940,7 +1940,7 @@ html.about-live .about-figure {
      row stacks too — the key over the value — so the value has the full
      width and the email fits a phone in one line, never broken mid-word. */
   .about-panel--contact .about-inner {
-    padding-bottom: 3.5rem;
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
   }
   .about-panel--contact .contact-block {
     margin-top: 2rem;
@@ -2072,7 +2072,9 @@ a.contact-val:focus-visible {
 /* ---- footer ---- */
 footer.foot {
   margin-top: 8rem;
-  padding: 2.4rem 0 3rem;
+  /* The last thing on the page: with viewport-fit=cover the document runs
+     under the iOS home indicator, so the inset keeps the links above it. */
+  padding: 2.4rem 0 calc(3rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--hairline);
   font-family: var(--mono);
   font-size: 0.72rem;
