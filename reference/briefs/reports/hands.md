@@ -564,3 +564,129 @@ the camera path, synthetic landmarks through the real pipeline, IT locale:
 6. Reload, `or use the pointer`: hover with the mouse; click a print to
    open it; a quick flick anywhere or a double-click closes it. On a phone:
    tap opens, swipe closes.
+
+## Round 3 — audit fixes
+
+Round 3 fixes what the 2026-09-13 audit found (`reference/briefs/round3/audit-2026-09-13.md`,
+brief `round3/D-hands-darkroom.md`). Two sessions: the first did the
+audit-verify pass and committed D1, D2, D6, D7 and the MediaPipe path, then the
+machine ran out of memory mid-D8; the second (this report) verified the WIP it
+left in the tree, committed it, and carried the rest. Files only under
+`src/app/(immersive)/graphic-designs/hands/**` and this report. Headless
+Chrome on the integrated Radeon (ANGLE D3D11), a fake camera device for the
+camera path, synthetic 21-point hands written into the bus at 60 Hz through
+the real landmark → tracker → world pipeline, IT locale.
+
+### What changed (commit → items)
+
+| commit | item | what |
+|---|---|---|
+| `fe4e7f9` | D1 · B7, I18 | key guards: `e.repeat`, Alt/Ctrl/Meta ignored; Escape held on an opened print closes it and stops there, a second distinct press exits (gate too) |
+| `5e84cb6` | — | MediaPipe wasm + model from `public/mediapipe/1.0.1/` (C's versioned folder) |
+| `8df5cb9` | D2 · B15 | the card shader samples the print's alpha; texels under 2 % alpha are discarded (the six alpha prints show no grey box) |
+| `c9e0ab6` | D6 · I16 | `touch-action: none` only on `.hands-stage.is-running.is-pointer .hands-canvas`; the page keeps its pinch-zoom on the gate, in camera mode and over the chrome |
+| `84ba39a` | D7 · I17 | `role="alert"` on the no-WebGL and context-lost messages; `role=application` kept |
+| `8bc3ff0` | D8 · S5, B24 | the frame loop's holders, the keyboard holder and `fistOpens` reused instead of allocated; the detection loop's mapped hands pre-allocated; `loader.load` error callback (a lost print warns once and is skipped); the console restored on `stop()` whether or not the model settled |
+| `a9b234d` | D8 · S5, B24 | `getCurrentViewport` (and its `[0,0,0]`) only on a resize; the two trackers' state objects form one array built once; the world takes the bus queues as written (viewport-normalised) and converts them, the scene empties them in place (`input.consume()`, the four `drain*` are gone); `webglcontextlost/restored` listeners in an effect, removed on unmount; "swipe to close" hint once per browser session (`sessionStorage`) |
+| `25a9fe2` | D3 · S5 | the model (wasm + task, ~20 MB) loads from the gate's mount, once per mount, shared by every camera start; the task file is fetched with a byte count and streamed into the landmarker (`modelAssetBuffer`) so the gate can show "scarico il modello… 40 %" while the visitor waits on it; the 8 s clock covers the camera alone; a model that will not load has its own dialog line with the retry; the console filter is one page-level, reference-counted patch released when the load settles, fails, or `CONSOLE_FILTER_GRACE_MS` after an unmount |
+| `bd21e27` | D4 · I13, I14, I15 | nothing in the mono register under 0.7rem (11.2 px); a 2 px `--ring` amber focus ring on the stage (offset −2 px) and every control (offset 3 px) instead of `outline: none`; on coarse pointers a 44 px hit area through an invisible `::before` inset on the exit link, "oppure usa il puntatore" and "riprova con la fotocamera", a 44 px `min-height` on the bordered buttons |
+| `268f255` | D9 · I7, I5, I10, B3 | `metaTitle` "Mani · Hands"; descriptions EN 152 / IT 155 (were 181 / 191); `pageMetadata` → the route's own OG / Twitter card |
+| `7de4bdd` | D5 · B22 | the caption block is measured after it renders and pulled up until it ends `OPEN.captionEdgePx` above the viewport's bottom; under 420 px tall its two lines sit tight — on 844 × 390 both lines fit under the print |
+
+### Decisions
+
+- **Hit areas without moving the design.** The exit pill, the two text buttons
+  and the dialog's retry keep their look; on `(pointer: coarse)` an invisible
+  `::before` (44 px tall, 6 px wider on each side) takes the tap. E and F can
+  copy the same six lines for `.vortex-exit` / `.tara-exit` / `.wall-exit`.
+- **The model loads unprompted at the gate** (≈ 20 MB). `navigator.connection.saveData`
+  waits for the click instead. Under React StrictMode (dev only) the mount
+  effect runs twice: the first load is aborted at once, the second is the one
+  that counts — two entries in the network panel are expected in `next dev`.
+- **Console filter.** MediaPipe's INFO lines go through `console.error`; the
+  filter is now leased (module-level count) rather than patched per session,
+  so a load still settling from a previous mount and a new mount's load cannot
+  restore the console from under each other.
+- **Late model, camera up.** The gate's button reads the download percent
+  (`downloading` / `scarico il modello… {pct} %`) instead of "avvio in corso";
+  when the length is unknown it reads "avvio in corso".
+
+### New tunables — `hands.config.ts`
+
+| name | value | meaning |
+|---|---|---|
+| `INIT_TIMEOUT_MS` | 8000 | now the **camera alone** (permission → stream → first frame); the model has no clock |
+| `CONSOLE_FILTER_GRACE_MS` | 15000 | unmount with the model still loading: the console filter is released when it settles or after this |
+| `HINT_SESSION_KEY` | `"hands:hint-close"` | sessionStorage key for the once-per-session "swipe to close" hint |
+| `OPEN.captionMaxTop` | 0.86 | the caption never sits higher than this share of the viewport |
+| `OPEN.captionEdgePx` | 12 | … and always ends at least this many px above the bottom edge |
+
+New copy (`copy.ts`, EN + IT): `downloading`, `errModel`.
+
+### Verification done (round 3)
+
+- **WIP (8bc3ff0)** pointer path: 14 prints, 13 drifting in 1 s, hold follows
+  195 px, tear both ways (hover-then-Shift and Shift-then-press: 2 + 2
+  halves), hover 0.8 / lift 0.19, click → `opened` at (0, 0) ×2.22 with
+  caption and hint, flick → `closed`, 14 wholes back; Tab / Space / arrows
+  (+1.88 u) / Enter / Escape; live region "stampa 14 di 14 · chiusa". Fake
+  camera: presence → hover 0.99 → pinch → `held`, carried 1.95 u,
+  `released` → fist (reticle `is-fist`) → `opened` + "spazza per chiudere"
+  → open-palm sweep → `closed` → the same sweep outside focus → `pushed`;
+  Escape → `/graphic-designs`, no `<video>`, console clean.
+- **D8**: hint once per session (`sessionStorage` "1" set at the first open,
+  no hint at the second, none on a re-entry), context loss →
+  "Il contesto grafico è andato perso…" (`role=alert`), restore → alert gone,
+  drift resumes; exit → one canvas (the site's), console clean.
+- **D3** with the model throttled to 800 KB/s: fetch starts 0.39 s after
+  navigation (before any click), click at 2.5 s → "scarico il modello… 21 %"
+  … "80 %" → "avvio in corso" → running 11.7 s after the click, **no
+  timeout**; 404 on the model → "il modello delle mani non si è caricato",
+  console released while the dialog shows, retry → running in 1.3 s; click
+  the camera then "oppure usa il puntatore" mid-download → pointer mode, video
+  removed, holds work; exit mid-download → the fetch aborts in 2 ms, the
+  filter released 3.5 s later (when MediaPipe's read of the aborted stream
+  rejects).
+- **D4** (iPhone 14 and 1440 × 900): every mono size 11.2 px; the coarse
+  block present; with its rules applied, `elementFromPoint` 21 px above and
+  below the exit link (32 px box), "oppure usa il puntatore" (21 px box) and
+  the camera button still hits them; the stage shows `outline: solid 2px`
+  while focused; no `outline: none` left in the sheet.
+- **D5**: 844 × 390 — print bottom at 316 px, caption 324–361 px, both lines
+  inside the viewport, hint on; 390 × 844 — top 76.5 %, block 662–737 px;
+  1440 × 900 — top 81 %, unchanged.
+- **D9**: `<title>Mani · Hands — Alberto Marocco.dev</title>`, `og:title`,
+  `og:url` `/graphic-designs/hands`, descriptions per locale, both locales.
+- **No WebGL** (every `webgl2` context refused): "Questa demo richiede WebGL…"
+  with `role=alert`, the exit link, no canvas, console clean.
+- **Reduced motion** (emulated, pointer path): hover lift 0.23 with tilt 0 and scale 1; open → 13 away with travel 0 and spin 0 (fades only); caption transition 1e-06s; Escape closes; drift off (0 of 14 moved in 0.8 s).
+- `npx tsc --noEmit` clean; `npx eslint` on the folder zero findings.
+
+### Known limits (new)
+
+- The camera path with real hands was not driven (no webcam on this machine):
+  the detection loop's refactor (reused buffers) is verified by review and by
+  the landmark pipeline downstream of it.
+- A 20 MB download starts at the gate's mount for every visitor without
+  `saveData`, whether or not they pick the camera.
+- The exit pill's 45 % black ground lets a white print behind it wash out its
+  text (pre-existing, shared with the other demos' exit idiom).
+- The percent clamps under 100 until the stream ends; a content-encoded
+  response would make it undershoot (not the case for a `.task`).
+- After a rotation with a print open the caption is not re-clamped until the
+  next open.
+
+### How to test it in two minutes (round 3)
+
+1. `/graphic-designs/hands` with DevTools "Slow 4G": the model starts
+   downloading at the gate; click `attiva la fotocamera` → the button counts
+   "scarico il modello… 40 %" until it lands, then "avvio in corso" → the
+   hands are in; no "la fotocamera non risponde".
+2. `oppure usa il puntatore` → click a print → caption + `trascina di scatto
+   per chiudere` (once per session) → hold **Esc** for a second: the print
+   closes and you are still in the demo → **Esc** again → the index.
+3. Open img_001 (the road with orange handwriting): no grey box around it.
+4. Device toolbar, iPhone landscape (844 × 390): open a print — the caption's
+   two lines sit under it, readable.
+5. Tab into the stage: an amber ring at the viewport's edge; Tab on: the exit
+   link's ring.

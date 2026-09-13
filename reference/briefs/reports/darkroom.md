@@ -526,3 +526,84 @@ tracers (`harness.js`, `verify.sh` in this session's scratchpad).
    print is fixed (Space presses get you there), and it cuts.
 6. Device toolbar, a phone: drag a finger. Exit and re-enter a couple of
    times with the console open: nothing but three's notices.
+
+## Round 3 — audit fixes
+
+Route `/graphic-designs/darkroom` · audit `reference/briefs/round3/audit-2026-09-13.md`
+· brief `round3/D-hands-darkroom.md` · 2026-09-13, headless Chrome on the
+integrated Radeon (ANGLE D3D11), 1440 × 900 and the iPhone 14 viewport
+(390 × 844 @3×), synthetic pointer events, in-page tracers. Three commits.
+
+### What changed (commit → items)
+
+| commit | item | what |
+|---|---|---|
+| `ac5b38f` | D10 · S4 | a **mobile tier** (`TIER` in `darkroom.config.ts`), picked once at mount on a coarse pointer, a viewport under 720 px or `deviceMemory` ≤ 4 GB: grids at 0.75× (velocity 192, dye 384, exposure long side 768), 8 Jacobi iterations (was 20), sub-step budget 2 (was 3), no vorticity pass, canvas DPR ≤ 1.25 (was 1.5); the desktop tier is the old numbers. The grid sizes moved out of `SIM` into the tiers |
+| `ac5b38f` | D10 · S4 | **one `develop()` a frame** on every tier: at the handover the finished print's developed look (tone, paper) is baked once into the hold target (`BAKE_FRAG`, the develop GLSL shared with the composite); the composite reads it back with one tap while it sinks. `u_printOld` / `u_rectOld` / `u_seedOld` are gone; the hold is RG16F (RGBA8 fallback) and still follows its rect through a resize mid-handover |
+| `ac5b38f` | D12 · S4 | `ImageBitmapLoader` for the prints (decoded off the main thread, flipY at decode), `TextureLoader` fallback; a bitmap is closed with its texture |
+| `ac5b38f` | D12 · B24 | the `webglcontextlost/restored` listeners live in an effect keyed on the renderer and are removed on unmount |
+| `ac5b38f` | D12 | **strokes on the placeholder are kept** (the choice the brief asked for): a print that lands late goes in under the exposure developed meanwhile, remapped from the placeholder's 4:5 rect onto the print's own; the tray never ignores a hand |
+| `191a4cc` | D11 · B21, I13, I14, I15, I16 | `next print →` 44 px tall on every pointer; `touch-action: pinch-zoom` on the canvas (was `none` on the stage — the page's pinch-zoom is back, one finger stirs, two are the browser's); 2 px `--ring` focus ring on the exit link and the next button; title sub and keyboard hint 0.7rem (11.2 px); on coarse pointers the exit link takes a 44 px hit area through an invisible `::before` |
+| `80c8292` | D13 · I7, I10, I5, B3 | `metaTitle` "Camera Oscura · Darkroom"; IT aria "Camera Oscura — sviluppo interattivo…" (the tautology is gone); `pageMetadata` → the route's own OG / Twitter card; descriptions 131 / 134 |
+
+### New tunables — `darkroom.config.ts`
+
+| name | value | meaning |
+|---|---|---|
+| `TIER.mobileMaxWidth` | 720 | viewport width (CSS px) under which the mobile tier is picked |
+| `TIER.mobileMaxMemoryGb` | 4 | `navigator.deviceMemory` at or under which the mobile tier is picked |
+| `TIER.desktop.velocityShort / dyeShort / exposureLong` | 256 / 512 / 1024 | the grids (moved from `SIM`) |
+| `TIER.desktop.pressureIterations` | 20 | Jacobi iterations (moved from `SIM`) |
+| `TIER.desktop.maxSubsteps` | 3 | sub-step budget on a long frame (moved from `SIM`) |
+| `TIER.desktop.vorticity` | true | whether the curl + confinement passes run |
+| `TIER.desktop.dpr` | 1.5 | the canvas' DPR cap |
+| `TIER.mobile.*` | 192 / 384 / 768 · 8 · 2 · false · 1.25 | the same knobs for phones |
+
+### Verification done (round 3)
+
+| path | result |
+|---|---|
+| desktop 1440 × 900, tier desktop, DPR 1 (headless) | idle 59.7 fps (p95 17.4 ms); stirring 60 fps (p95 17.5 ms, max 17.8); a 3 s serpentine → coverage 0.88 → `fixing` → `fixed` 0.72 s → `dissolving` 0.4 s later → print 2 `developing` 1.2 s after; print 2 answers a 1.5 s stir with 0.86 |
+| iPhone 14 viewport, **tier mobile** (192 / 384 / 768, 8 iterations, no vorticity), canvas 487 × 1055 (DPR 1.25) | idle 60 fps (p95 17.4 ms, none over 33 ms); stirring 60 fps (p95 17.3 ms); the same handover timeline (fixing → fixed 0.55 s → dissolving → developing 1.2 s) |
+| the handover, screen brightness probed at the tray's centre every frame (`readPixels` after the frame's last draw) | 214–216 through `fixing`/`fixed`, then a smooth fall 217 → 0 over 1.19 s of `dissolving` — the baked print sinks; a mid-dissolve screenshot shows the portrait darkening and thinning over the incoming 4:3 print |
+| → then → again 0.3 s into the dissolve | print 3 bound at 62 ms, `developing` at 485 ms — re-targeted inside the same dissolve, both tiers |
+| brush path (reduced motion, iPhone 14) | no control at start; a touch stroke paints 0.15; nothing advances by itself in 3.5 s; Space presses → `fixed`; `stampa successiva →` 46 × 195 px, 11.2 px font, live region "stampa 1 fissata"; click → print 2 `developing`, control gone |
+| prints throttled to 2.5 KB/s (~8 s each), a 2.5 s stir on the black placeholder | coverage 0 while the placeholder is in the tray (not measured), 1.0 the moment the print lands — the strokes are kept |
+| context loss (`WEBGL_lose_context`) | "Il contesto grafico è andato perso…" `role=alert`, HUD gone, exit link stays; restore → alert gone, the print starts over, stirring works (0.89) |
+| no WebGL (every `webgl2` context refused) | "Questa demo richiede WebGL 2…" `role=alert`, exit link, no canvas, console clean |
+| `/graphic-designs/darkroom` → stir → Esc, ×3 | one canvas each time (the site's field), stage gone, heap 39 / 44 / 58 MB without a forced GC, console clean |
+| head | `<title>Camera Oscura · Darkroom — Alberto Marocco.dev</title>`, `og:title` the same, `og:url` `/graphic-designs/darkroom`, both locales |
+
+`npx tsc --noEmit` clean; `npx eslint` on the folder zero findings.
+
+### Known limits (new)
+
+- The frame times above are from an integrated Radeon at a phone viewport,
+  not a phone: they prove the tier switches and costs less, not a number on
+  an iPhone. The audit's 332 ms was the desktop tier at DPR 1.5; the mobile
+  tier draws 0.69× the composite pixels, 0.56× the fluid texels, 0.4× the
+  pressure passes and one develop() in the handover.
+- On a very slow network a vigorous stir on the placeholder can fix the print
+  the moment it lands (its strokes were kept in full). Blocking input instead
+  would have made the tray look dead for the wait; kept is the better fault.
+- `ImageBitmapLoader` relies on `createImageBitmap`'s `imageOrientation: "flipY"`
+  (Safari ≥ 15); a browser that ignores the option would show the prints
+  upside down — worth one look on a real iPhone.
+- The emulated phone reports no coarse pointer, so the keyboard line under the
+  hint shows there (as in round 2); the coarse-pointer CSS is verified by
+  reading the sheet.
+- Two-finger stirring is gone on touch: a pinch is the page's zoom now.
+
+### How to test it in two minutes (round 3)
+
+1. Device toolbar, iPhone 14, `/graphic-designs/darkroom`: stir with a finger —
+   smooth; a pinch zooms the page. DevTools Performance: no frame over 33 ms
+   while stirring.
+2. Stir a print to the end on any screen: as it fixes, the next print is in
+   the tray and the finished one sinks over it, darkening — no cut.
+3. DevTools → Rendering → `prefers-reduced-motion: reduce`: paint, press Space
+   until fixed — `stampa successiva →` is a 44 px tall button; tap it.
+4. Network "Slow 3G", reload: stir the black tray while the print downloads —
+   when it appears, what you stirred is already developed on it.
+5. Tab: the exit link (and, on the brush path, the next button) shows an
+   amber ring.
