@@ -15,25 +15,22 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      // No Permissions-Policy header. Tarassaco (camera + microphone) and Mani
+      // (camera) run on the spec's default allowlist — `self` for a top-level
+      // document — so the per-route `camera=(self)` blocks that used to sit
+      // here granted nothing the browser did not already grant. The tempting
+      // inverse, `camera=()` everywhere else, would break the demos: a policy
+      // binds to the document, and a client-side navigation from any site page
+      // into a demo keeps that page's document (and its denial).
       {
-        // The Tarassaco experiment needs camera + microphone. The browser default
-        // Permissions-Policy must explicitly allow this origin (`(self)`), and we
-        // scope the header to this route only so the rest of the site keeps the
-        // default policy. Note: this header is served by the Next/Vercel server —
-        // a separate static-export host (e.g. a plain .it host) would need the
-        // same header set at the web-server/CDN level instead.
-        source: "/graphic-designs/tarassaco",
+        // Two hardening headers on every response. No CSP yet: the document
+        // inlines a JSON-LD script and React's own bootstrap, so a real policy
+        // needs per-request nonces (proxy) — deferred, see DECISIONS.
+        source: "/:path*",
         headers: [
-          {
-            key: "Permissions-Policy",
-            value: "camera=(self), microphone=(self)",
-          },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
         ],
-      },
-      {
-        // Mani — Hands reads the webcam only (no microphone). Same scoping.
-        source: "/graphic-designs/hands",
-        headers: [{ key: "Permissions-Policy", value: "camera=(self)" }],
       },
       // Static payloads that never change without a rename (DECISIONS: "immutable
       // means renamed, never overwritten"): the MediaPipe wasm + models under a
