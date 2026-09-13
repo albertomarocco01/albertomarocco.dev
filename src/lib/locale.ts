@@ -17,3 +17,14 @@ export const OG_LOCALE: Record<Locale, string> = {
 export function isLocale(value: string | undefined | null): value is Locale {
   return value === "en" || value === "it";
 }
+
+/**
+ * Write the `locale` cookie for a year (client only — the toggle calls this,
+ * then reloads). `SameSite=Lax` as before, plus `Secure` whenever the page is
+ * served over https, so the preference never travels on a plain connection;
+ * left off on http so `next dev` on localhost keeps working.
+ */
+export function persistLocale(locale: Locale): void {
+  const secure = location.protocol === "https:" ? "; secure" : "";
+  document.cookie = `locale=${locale}; path=/; max-age=31536000; samesite=lax${secure}`;
+}
