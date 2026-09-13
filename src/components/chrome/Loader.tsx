@@ -245,9 +245,12 @@ export function Loader({ tag }: { tag: string }) {
     };
   }, [reducedMotion, reveal]);
 
-  // Reduced motion never shows the veil (AppProvider has already entered).
-  if (reducedMotion) return null;
-
+  // Rendered whatever the motion setting: under reduced motion CSS hides it
+  // (`.loader { display: none }` in the `reduce` block) and AppProvider has
+  // already entered. Not `return null` there — the server renders it (the flag
+  // is false on the server), so a client that skipped it would leave an orphan
+  // veil in the body that React never claims, right where its sibling markup
+  // is reconciled.
   return (
     <div className="loader" ref={rootRef} aria-hidden="true">
       <p className="loader-name">

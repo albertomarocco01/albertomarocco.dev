@@ -8,6 +8,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 // Silence THREE.Clock deprecation warnings coming from React Three Fiber (R3F v9).
 // Scoped to an effect with a restore, not applied at module scope: patching on
@@ -51,28 +52,24 @@ export function useApp(): AppState {
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  // Known on the first client render, hydration included (see the hook), so no
+  // consumer ever mounts a motion pass it then has to tear down.
+  const reducedMotion = useReducedMotion();
   const [entered, setEntered] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
   const [fieldReady, setFieldReady] = useState(false);
 
   useSilenceClockWarning();
 
-  // Detect reduced-motion on mount; if set, enter immediately (no entrance).
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const apply = () => {
-      setReducedMotion(mq.matches);
-      if (mq.matches) setEntered(true);
-    };
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
-  }, []);
+  // Reduced motion skips the veil, so the site is entered from the first
+  // render. Adjusted during render, not in an effect, for the same reason as
+  // above; and latched, so turning the setting off later leaves the site
+  // entered instead of hiding the topbar again.
+  if (reducedMotion && !entered) setEntered(true);
 
   // The entrance is driven by the loading veil (Loader): as its fake fill
   // completes it calls `enter()`, so the opening (topbar fade + field bloom, see
-  // Shell) plays exactly as the veil dissolves. Under reduced motion the effect
-  // above already set `entered` (the veil is skipped), making `enter` a no-op.
+  // Shell) plays exactly as the veil dissolves. Under reduced motion `entered`
+  // is already set (the veil is skipped), making `enter` a no-op.
   const enter = useCallback(() => setEntered(true), []);
 
   // Pure insurance: if the loader never reports back (it threw before its own

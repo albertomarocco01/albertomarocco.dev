@@ -156,7 +156,13 @@ export function Shell({
       <a href="#main" className="sr-only">
         {nav.skip}
       </a>
-      <div ref={topbarRef} className={`topbar${entered ? " in" : ""}`}>
+      {/* `in` only on the motion path: under reduced motion `entered` is already
+          true while hydrating, and the server rendered the bar without it — CSS
+          shows the bar there instead (see the reduced-motion block). */}
+      <div
+        ref={topbarRef}
+        className={`topbar${entered && !reducedMotion ? " in" : ""}`}
+      >
         <div className="topbar-left">
           <Link href="/" className="wordmark" onClick={onWordmarkClick}>
             alberto marocco

@@ -836,25 +836,29 @@ footer.foot a,
    SSR HTML and stay tabbable throughout, and focusing one composes the column
    (HomeSequence's focusin handler) so a keyboard visitor never lands on
    something they cannot see. `pointer-events` is the pointer's half of the same
-   deal: an invisible link must not be clickable. */
-html.home-live .teaser {
-  opacity: 0;
-  pointer-events: none;
-  filter: blur(10px);
-  transform: translateY(16px);
-  transition:
-    opacity 0.9s var(--ease),
-    filter 0.9s var(--ease),
-    transform 0.9s var(--ease);
-}
-/* Unlike the lede, no `hero-done` reveal here: the column stays driver-owned
-   for the whole page life so upward intent can always fold it — the driver
-   re-syncs `.is-in` on every (re)mount, locale switches included. */
-html.home-live .teaser.is-in {
-  opacity: 1;
-  pointer-events: auto;
-  filter: blur(0);
-  transform: none;
+   deal: an invisible link must not be clickable. Behind `no-preference` as well
+   as `home-live`: under reduced motion nothing is ever hidden, whatever a
+   script does with the class. */
+@media (prefers-reduced-motion: no-preference) {
+  html.home-live .teaser {
+    opacity: 0;
+    pointer-events: none;
+    filter: blur(10px);
+    transform: translateY(16px);
+    transition:
+      opacity 0.9s var(--ease),
+      filter 0.9s var(--ease),
+      transform 0.9s var(--ease);
+  }
+  /* Unlike the lede, no `hero-done` reveal here: the column stays driver-owned
+     for the whole page life so upward intent can always fold it — the driver
+     re-syncs `.is-in` on every (re)mount, locale switches included. */
+  html.home-live .teaser.is-in {
+    opacity: 1;
+    pointer-events: auto;
+    filter: blur(0);
+    transform: none;
+  }
 }
 /* No transition delays here: the 01 → 02 → 03 stagger is the driver's — each
    tile has its own threshold on the scrub, so scroll pace *is* the stagger,
