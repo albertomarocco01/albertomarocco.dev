@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { View } from "@react-three/drei";
 import { MeltMaterial, type MeltMaterialImpl } from "./melt-material";
+import { fieldState } from "./field-state";
 
 // MeltMaterial must be extended once; importing for its side effect.
 void MeltMaterial;
@@ -165,10 +166,11 @@ function MeltScene({ ioRef }: { ioRef: React.RefObject<MeltIO> }) {
 
     const delta = Math.min(raw, DT_MAX);
 
-    // The texture is the gate, and it only ever opens: the tremble below has no
-    // envelope, so from the first raster the GPU copy owns these pixels.
-    // Opacity (not visibility) keeps the h1 in the a11y tree.
-    const alive = io.tex != null;
+    // The texture is the gate: the tremble below has no envelope, so from the
+    // first raster the GPU copy owns these pixels — until the canvas loses its
+    // context (field-state.ts), when the DOM h1 takes them back. Opacity (not
+    // visibility) keeps the h1 in the a11y tree.
+    const alive = io.tex != null && !fieldState.lost;
     if (alive !== melting.current) {
       melting.current = alive;
       mesh.visible = alive;

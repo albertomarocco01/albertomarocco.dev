@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Canvas, type RootState } from "@react-three/fiber";
 import { View, Preload } from "@react-three/drei";
 import { useApp } from "@/components/providers/AppProvider";
 import { AmbientField } from "./AmbientField";
+import { fieldState } from "./field-state";
 import { isSoftwareRenderer } from "@/lib/webgl-caps";
 
 // Software-renderer detection lives in @/lib/webgl-caps (shared with the
@@ -29,6 +30,10 @@ export function Field() {
   const [active, setActive] = useState(true);
   // Set once the renderer is known; until then assume hardware (animate).
   const [staticOnly, setStaticOnly] = useState(false);
+  // The context is gone (iOS under memory pressure, a GPU reset): the field
+  // stops asking for frames until the browser gives it back.
+  const [lost, setLost] = useState(false);
+  const detach = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -40,7 +45,12 @@ export function Field() {
 
   // Mark the document so gen-row fallback plates crossfade to the live canvas.
   useEffect(() => {
-    return () => document.documentElement.classList.remove("canvas-live");
+    return () => {
+      detach.current?.();
+      detach.current = null;
+      fieldState.lost = false;
+      document.documentElement.classList.remove("canvas-live");
+    };
   }, []);
 
   return (
@@ -50,7 +60,10 @@ export function Field() {
           opening reads as an explosion out of nothing rather than a fade-up of
           an already-spread field. */}
       {!reducedMotion && (
-        <AmbientField active={active && entered} staticOnly={staticOnly} />
+        <AmbientField
+          active={active && entered && !lost}
+          staticOnly={staticOnly}
+        />
       )}
       <Canvas
         className="field-canvas"
@@ -73,8 +86,36 @@ export function Field() {
           powerPreference: "low-power",
         }}
         onCreated={(state: RootState) => {
-          document.documentElement.classList.add("canvas-live");
+          const root = document.documentElement;
+          root.classList.add("canvas-live");
           if (isSoftwareRenderer(state.gl.getContext())) setStaticOnly(true);
+
+          // Context loss: the DOM copies (the h1 under the melt, the /about
+          // <img>s, the gen-row plates) take the pixels back — `lost` is read
+          // by every view on the frame requested here, which is what drops
+          // `is-melting` / `is-live`. preventDefault is what lets the browser
+          // restore the context; three rebuilds its state on restore and
+          // re-uploads the textures, so the views simply re-arm.
+          const el = state.gl.domElement;
+          const onLost = (e: Event) => {
+            e.preventDefault();
+            fieldState.lost = true;
+            root.classList.remove("canvas-live");
+            setLost(true);
+            state.invalidate();
+          };
+          const onRestored = () => {
+            fieldState.lost = false;
+            root.classList.add("canvas-live");
+            setLost(false);
+            state.invalidate();
+          };
+          el.addEventListener("webglcontextlost", onLost);
+          el.addEventListener("webglcontextrestored", onRestored);
+          detach.current = () => {
+            el.removeEventListener("webglcontextlost", onLost);
+            el.removeEventListener("webglcontextrestored", onRestored);
+          };
         }}
       >
         <View.Port />

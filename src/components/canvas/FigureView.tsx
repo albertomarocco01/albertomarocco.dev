@@ -136,16 +136,21 @@ function FigureScene({
     if (!m || !mesh || !io || !io.track) return;
 
     // The texture is the gate: from its first frame the GPU copy owns these
-    // pixels and CSS fades the <img> out underneath (`is-live`). Opacity, not
-    // visibility, so the <img> keeps its alt text in the a11y tree.
+    // pixels and CSS fades the <img> out underneath (`is-live`) — until the
+    // canvas loses its context (field-state.ts), when the <img> takes them
+    // back. Opacity, not visibility, so the <img> keeps its alt text in the
+    // a11y tree.
     const tex = texRef.current;
-    const alive = tex != null;
+    const alive = tex != null && !fieldState.lost;
     if (alive !== live.current) {
       live.current = alive;
       mesh.visible = alive;
       io.host?.classList.toggle("is-live", alive);
     }
-    if (!alive) return;
+    if (!alive) {
+      reveal.current = 0; // a restore fades back in over the <img>'s own fade
+      return;
+    }
 
     const delta = Math.min(raw, DT_MAX);
     reveal.current += (1 - reveal.current) * Math.min(1, delta * REVEAL_RATE);

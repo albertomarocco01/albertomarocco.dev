@@ -19,6 +19,9 @@ export const fieldState = {
   fade: 0,
   /** bumps on every publish, so a reader can tell a live field from a stale one */
   frame: 0,
+  /** the shared canvas lost its WebGL context (Field.tsx): every view hands its
+   *  pixels back to the DOM until the context is restored */
+  lost: false,
 };
 
 type OrbLike = { x: number; y: number; r: number };
