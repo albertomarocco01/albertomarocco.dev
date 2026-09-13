@@ -7,9 +7,11 @@ import type { Locale } from "@/lib/locale";
  * these strings down as one prop. Typing both entries as `HandsCopy` keeps
  * EN/IT parity compiler-enforced.
  *
- * The piece's own name — "Mani — Hands" — is a title, not copy, and stays as-is
- * in both locales. Every visitor-facing string belongs here, never inline in a
- * component. HUD labels are lowercase mono, few words.
+ * The piece's own name — "Mani · Hands" — is a title, not copy, and stays as-is
+ * in both locales (the middle dot keeps the layout's " — Alberto Marocco.dev"
+ * template from making a three-dash title). Every visitor-facing string belongs
+ * here, never inline in a component. HUD labels are lowercase mono, few words.
+ * Apostrophes are straight; both descriptions stay under 160 characters.
  */
 export interface HandsCopy {
   metaTitle: string;
@@ -86,9 +88,9 @@ const CAPTIONS: readonly string[] = [
 ];
 
 const en: HandsCopy = {
-  metaTitle: "Mani — Hands",
+  metaTitle: "Mani · Hands",
   metaDescription:
-    "Your hands, read by the webcam: pinch a print out of the drift, carry it, close your hand on it to open it, tear it in two. Processed locally — nothing is recorded or sent anywhere.",
+    "Your hands, read by the webcam: pinch a print out of the drift, carry it, close your hand on it to open it, tear it in two. Nothing is recorded or sent.",
   aria: "Mani — hand-tracked gallery of prints. With the camera: pinch to hold a print, close your hand on it to open it, sweep an open hand to close it, pull with both hands to tear it, push an open palm to scatter them. With the pointer: press to hold, click to open, flick or double-click to close, shift-drag to tear, double-click to push. Keys: Tab cycles the prints, Space holds or releases, Enter opens the focused print, arrows move a held print, T tears it, P pushes from the centre, ? shows the guide, Escape closes an opened print and, pressed again, exits; Backspace closes it too.",
   exit: "← exit the demo",
   enable: "enable the camera",
@@ -134,9 +136,9 @@ const en: HandsCopy = {
 };
 
 const it: HandsCopy = {
-  metaTitle: "Mani — Hands",
+  metaTitle: "Mani · Hands",
   metaDescription:
-    "Le tue mani, lette dalla webcam: pizzica una stampa dalla deriva, portala con te, chiudi la mano su di essa per aprirla, strappala in due. Tutto in locale — niente viene registrato o inviato.",
+    "Le tue mani, lette dalla webcam: pizzica una stampa dalla deriva, portala, chiudi la mano per aprirla, strappala in due. Niente viene registrato o inviato.",
   aria: "Mani — galleria di stampe guidata dalle mani. Con la fotocamera: pizzica per tenere una stampa, chiudi la mano su di essa per aprirla, spazza con la mano aperta per chiuderla, tira con due mani per strapparla, spingi col palmo aperto per disperderle. Col puntatore: premi per tenere, clic per aprire, uno scatto o un doppio clic per chiudere, maiusc + trascina per strappare, doppio clic per spingere. Tasti: Tab scorre le stampe, Spazio tiene o lascia, Invio apre la stampa selezionata, le frecce spostano la stampa tenuta, T la strappa, P spinge dal centro, ? mostra la guida, Esc chiude la stampa aperta e, premuto di nuovo, esce; anche Backspace la chiude.",
   exit: "← esci dalla demo",
   enable: "attiva la fotocamera",
