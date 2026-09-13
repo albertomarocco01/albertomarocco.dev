@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import { getLocale } from "@/lib/i18n";
+import { pageMetadata } from "@/lib/seo";
 import { DARKROOM_COPY } from "./copy";
 import { DarkroomClient } from "./client";
 
 export async function generateMetadata(): Promise<Metadata> {
   const copy = DARKROOM_COPY[await getLocale()];
-  return {
+  return pageMetadata({
     title: copy.metaTitle,
     description: copy.metaDescription,
-    alternates: { canonical: "/graphic-designs/darkroom" },
-  };
+    path: "/graphic-designs/darkroom",
+  });
 }
 
 // The demo tree is client-only (`ssr: false`, see client.tsx), so the locale is

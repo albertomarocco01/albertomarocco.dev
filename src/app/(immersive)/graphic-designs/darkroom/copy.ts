@@ -7,8 +7,10 @@ import type { Locale } from "@/lib/locale";
  * these strings down as one prop. Typing both entries as `DarkroomCopy` keeps
  * EN/IT parity compiler-enforced.
  *
- * The piece's own name — "Camera Oscura — Darkroom" — is a title, not copy, and
- * stays as-is in both locales. Labels are lowercase mono, few words.
+ * The piece's own name — "Camera Oscura · Darkroom" — is a title, not copy, and
+ * stays as-is in both locales (the middle dot keeps the layout's
+ * " — Alberto Marocco.dev" template from making a three-dash title). Labels
+ * are lowercase mono, few words; apostrophes straight; descriptions under 160.
  */
 export interface DarkroomCopy {
   metaTitle: string;
@@ -34,7 +36,7 @@ export interface DarkroomCopy {
 }
 
 const en: DarkroomCopy = {
-  metaTitle: "Camera Oscura — Darkroom",
+  metaTitle: "Camera Oscura · Darkroom",
   metaDescription:
     "Stir the developer with your pointer and photographs develop where it has moved — a GPU fluid simulation, entirely in your browser.",
   aria: "Camera Oscura — interactive darkroom. Move the pointer or a finger to stir the developer and the print develops where the liquid moves. Space agitates the tray, right and left arrows change print, Escape exits.",
@@ -50,10 +52,10 @@ const en: DarkroomCopy = {
 };
 
 const it: DarkroomCopy = {
-  metaTitle: "Camera Oscura — Darkroom",
+  metaTitle: "Camera Oscura · Darkroom",
   metaDescription:
     "Muovi lo sviluppo con il puntatore e le fotografie affiorano dove è passato — una simulazione di fluido su GPU, tutta nel tuo browser.",
-  aria: "Camera Oscura — camera oscura interattiva. Muovi il puntatore o un dito per smuovere lo sviluppo: la stampa affiora dove il liquido si muove. Spazio agita la bacinella, le frecce destra e sinistra cambiano stampa, Esc esce.",
+  aria: "Camera Oscura — sviluppo interattivo. Muovi il puntatore o un dito per smuovere lo sviluppo: la stampa affiora dove il liquido si muove. Spazio agita la bacinella, le frecce destra e sinistra cambiano stampa, Esc esce.",
   exit: "← esci dalla demo",
   hint: "muovi lo sviluppo",
   keyboardHint: "spazio agita · ← → cambia stampa · esc esce",
