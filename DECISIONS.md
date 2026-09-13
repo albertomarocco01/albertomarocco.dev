@@ -6,13 +6,15 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
 
 ## Stack / versions
 
-- **Next 16.2.9, React 19.2, TypeScript 6** (scaffolded with `create-next-app`,
+- **Next 16.3, React 19.2, TypeScript 6** (scaffolded with `create-next-app`,
   App Router, `src/` dir, no Tailwind, ESLint flat config, Turbopack).
 - **@react-three/drei is v10**, not the spec's "latest 9.x" — drei 10 is the
   current major that pairs with R3F 9 + React 19. The architecture is unchanged.
-- **`@react-three/postprocessing` deliberately omitted** for now. The spec marks
-  the bloom/grain pass optional; the CSS grain already reads well and skipping it
-  keeps the lazy 3D chunk leaner. Easy to add later.
+- **`@react-three/postprocessing` stays out of the site canvas.** The spec marks
+  the bloom/grain pass optional; the CSS grain already reads well on the site.
+  Two demos do use it, in their own route chunks — Parete (bloom + SMAA,
+  `wall/components/WallCanvas.tsx`) and Image Vortex (`VortexScene.jsx`) — so
+  it never reaches the site bundle.
 
 ## Art direction / type
 
@@ -40,9 +42,10 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
   the work. The amber entrance wash (`WashView`) is removed. The field mounts
   after first paint + idle (now **not** gated on entry, so it lives behind the
   gate too); the gate's background is transparent so it reads through, while the
-  home stays hidden until entry via `.wrap` opacity. It runs only while it can
-  be seen — `active` is gated on hero `IntersectionObserver` + tab visibility,
-  fading out and idling when scrolled away/backgrounded and resuming on return.
+  home stays hidden until entry via `.wrap` opacity. *(Superseded: the gate and
+  its entry are gone — see "The entrance" under Motion.)* It is now a full-site
+  background, so the only gate on `active` is tab visibility (`Field.tsx`):
+  backgrounded, it fades out and idles; it resumes on return.
 - **One shared material, branched on `u_white` — not forked.** The same
   `AuraMaterial` renders two looks from one `if (u_white > 0.5)`:
   - **`u_white` 0 — the amber/ember WORK reveals:** the domain-warped value-noise
@@ -153,6 +156,15 @@ dial to nudge by eye on real hardware: lower it if an orb drifting behind the na
 reads too strong, raise it if the orbs feel too subtle. (Headless/software WebGL
 paints only the field's static frame and can't drive this demand-loop field, so
 the look was reasoned from the shader math, not machine-verified visually.)
+
+**Current values (2026-09-13) — the numbers above are the history of the first
+retune, not today's field.** Later passes went the other way, towards a dense,
+calm full-site background: `BLOB_COUNT` **14** (`field-glsl.ts`), `CORE_RADIUS`
+**0.055**, `BASE_SPEED` **0.25**, `IDLE_DRIFT` **0.065** (`Aura.tsx`, scaled for
+aspect), `maxFade` **0.7** (`AmbientField.tsx`). Size, softness, gain and
+opacity are live uniforms tuned with the `?tune` panel (`bubble-params.ts`).
+The source files are the truth; this note only stops the log from reading as
+current.
 
 ## Motion
 
@@ -291,13 +303,14 @@ the look was reasoned from the shader math, not machine-verified visually.)
   `footer.vat` is optional and unset in both dictionaries, and `Footer.tsx`
   renders the span only when it has a value. Never ship a made-up number — set
   the real one as `vat: "P.IVA 01234567890"` in both locales of `dictionary.ts`.
-- **Instagram** links to `instagram.com/albertomarocco` (guessed handle).
-- **"Studio — next"** is a coming-soon row; its link points to `#work` until the
-  real project/route exists.
-- Generative rows render the live shader (no stock imagery). **Vini Montarello**
-  now shows a real, optimized capture of its live home (see below). The
-  remaining `web` row (**Studio — next**) still uses a gradient plate
-  placeholder — **replace with a real still** when the project exists.
+- **Instagram** is `instagram.com/alberto.marocco` (`CONTACT.instagram`) —
+  confirm it is the account he wants linked.
+- **"Studio — next"** (`work.ts`, the third `gen` row on /xperiments) is a
+  coming-soon row that paints the violet aura and links nowhere; give it a
+  real destination (or drop it) when the project exists.
+- Both `web` rows show real, optimized captures of the live sites (**Vini
+  Montarello**, **Toretto Blend** — sources under `reference/WorkPhotos/`);
+  the `mediaGradient` plate on each is the no-image fallback only.
 
 ## Vini Montarello preview (B3)
 
@@ -311,8 +324,8 @@ the look was reasoned from the shader math, not machine-verified visually.)
 - **No iframe** (heavy, X-Frame-Options). next/image with `fill` + `sizes` +
   `object-fit: cover` fills the reveal box (fixed height → **CLS 0**), lazy by
   default, toned into the dark palette (brightness/saturate) and lifting on open.
-- **"visit site ↗" overlay, top-right** — label string owned by `work.ts`
-  (`cue`); placed in the corner so it never collides with the site's own centred
+- **"visit site ↗" overlay, top-right** — label string is the row's `cue` in
+  the dictionary (`work.items.<id>.cue`, EN + IT); placed in the corner so it never collides with the site's own centred
   wordmark or the bottom-left caption, with a solid-enough background to read
   without relying on `backdrop-filter`. The whole row remains the link.
 - **To replace:** drop a new capture at the same path (any jpg/png/webp/avif;
@@ -322,9 +335,15 @@ the look was reasoned from the shader math, not machine-verified visually.)
 ## Analytics / SEO
 
 - **`@vercel/analytics/next`** — cookieless, no banner.
-- Metadata API (title template, description, OpenGraph, Twitter, robots,
-  canonical), `sitemap.ts`, `robots.ts`, brand `icon.svg`, and a dynamic OG image
-  (`opengraph-image.tsx` via `next/og`, Fraunces fetched as TTF and subsetted).
+- Metadata API: the root layout holds the base URL, the title template and
+  the site-wide description; every page (site and demo) resolves its own
+  title, description, canonical, Open Graph and Twitter block through
+  `pageMetadata({ title, description, path })` in `lib/seo.ts`, so a shared
+  link previews that page and not the home. `sitemap.ts` (dates per route,
+  kept by hand), `robots.ts`, `manifest.ts`, the brand `icon.svg` and its
+  180 px `apple-icon.tsx`, and the OG image (`opengraph-image.tsx` via
+  `next/og`, Fraunces read from a vendored TTF). Details, rules and the
+  limits under "Round 3 — C" below.
 
 ## Verification (local prod build, Lighthouse desktop, headless Chrome)
 
@@ -522,12 +541,11 @@ do not leak into the site bundle. Fonts are 195–229 KB on every route (Fraunce
 roman + italic, JetBrains Mono, all variable) and are the largest fixed cost;
 they are left alone deliberately, since the display serif *is* the site.
 
-- **The index's covers are eager, not lazy.** Five cards, every optimised cover
-  a few KB: lazy-loading the ones below the fold only bought a visible pop-in
-  on the way down. The first keeps its `preload` (it is the LCP element).
-- **`public/darkroom|hands|wall` are `immutable`**, like `/vortex/images` and
-  `/mediapipe`: content-addressed by filename, so they should not be
-  revalidated on every visit to the index.
+- **The index's covers** are static imports from `src/assets/covers/` (see
+  "Round 3 — C": hashed URLs, real `sizes`, lazy below the fold; the first
+  keeps its `preload` as the LCP element). *(Superseded: they were eager
+  files under `public/<id>/` with an `immutable` header — the header was the
+  bug, see B4 below.)*
 
 ## Merge — round 2 (2026-09-11)
 
@@ -608,3 +626,145 @@ headers moved with them.
 
 - **WebGPU** (TSL/`WebGPURenderer`) is intentionally not attempted; WebGL2 ships.
   A WebGPU path with WebGL2 fallback can come later without architecture changes.
+  (The layout's keywords no longer say "webgpu" for that reason.)
+- **Content-Security-Policy.** The document inlines a JSON-LD script and
+  React's own bootstrap, so a real policy needs per-request nonces (a proxy
+  that stamps the nonce and a `headers()` that reads it). Not done in round 3;
+  `Referrer-Policy` and `X-Content-Type-Options` are.
+- **`hreflang` / `alternates.languages`.** See "Round 3 — C": the locale is a
+  cookie, not a URL, so there is no second URL to point a crawler at.
+
+## Round 3 — audit fixes (2026-09-13)
+
+The audit in `reference/briefs/round3/audit-2026-09-13.md` (item ids B/S/I
+below) was fixed by six parallel packages, one session each, with a shared
+working tree and one index; `reference/briefs/round3/00-shared.md` has the
+rules, `reference/briefs/round3/reports/<pkg>.md` the per-package reports.
+Each package appends its own subsection here — **append, never rewrite** the
+ones above.
+
+### C — copy, SEO, config, docs, covers
+
+- **Brand, one rule (I8).** *"Alberto Marocco.dev"* is the site's **name**:
+  `<title>`s, `og:site_name`, `applicationName`, the manifest, the OG image's
+  alt. *"albertomarocco.dev"* is the **domain**, lowercase, wherever it is
+  shown as an address: the footer's last cell, the OG image's wordmark, the
+  README title. Both live in `lib/seo.ts` (`SITE_NAME`, `SITE_URL`) and
+  nothing else spells them out — layout, sitemap, robots, manifest and the OG
+  image import them.
+- **Titles never make three dashed segments (I7).** The layout template
+  appends ` — Alberto Marocco.dev`, so a page title carries no ` — ` of its
+  own. A name that is two parts joins them with a middle dot in its `<title>`
+  form — `Merge · Graphic Designs`, `Camera Oscura · Darkroom`, `Mani ·
+  Hands`, `Tarassaco · Dandelion Wind` — while the visible h1 keeps the em
+  dash (`Merge — Graphic Designs`). The vortex drops its "— Merge" suffix
+  (`Image Vortex`). Every description, EN and IT, stays ≤ 160 characters
+  (dictionary: 92–154). Demo `copy.ts` files apply the same rule (D/E/F).
+- **Naming (I1, I2, I10).** The demo index is *Merge — Graphic Designs*
+  everywhere it is a name (home teaser included — it fits the one-line teaser
+  window at 1440 and 390 px); "graphic designs" is plural everywhere. In
+  Italian the topbar and the /about title say **"chi sono" / "Chi sono"** —
+  the nav's other English tokens (*graphic designs*, *xperiments*) are names
+  of things, "about" was a word left untranslated. The contact row keys match
+  across locales (*where* / *dove*), the reply note lists the languages in
+  the same order in both (`it / en`), and /about's description no longer
+  opens with the home's sentence. Straight `'` apostrophes in all copy (I5).
+- **Dead dictionary keys are deleted, not kept (I9).** The `Dictionary` type
+  forces every key into both languages, so an unread key costs a translation
+  for nothing. Removed: `nav.work`, `nav.contact`, `gd.back`, `about.label`,
+  `about.title`, `work.aria`, `work.sections`,
+  `work.items["merge-graphic-designs"]`, `error` (the boundaries read
+  `ERROR_COPY` from `lib/boundary-copy.ts` directly). New: `notFound`.
+- **Per-route Open Graph (B3).** A page's `openGraph` replaces the layout's
+  object wholesale (measured: setting only `title` left the home's
+  `og:title`/`og:url` on every route, and setting `openGraph` without
+  `images` dropped the OG image entirely). `pageMetadata` therefore writes
+  the full block — type, site name, locale, url, title with the suffix,
+  description, the image — and Twitter alongside; every `page.tsx` calls it.
+- **Immutable means renamed, never overwritten (B4, S15).** Anything served
+  under `Cache-Control: immutable` is content-addressed by its **path**: when
+  the bytes change, the path changes. The folders under that header, both in
+  `next.config.ts`: `public/mediapipe/<version>/` (the `@mediapipe/tasks-vision`
+  version — a package bump is a new folder, the old one deleted once nothing
+  references it; the never-requested `vision_wasm_module_internal.*` were
+  dropped, S6) and `public/vortex/images/` (a re-encoded print is a new
+  filename, and the reference in the vortex config moves with it — the set
+  was re-encoded in place once, `ca3ac2b`). The demo covers left `/public`
+  altogether: `src/assets/covers/<id>.webp` are static imports, so Next
+  hashes the URL (`/_next/static/media/<name>.<hash>.webp`) and a re-shot
+  cover is a new URL by construction. The vortex cover is now an 800 × 1000
+  capture of the running piece, like the other four (S7).
+- **Cover `sizes` follow the card (S7).** `(max-width: 560px) 88vw,
+  (max-width: 785px) 28vw, 220px` — one column under 560 px, the
+  `clamp(120px, 28vw, 220px)` column to the point where it caps, 220 px above.
+  Measured on the iPhone 14 viewport: the 309 css px box gets the full 800 px
+  source (2.6×) instead of a 156 px variant. Covers below the fold are
+  `loading="lazy"`; the first keeps its `preload`.
+- **The 404 is the site's own page (B2).** `app/not-found.tsx` renders inside
+  the root layout only — the (site) chrome (topbar shell, veil, Lenis, the
+  WebGL field, the custom cursor) is deliberately not mounted, so a mistyped
+  URL never boots three.js. It borrows the section pages' classes (`.topbar
+  .in` wordmark, `.sect-label`, `.page-title`, `.page-lede`, `.gd-back`, the
+  footer), reads the locale cookie (an async Server Component), and restores
+  the pointer inline because `globals.css` hides it for a custom cursor that
+  is not there. Next stamps it 404 + `noindex`; its `<title>` is the layout's
+  default (a root `not-found` cannot export metadata).
+- **Fallbacks read the cookie on the server (I12).** The demos'
+  `loading.tsx` is an async Server Component: the word is right from the
+  first byte, and the partial prefetch still carries it (checked on the RSC
+  prefetch payload). The two `error.tsx` stay Client Components and read
+  `<html lang>` — a boundary's fallback is client-rendered, never hydrated,
+  so `useLocale` returns the real value on its first render; no flash to fix.
+- **`hreflang` is not possible with a cookie locale (I12).** There is one URL
+  per page and the language is a cookie, so there is no alternate URL for
+  `alternates.languages` to point at, and a crawler — which sends no cookie —
+  indexes the Italian default only; the English copy is invisible to search
+  engines and social previews (`og:locale` for bots is always `it_IT`). A
+  deliberate limit of the no-`[lang]`-routing decision above, accepted for a
+  portfolio whose primary language is Italian. Also no `Accept-Language`
+  negotiation, for the same reason (the cookie is the choice).
+- **Headers (I26).** No `Permissions-Policy`: the spec's default allowlist
+  for a top-level document is already `self`, so the per-route
+  `camera=(self)` blocks granted nothing — and the inverse, `camera=()` on
+  every other route, would break the demos, because a policy binds to the
+  document and a client-side navigation into a demo keeps the previous page's
+  document. Every response carries `Referrer-Policy:
+  strict-origin-when-cross-origin` and `X-Content-Type-Options: nosniff`.
+  CSP: deferred, above.
+- **AVIF stays off (I26), measured.** The optimizer runs per request, not at
+  build, so "build time" was never the cost; the cost is CPU per variant and
+  the result is worse: on these dark, already-lossy WebP sources sharp's AVIF
+  at q75 came out *larger* than WebP (darkroom cover 640 w: 17.2 KB vs 9.7
+  KB; vini 1080 w: 90 KB vs 45 KB) and 3–6× slower to encode. Revisit only
+  with photographic sources.
+- **OG image fonts (S14).** `opengraph-image.tsx` reads
+  `src/assets/fonts/fraunces-300-latin.ttf` with `fs` at module scope — no
+  network at build. The file is the TTF Google Fonts serves for
+  `Fraunces:opsz,wght@9..144,300`, subset with the CSS API's `text=`
+  parameter to printable ASCII + `àèéìòù ÀÈÉÌÒÙ · — – ’` (25 KB). To add
+  glyphs: request `https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300&text=<url-encoded glyphs>`
+  with a non-browser UA, download the `url(...)` it names, replace the file.
+  The rendered PNG is pixel-identical to the fetched-at-build version. Only
+  the fonts a build reads are vendored (no JetBrains Mono: nothing renders it
+  server-side).
+- **Sitemap dates are a table (I25).** `sitemap.ts` keeps a per-route
+  `modified` date, seeded from each route folder's last commit; bump it when
+  a route's content or behaviour really changes, not for a chrome or
+  dependency change that touches every page. `manifest.ts` describes a
+  *site* (`display: browser`, Italian description, the SVG mark + the PNG
+  apple icon); `apple-icon.tsx` draws the `icon.svg` mark at 180 px.
+- **Locale cookie (I12).** `persistLocale()` in `lib/locale.ts` writes it with
+  `Secure` when the page is https (nothing on localhost); the toggle is to
+  call it (request to A).
+- **Repository hygiene (I27).** `toretto-raw.png` (the source of the Toretto
+  Blend row preview) moved from the root to `reference/WorkPhotos/`. The
+  `src/Merge Designs/` exceptions in `.gitignore`, `eslint.config.mjs` and
+  `tsconfig.json` stay: the folder is Alberto's untracked 64 MB source
+  archive for Tarassaco, on disk in this checkout; the three exclusions are
+  what keep it out of the build, and moving a folder the dev server watches
+  is a Windows lock away from a crash. Move it out of `src/` by hand when
+  the server is down, then drop the three lines.
+- **Left for the second C run (needs the other packages first):** the
+  DECISIONS entries and dictionary requests A/B/D/E/F hand over; the
+  `.notfound` CSS block (request to A) so the 404's inline `cursor` styles
+  can go.
