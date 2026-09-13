@@ -24,7 +24,7 @@ export function Footer({
   return (
     <footer className={`foot${curtain ? " curtain" : ""}`}>
       <div className="foot-inner">
-        <span className="vat">{footer.vat}</span>
+        {footer.vat && <span className="vat">{footer.vat}</span>}
         <Link href={CONTACT.contactHref} className="foot-contact">
           {footer.contact}
           <span className="arrow" aria-hidden="true">
