@@ -324,11 +324,7 @@ footer.foot a,
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 clamp(1.4rem, 5vw, 5rem);
-  /* Visible from first paint (protects LCP). `.in` remains as a harmless final
-     state; only the topbar still fades in via GSAP. */
-}
-.wrap.in {
-  opacity: 1;
+  /* Visible from first paint (protects LCP); only the topbar fades in. */
 }
 /* Programmatic skip-link target, not an interactive control — it takes focus so
    the skip link works, and shows nothing for it. */

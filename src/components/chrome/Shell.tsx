@@ -184,7 +184,7 @@ export function Shell({
       {/* `tabIndex={-1}` so the skip link can actually move focus here; the
           outline is suppressed in CSS since this is a programmatic target, not
           an interactive control. */}
-      <div id="main" tabIndex={-1} className={`wrap${entered ? " in" : ""}`}>
+      <div id="main" tabIndex={-1} className="wrap">
         {children}
       </div>
     </>
