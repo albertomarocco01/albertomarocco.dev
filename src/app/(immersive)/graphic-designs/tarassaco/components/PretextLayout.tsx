@@ -7,6 +7,8 @@ interface PretextLayoutProps {
   windowWidth: number;
   exclusionWidth?: number;
   exclusionHeight?: number;
+  /** narrowest row allowed beside the exclusion zone before rows run under it */
+  minTextWidth?: number;
   registerNode: (el: HTMLElement | null, x: number, y: number) => void;
   clearNodes: () => void;
   enableReveal?: boolean;
@@ -28,6 +30,7 @@ export function PretextLayout({
   windowWidth, 
   exclusionWidth = 0, 
   exclusionHeight = 0, 
+  minTextWidth = 200,
   registerNode,
   enableReveal = false,
   revealMode = 'ltr',
@@ -64,16 +67,21 @@ export function PretextLayout({
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      
-      // Must mirror what the DOM actually renders, or the absolutely-positioned
-      // words drift and overlap. The container is `.tarassaco` (font stack
-      // below) at `text-base` = 16px with `tracking-wide` = 0.025em. Canvas
-      // measureText ignores letter-spacing, so add it back: 0.025em × 16px =
-      // 0.4px per character, applied after every character including the last.
-      ctx.font = '16px "Inter", ui-sans-serif, system-ui, sans-serif';
-      const LETTER_SPACING = 0.4;
 
-      const lineHeight = 32;
+      // Must mirror what the DOM actually renders, or the absolutely-positioned
+      // words drift and overlap — so read the container's computed font, letter
+      // spacing and line height instead of hard-coding them: the stylesheet
+      // sets a smaller poem on phones and the face is the site's own serif
+      // (a next/font variable, resolved here to its real family name). Canvas
+      // measureText ignores letter-spacing, so it is added back per character,
+      // after every character including the last. Fonts still loading measure
+      // with the fallback face; `document.fonts.ready` below re-runs this.
+      const cs = getComputedStyle(container);
+      ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const fontSize = parseFloat(cs.fontSize) || 16;
+      const LETTER_SPACING = parseFloat(cs.letterSpacing) || 0;
+
+      const lineHeight = parseFloat(cs.lineHeight) || fontSize * 2;
       let currentX = 0;
       let currentY = 0;
       let globalIndex = 0;
@@ -86,12 +94,12 @@ export function PretextLayout({
         const wordWidth = metrics.width + token.length * LETTER_SPACING;
 
         // Dynamic Exclusion Zone
-        let allowedWidth = currentY < exclusionHeight ? Math.max(200, width - exclusionWidth - 40) : width;
+        let allowedWidth = currentY < exclusionHeight ? Math.max(minTextWidth, width - exclusionWidth - 40) : width;
 
         if (currentX + wordWidth > allowedWidth && token.trim() !== "") {
           currentX = 0;
           currentY += lineHeight;
-          allowedWidth = currentY < exclusionHeight ? Math.max(200, width - exclusionWidth - 40) : width;
+          allowedWidth = currentY < exclusionHeight ? Math.max(minTextWidth, width - exclusionWidth - 40) : width;
         }
 
         if (token.trim() !== "") {
@@ -116,9 +124,13 @@ export function PretextLayout({
     calculateLayout();
     const observer = new ResizeObserver(calculateLayout);
     observer.observe(containerRef.current);
+    // The web font may land after the first measure; measuring with the
+    // fallback face lays the words out for the wrong widths.
+    let live = true;
+    document.fonts?.ready.then(() => { if (live) calculateLayout(); });
 
-    return () => observer.disconnect();
-  }, [processedText, exclusionWidth, exclusionHeight, windowWidth]);
+    return () => { live = false; observer.disconnect(); };
+  }, [processedText, exclusionWidth, exclusionHeight, minTextWidth, windowWidth]);
 
   // Typewriter effect. Updater stays pure — advance one char, no-op at the end.
   useEffect(() => {

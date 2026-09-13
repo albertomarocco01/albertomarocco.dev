@@ -16,14 +16,16 @@
 */
 
 /* ---- scope base (was the Vite app's body) ---- */
+/* The stage owns the viewport like the other four demos: fixed, inset 0,
+   overflow hidden — nothing ever scrolls, on a phone the flower shrinks and the
+   poem wraps around it (tarassaco.config.ts) instead of pushing the page. */
 .tarassaco {
-  position: relative;
-  min-height: 100vh;
-  min-height: 100dvh;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
   background-color: #000;
   color: #fff;
   font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
-  overflow-x: hidden;
   cursor: auto; /* restore the pointer over the site-wide `body { cursor: none }` */
   isolation: isolate;
   /* press-and-hold blows: no one-finger pan to cancel the pointer, no
@@ -32,6 +34,22 @@
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+}
+.tarassaco .tara-root {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+/* main scene: header + poem column, the flower hanging off its top-right */
+.tarassaco .tara-main {
+  margin-top: 3rem;
+}
+.tarassaco .tara-main-head {
+  margin-bottom: 4rem;
 }
 .tarassaco ::selection {
   background: #fff;
@@ -79,23 +97,14 @@
 .tarassaco .w-12 { width: 3rem; }
 .tarassaco .h-12 { height: 3rem; }
 .tarassaco .w-24 { width: 6rem; }
-.tarassaco .w-\[450px\] { width: 450px; }
-.tarassaco .h-\[450px\] { height: 450px; }
 .tarassaco .h-\[1px\] { height: 1px; }
 .tarassaco .max-w-2xl { max-width: 42rem; }
 .tarassaco .max-w-6xl { max-width: 72rem; }
-.tarassaco .min-h-screen { min-height: 100vh; min-height: 100dvh; }
 
 /* ---- spacing ---- */
 .tarassaco .mt-4 { margin-top: 1rem; }
-.tarassaco .mt-12 { margin-top: 3rem; }
-.tarassaco .mb-16 { margin-bottom: 4rem; }
-.tarassaco .-mt-24 { margin-top: -6rem; }
-.tarassaco .-mr-12 { margin-right: -3rem; }
 .tarassaco .px-8 { padding-left: 2rem; padding-right: 2rem; }
 .tarassaco .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
-.tarassaco .pl-32 { padding-left: 8rem; }
-.tarassaco .pr-32 { padding-right: 8rem; }
 
 /* ---- transforms ---- */
 .tarassaco .-translate-y-1\/2 { transform: translateY(-50%); }
@@ -170,8 +179,6 @@
   .tarassaco .md\:px-16 { padding-left: 4rem; padding-right: 4rem; }
   .tarassaco .md\:left-16 { left: 4rem; }
   .tarassaco .md\:right-16 { right: 4rem; }
-  .tarassaco .md\:pl-48 { padding-left: 12rem; }
-  .tarassaco .md\:pr-48 { padding-right: 12rem; }
 }
 
 /* ---- persistent demo chrome: title + exit + directional blow hints ---- */
@@ -371,5 +378,43 @@
   }
   .tarassaco .tara-hold-touch {
     display: inline;
+  }
+}
+
+/* ---- phones (keep equal to PHONE_MAX_WIDTH in tarassaco.config.ts) ---- */
+/* The stage never scrolls, so poem and flower share one screen: the column
+   starts under the exit link instead of centring (a tail that does not fit is
+   what gets clipped, never the header or the flower), the flower is 200 px and
+   mostly inside the column, the poem is set at 13 px / 1.7, and the tutorials'
+   mini dandelion drops to the bottom centre instead of sitting over the text. */
+@media (max-width: 640px) {
+  .tarassaco .tara-root {
+    justify-content: flex-start;
+    padding-top: 4.75rem;
+  }
+  .tarassaco .tara-main {
+    margin-top: 0;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+    padding-bottom: 5rem;
+  }
+  .tarassaco .tara-main-head {
+    margin-bottom: 1.5rem;
+  }
+  .tarassaco .text-base {
+    font-size: 0.8125rem;
+  }
+  .tarassaco .leading-loose {
+    line-height: 1.7;
+  }
+  .tarassaco .max-w-2xl {
+    padding: 0 1.5rem;
+  }
+  .tarassaco .tara-side {
+    top: auto;
+    bottom: 6.5rem;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
   }
 }

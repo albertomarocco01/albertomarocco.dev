@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 
 interface GlowingDandelionProps {
   registerNode: (el: HTMLElement | SVGElement | null, x: number, y: number) => void;
+  /** the square box the flower is drawn in, CSS px (tarassaco.config.ts) */
+  size: number;
 }
 
-export function GlowingDandelion({ registerNode }: GlowingDandelionProps) {
+export function GlowingDandelion({ registerNode, size }: GlowingDandelionProps) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   // Elite "Ethereal" Architecture - More seeds, more organic. Lazy useState,
@@ -46,7 +48,8 @@ export function GlowingDandelion({ registerNode }: GlowingDandelionProps) {
     // against nodes the physics rAF loop is concurrently writing transforms to.
     // Resize is debounced for the same reason — and because a rect read mid-
     // flight returns the seed's *displaced* position, which registerNode would
-    // then store as its origin.
+    // then store as its origin. A size change (phone ↔ desktop) re-registers
+    // through the same path.
     let debounce: ReturnType<typeof setTimeout>;
     const onResize = () => {
       clearTimeout(debounce);
@@ -59,10 +62,10 @@ export function GlowingDandelion({ registerNode }: GlowingDandelionProps) {
       clearTimeout(debounce);
       window.removeEventListener('resize', onResize);
     };
-  }, [registerNode]);
+  }, [registerNode, size]);
 
   return (
-    <div className="w-[450px] h-[450px] relative pointer-events-none select-none">
+    <div className="relative pointer-events-none select-none" style={{ width: size, height: size }}>
       <svg
         ref={svgRef}
         viewBox="0 0 400 400"

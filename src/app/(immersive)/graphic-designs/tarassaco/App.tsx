@@ -113,7 +113,7 @@ export default function App({ copy }: { copy: TarassacoCopy }) {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center overflow-hidden relative selection:bg-white selection:text-black">
+    <div className="tara-root">
       
       {/* start() inside the click: the permission prompt and the audio resume
           need the user gesture. */}
