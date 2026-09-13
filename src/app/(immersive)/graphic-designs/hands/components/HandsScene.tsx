@@ -36,7 +36,7 @@ export function HandsScene({ copy, input, reticles, worldRef, reducedMotion, onE
   const visible = useTabVisible();
 
   if (!webgl) {
-    return <div className="hands-fallback">{copy.noWebgl}</div>;
+    return <div className="hands-fallback" role="alert">{copy.noWebgl}</div>;
   }
 
   return (
@@ -65,7 +65,7 @@ export function HandsScene({ copy, input, reticles, worldRef, reducedMotion, onE
           onEvent={onEvent}
         />
       </Canvas>
-      {contextLost && <div className="hands-fallback">{copy.contextLost}</div>}
+      {contextLost && <div className="hands-fallback" role="alert">{copy.contextLost}</div>}
     </>
   );
 }
