@@ -20,6 +20,15 @@ const NAV_OUT = 0.28;
 // A CSS-only `veil-out` in globals.css backs even this up, for the case where
 // no JS runs at all.
 const SAFETY_MS = 2000;
+// How long (ms) a full fill may wait for the page before the veil lifts anyway.
+// Counted from the moment the fill parks, not from mount: (site)/loading.tsx's
+// fallback is the only thing it can be waiting on, and a page that has not
+// streamed in by then is better shown as it arrives than kept behind a veil.
+// Sized so the whole beat stays under the 4 s CSS fail-safe.
+const VEIL_HOLD_MS = 2400;
+// Once a fill resumes from a hold, how far (ms) the safety dismissal is pushed
+// back so the scripted last segment + fade can finish instead of being snapped.
+const SAFETY_AFTER_HOLD_MS = 1500;
 
 /**
  * Has the veil already played in this *page load*? Module-scoped, deliberately
@@ -60,6 +69,68 @@ function park(el: HTMLElement) {
 }
 
 /**
+ * Is the real page in the DOM? Under the (site) layout `#main` wraps either the
+ * route's page or, while it streams, (site)/loading.tsx's near-empty fallback
+ * (`aria-busy="true"`, 60vh of nothing). "Lifts once the real page has
+ * streamed in" is only true if the veil waits for the former.
+ */
+function pageReady(): boolean {
+  const main = document.getElementById("main");
+  return (
+    !!main &&
+    main.children.length > 0 &&
+    !main.querySelector('[aria-busy="true"]')
+  );
+}
+
+/**
+ * A pause in `tl` that lasts until the page is in the DOM, or `maxMs`. Placed
+ * with `.add(hold.start)`: when the playhead gets there and the page is already
+ * in — the common case — nothing happens and the beat is unchanged; otherwise
+ * the timeline pauses and a MutationObserver on `#main` plays it on the moment
+ * the fallback goes. `onChange` reports the hold so the safety dismissal can
+ * stand aside while it runs; `cancel` is for a navigation that interrupts the
+ * sweep (or a StrictMode re-run) — it reports the hold over without playing.
+ */
+function holdForPage(
+  tl: gsap.core.Timeline,
+  maxMs: number,
+  onChange: (holding: boolean) => void,
+) {
+  let observer: MutationObserver | null = null;
+  let timer = 0;
+  const cancel = () => {
+    const wasHolding = observer !== null;
+    observer?.disconnect();
+    observer = null;
+    window.clearTimeout(timer);
+    if (wasHolding) onChange(false);
+  };
+  const resume = () => {
+    if (!observer) return;
+    cancel();
+    tl.play();
+  };
+  const start = () => {
+    const main = document.getElementById("main");
+    if (!main || pageReady()) return;
+    tl.pause();
+    onChange(true);
+    observer = new MutationObserver(() => {
+      if (pageReady()) resume();
+    });
+    observer.observe(main, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["aria-busy"],
+    });
+    timer = window.setTimeout(resume, maxMs);
+  };
+  return { start, cancel };
+}
+
+/**
  * Loading veil, shown on every load / refresh. A full-viewport opaque void panel
  * (the wordmark + an amber progress bar + a mono counter) that buys a deliberate
  * beat over the real network/hydration cost, then dissolves to reveal the home.
@@ -94,6 +165,23 @@ export function Loader({ tag }: { tag: string }) {
   // The navigation sweep's 0→100 fill, kept across sweeps so an interrupted
   // one can hand its progress to the next.
   const navProg = useRef({ v: 0 });
+  // The page-hold on the current timeline, if any (see `holdForPage`), whether
+  // it is in progress, and the safety dismissal — its timer and its function —
+  // so a hold can stand it aside and, on resuming, push it back.
+  const holdRef = useRef<ReturnType<typeof holdForPage> | null>(null);
+  const holdingRef = useRef(false);
+  const safetyRef = useRef(0);
+  const dismissRef = useRef<(() => void) | null>(null);
+  const onHold = useCallback((holding: boolean) => {
+    holdingRef.current = holding;
+    // Resuming with the safety armed: give the scripted fade room to finish.
+    if (!holding && safetyRef.current) {
+      window.clearTimeout(safetyRef.current);
+      safetyRef.current = window.setTimeout(() => {
+        dismissRef.current?.();
+      }, SAFETY_AFTER_HOLD_MS);
+    }
+  }, []);
 
   // Reveal the home: unlock scroll + fire the site entrance. Idempotent.
   const reveal = useCallback(() => {
@@ -118,9 +206,15 @@ export function Loader({ tag }: { tag: string }) {
       // layout — skips to a fast dissolve, so the beat isn't re-paid on
       // navigation. A refresh always gets the whole opening back (see
       // `veilPlayed`).
+      holdRef.current?.cancel();
       if (veilPlayed) {
         reveal();
-        gsap.to(root, {
+        // Even the fast dissolve waits for the page: back from a demo the
+        // (site) route may still be streaming behind its fallback.
+        const fast = gsap.timeline();
+        const hold = holdForPage(fast, VEIL_HOLD_MS, onHold);
+        holdRef.current = hold;
+        fast.add(hold.start).to(root, {
           autoAlpha: 0,
           duration: 0.3,
           ease: FIELD_EASE,
@@ -138,8 +232,10 @@ export function Loader({ tag }: { tag: string }) {
       };
       paint();
 
-      gsap
-        .timeline({ onUpdate: paint })
+      const tl = gsap.timeline({ onUpdate: paint });
+      const hold = holdForPage(tl, VEIL_HOLD_MS, onHold);
+      holdRef.current = hold;
+      tl
         // Quick off the line, then two deliberate hesitations before settling —
         // the "stall" cadence that reads as a real load buying time.
         // Halved from the original cadence: 1.68s of invented progress was
@@ -148,6 +244,11 @@ export function Loader({ tag }: { tag: string }) {
         .to(prog, { v: 34, duration: 0.18, ease: "power2.out" })
         .to(prog, { v: 58, duration: 0.18, ease: "power1.inOut" }, "+=0.06")
         .to(prog, { v: 82, duration: 0.16, ease: "power1.inOut" }, "+=0.05")
+        // The page has to be in the DOM before the bar completes: on a slow
+        // connection this is where the fill parks (see `holdForPage`), and the
+        // last segment plays as the page lands. Nothing happens when it is
+        // already there, which on a normal load it is.
+        .add(hold.start)
         .to(prog, { v: 100, duration: 0.18, ease: FIELD_EASE }, "+=0.04")
         // Fill is full: reveal the home now, so the topbar fade + field bloom
         // run concurrently with — not after — the veil dissolving.
@@ -169,7 +270,8 @@ export function Loader({ tag }: { tag: string }) {
   // The timing lands right by construction: `usePathname()` updates when the
   // transition *commits*, which is the exact moment the route's `loading.tsx`
   // fallback would flash. The veil goes up over it and lifts once the real page
-  // has streamed in behind it.
+  // has streamed in behind it — literally: the sweep holds at the full bar
+  // until `#main` carries the page rather than that fallback (`holdForPage`).
   //
   // No scroll lock, unlike the first load: the router resets the scroll itself,
   // and freezing the page for the length of a sweep is worse than not covering
@@ -211,15 +313,21 @@ export function Loader({ tag }: { tag: string }) {
     // fade if it is still running. Idempotent.
     park(root);
     gsap.killTweensOf(root);
+    holdRef.current?.cancel();
 
-    const tl = gsap
-      .timeline({ onUpdate: paint })
-      .to(root, { autoAlpha: 1, duration: NAV_IN, ease: FIELD_EASE })
+    const tl = gsap.timeline({ onUpdate: paint });
+    const hold = holdForPage(tl, VEIL_HOLD_MS, onHold);
+    holdRef.current = hold;
+    tl.to(root, { autoAlpha: 1, duration: NAV_IN, ease: FIELD_EASE })
       // Together with the fade-in, so the bar is already moving as the veil
       // arrives — a single gesture rather than fade-then-fill.
       .to(prog, { v: 100, duration: NAV_FILL, ease: FIELD_EASE }, 0)
+      // Full bar, veil up: if the route is still streaming behind its
+      // fallback, wait here for it (see `holdForPage`).
+      .add(hold.start)
       .to(root, { autoAlpha: 0, duration: NAV_OUT, ease: FIELD_EASE });
     return () => {
+      hold.cancel();
       tl.kill();
     };
   }, [pathname, reducedMotion]);
@@ -237,8 +345,11 @@ export function Loader({ tag }: { tag: string }) {
     if (reducedMotion || veilPlayed) return;
     const root = document.documentElement;
     root.classList.add("loading");
-    const safety = window.setTimeout(() => {
+    const dismiss = () => {
       if (doneRef.current) return;
+      // The fill is holding for the page (bounded — see `holdForPage`); its
+      // own ceiling plays the timeline on, and that re-arms this. Stand aside.
+      if (holdingRef.current) return;
       reveal();
       const el = rootRef.current;
       if (el) {
@@ -246,9 +357,13 @@ export function Loader({ tag }: { tag: string }) {
         el.style.visibility = "hidden";
         park(el);
       }
-    }, SAFETY_MS);
+    };
+    dismissRef.current = dismiss;
+    safetyRef.current = window.setTimeout(dismiss, SAFETY_MS);
     return () => {
-      window.clearTimeout(safety);
+      window.clearTimeout(safetyRef.current);
+      safetyRef.current = 0;
+      dismissRef.current = null;
       root.classList.remove("loading");
     };
   }, [reducedMotion, reveal]);
