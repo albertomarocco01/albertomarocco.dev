@@ -48,6 +48,12 @@ export function Row({
 }: RowProps) {
   const revealRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
+  // Has this row ever been open? The collapsed state is the CSS default
+  // (height 0, opacity 0, clip 100), so the effect below has nothing to
+  // animate on a row that was never opened — and on a fresh /websites or
+  // /xperiments it used to run N x 2 close tweens plus a Lenis resize each,
+  // for a page nobody had touched. The close branch runs only after an open.
+  const wasOpen = useRef(false);
 
   // drei's <View> reads getBoundingClientRect() on every frame it renders — a
   // forced synchronous reflow — and its loop runs whether or not the row is
@@ -87,6 +93,7 @@ export function Row({
       if (!reveal || !inner) return;
 
       if (isOpen) {
+        wasOpen.current = true;
         const gap = parseFloat(getComputedStyle(inner).marginBottom) || 0;
         const target = inner.offsetHeight + gap;
         gsap.to(reveal, {
@@ -111,6 +118,8 @@ export function Row({
           overwrite: "auto",
         });
       } else {
+        if (!wasOpen.current) return; // never opened: already collapsed by CSS
+        wasOpen.current = false;
         gsap.to(reveal, {
           height: 0,
           duration: reducedMotion ? 0 : 0.6,
