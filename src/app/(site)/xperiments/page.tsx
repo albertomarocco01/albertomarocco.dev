@@ -3,17 +3,20 @@ import type { Metadata } from "next";
 import { WorkRows } from "@/components/work/WorkRows";
 import { Footer } from "@/components/Footer";
 import { getDictionary, getLocale } from "@/lib/i18n";
+import { pageMetadata } from "@/lib/seo";
 
 // `generateMetadata` rather than a static object: the title and description come
 // from the active dictionary, so they have to be resolved per request. The route
-// is already dynamic (the root layout awaits `cookies()`).
+// is already dynamic (the root layout awaits `cookies()`). `pageMetadata` also
+// writes the Open Graph / Twitter card, so a shared link previews this page and
+// not the home (a page's `openGraph` replaces the layout's, it is not merged).
 export async function generateMetadata(): Promise<Metadata> {
   const { xperiments } = getDictionary(await getLocale());
-  return {
+  return pageMetadata({
     title: xperiments.metaTitle,
     description: xperiments.metaDescription,
-    alternates: { canonical: "/xperiments" },
-  };
+    path: "/xperiments",
+  });
 }
 
 // The generative work, on its own route, in the (site) group: the rows here host

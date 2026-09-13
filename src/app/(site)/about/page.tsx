@@ -7,19 +7,22 @@ import { InstagramGlyph } from "@/components/chrome/InstagramGlyph";
 import { AboutFigure } from "@/components/about/AboutFigure";
 import { AboutSequence } from "@/components/about/AboutSequence";
 import { getDictionary, getLocale, type AboutPanelText } from "@/lib/i18n";
+import { pageMetadata } from "@/lib/seo";
 import laurea from "@/assets/about/laurea.webp";
 import calisthenics from "@/assets/about/calisthenics.webp";
 
 // `generateMetadata` rather than a static object: the title and description come
 // from the active dictionary, so they have to be resolved per request. The route
-// is already dynamic (the root layout awaits `cookies()`).
+// is already dynamic (the root layout awaits `cookies()`). `pageMetadata` also
+// writes the Open Graph / Twitter card, so a shared link previews this page and
+// not the home (a page's `openGraph` replaces the layout's, it is not merged).
 export async function generateMetadata(): Promise<Metadata> {
   const { about } = getDictionary(await getLocale());
-  return {
+  return pageMetadata({
     title: about.metaTitle,
     description: about.metaDescription,
-    alternates: { canonical: "/about" },
-  };
+    path: "/about",
+  });
 }
 
 // `--i` staggers the copy reveal (globals.css): each line composes a beat after
