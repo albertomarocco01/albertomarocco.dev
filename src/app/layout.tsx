@@ -75,9 +75,13 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+// `viewportFit: "cover"` is what makes iOS report real `env(safe-area-inset-*)`
+// values — without it every inset the CSS reads is 0 and the footer and the
+// demos' bottom HUDs sit under the home indicator.
 export const viewport: Viewport = {
   themeColor: "#0a0a0c",
   colorScheme: "dark",
+  viewportFit: "cover",
 };
 
 // Person structured data — lets search/AI surface who this is, role, place and
