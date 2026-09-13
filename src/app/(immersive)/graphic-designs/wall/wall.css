@@ -7,6 +7,14 @@
   The exit link mirrors `.vortex-exit` / `.tara-exit` so the demos share one
   chrome. The scrollbar gutter is released for the whole immersive group in
   globals.css — nothing to do here.
+
+  Legibility and touch: nothing in the mono register goes under 0.7rem
+  (11.2 px), on any viewport; keyboard focus is the opaque amber (--ring) — a
+  ring on the exit link, an underline on the keys — never a colour change
+  alone; `touch-action: none` sits on the canvas, where a drag orbits and a
+  pinch dollies, and not on the stage, so the chrome above it keeps the page's
+  own pinch-zoom (WCAG 1.4.4); on coarse pointers every key, the exit link and
+  the tour's call are at least 44 px tall.
 */
 
 /* ---- scope base ---- */
@@ -22,7 +30,6 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
-  touch-action: none; /* the room owns drag and pinch */
   /* camera-controls deliberately does not preventDefault on pointerdown, so a
      drag that crosses the HUD would start a text selection (and raise the
      copy/look-up callout on iOS). */
@@ -37,6 +44,11 @@
 }
 .wall-canvas {
   display: block;
+}
+/* the room owns drag and pinch — one finger orbits, two dolly — on the canvas
+   only; over the chrome a pinch stays the browser's zoom */
+.wall-canvas canvas {
+  touch-action: none;
 }
 
 /* ---- persistent chrome ---- */
@@ -63,7 +75,10 @@
 .wall-exit:focus-visible {
   color: var(--ink);
   border-color: var(--ink-dim);
-  outline: none;
+}
+.wall-exit:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
 }
 
 /* ---- title cover (idle only — it must not survive into the running demo) ---- */
@@ -93,7 +108,7 @@
 }
 .wall-title-sub {
   font-family: var(--mono);
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   letter-spacing: 0.42em;
   text-indent: 0.42em; /* offset the trailing tracking so it stays optically centred */
   text-transform: lowercase;
@@ -102,7 +117,7 @@
 .wall-title-keys {
   margin-top: 0.75rem;
   font-family: var(--mono);
-  font-size: 0.6rem;
+  font-size: 0.7rem;
   letter-spacing: 0.2em;
   text-indent: 0.2em;
   text-transform: lowercase;
@@ -122,7 +137,7 @@
      second term reserves the width the pager and the palette row occupy */
   max-width: min(58rem, calc(100vw - 42rem));
   font-family: var(--mono);
-  font-size: 0.64rem;
+  font-size: 0.7rem;
   letter-spacing: 0.18em;
   line-height: 1.9;
   text-transform: lowercase;
@@ -167,7 +182,7 @@
   border: 0;
   background: transparent;
   font-family: var(--mono);
-  font-size: 0.64rem;
+  font-size: 0.7rem;
   letter-spacing: 0.18em;
   text-transform: lowercase;
   color: var(--ink-ghost);
@@ -181,7 +196,7 @@
   outline: none;
 }
 .wall-key:focus-visible {
-  box-shadow: inset 0 -1px 0 0 var(--accent);
+  box-shadow: inset 0 -2px 0 0 var(--ring);
 }
 .wall-key.is-on {
   color: var(--ink);
@@ -231,7 +246,7 @@
   border: 0;
   background: transparent;
   font-family: var(--mono);
-  font-size: 0.64rem;
+  font-size: 0.7rem;
   letter-spacing: 0.2em;
   text-transform: lowercase;
   white-space: nowrap;
@@ -263,8 +278,9 @@
 }
 .wall-tour-label:focus-visible {
   text-decoration: underline;
+  text-decoration-thickness: 2px;
   text-underline-offset: 0.45em;
-  text-decoration-color: var(--accent);
+  text-decoration-color: var(--ring);
 }
 /* hidden while the tour runs, within arm's reach of the wall, or behind it */
 .wall-tour-label.is-hidden {
@@ -299,7 +315,7 @@
 .wall-tour-index {
   display: block;
   font-family: var(--mono);
-  font-size: 0.58rem;
+  font-size: 0.7rem;
   letter-spacing: 0.32em;
   font-variant-numeric: tabular-nums;
   color: var(--ink-dim);
@@ -316,7 +332,7 @@
 .wall-tour-text {
   margin: 0;
   font-family: var(--mono);
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   letter-spacing: 0.1em;
   line-height: 1.95;
   color: var(--ink);
@@ -344,8 +360,9 @@
 }
 .wall-tour-cta:focus-visible {
   text-decoration: underline;
+  text-decoration-thickness: 2px;
   text-underline-offset: 0.45em;
-  text-decoration-color: var(--accent);
+  text-decoration-color: var(--ring);
 }
 /* the pager: the same keys as the HUD's, a step brighter — they are the way on */
 .wall-tour-nav {
@@ -439,7 +456,7 @@
     left: 1rem;
     bottom: calc(7.2rem + env(safe-area-inset-bottom, 0px));
     max-width: calc(100vw - 2rem);
-    font-size: 0.58rem;
+    letter-spacing: 0.14em;
   }
   /* two rows of four across the full width, one column per label, so the
      views and the palettes line up instead of squeezing a label onto two lines */
@@ -455,9 +472,10 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
   }
+  /* four labels across 358 px at 11.2 px: the tracking gives, the size does not */
   .wall-key {
     padding: 0.55rem 0.2rem;
-    font-size: 0.58rem;
+    letter-spacing: 0.1em;
   }
   /* the card is centred over the spec line and the two rows of keys */
   .wall-tour {
@@ -473,8 +491,7 @@
     font-size: 1.3rem;
   }
   .wall-tour-text {
-    font-size: 0.6rem;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
   }
   .wall-tour-nav {
     justify-content: center;
@@ -484,7 +501,7 @@
     padding: 0.55rem 0.7rem;
   }
   .wall-tour-label {
-    font-size: 0.6rem;
+    letter-spacing: 0.14em;
   }
   /* docked (the rig stops placing it below `TOUR.labelDockBelowPx`): centred
      under the wall, where the card opens — the leader turns into a tick above */
@@ -503,12 +520,29 @@
     height: 1.2rem;
   }
 }
-/* a finger needs 44 px, whatever the viewport */
+/* a finger needs 44 px, whatever the viewport: the keys, the tour's label and
+   its call grow to it; the exit link keeps its hairline box and takes the hit
+   area through an invisible ::before, so the chrome does not change shape */
 @media (pointer: coarse) {
   .wall-key,
   .wall-tour-label {
     min-width: 44px;
     min-height: 44px;
+  }
+  .wall-tour-cta {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-top: 0.3rem;
+  }
+  .wall-exit::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -6px;
+    right: -6px;
+    height: 44px;
+    transform: translateY(-50%);
   }
 }
 @media (hover: none) and (pointer: coarse) {
