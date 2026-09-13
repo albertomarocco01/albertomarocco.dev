@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision";
 import {
+  CONSOLE_FILTER_GRACE_MS,
   DETECT_INTERVAL_MS,
   HAND_MODEL,
   INIT_TIMEOUT_MS,
@@ -13,29 +14,44 @@ import {
 import type { HandsInput } from "../engine/input";
 
 /**
- * The webcam source. `start()` must be called synchronously inside the gate
- * click: getUserMedia runs first, in the user-gesture window (iOS is strict),
- * then the MediaPipe HandLandmarker loads from /public, then a rAF loop feeds
- * `detectForVideo` at ~30 Hz — only when the video frame has advanced, only
- * while the tab is visible — and writes viewport-normalised landmarks into the
- * input bus. Nothing per frame touches React.
+ * The webcam source, in two halves that no longer wait for each other:
  *
- * Teardown (`stop()`, and on unmount): cancel the rAF, close the task, stop
- * every track, remove the video, restore the console. The camera light must be
- * off within a second of leaving.
+ * - The **model** (the MediaPipe wasm, ~12 MB, and the hand landmarker task,
+ *   ~8 MB) needs no permission, so it starts loading when the gate mounts —
+ *   `warm()`, from an effect — and lives for the life of the mount, shared by
+ *   every camera start. The task file is fetched here with a progress count
+ *   (`onProgress`, whole percent) and streamed into the landmarker; the gate
+ *   shows the count if the visitor clicks before it has landed. A browser
+ *   asking to save data waits for the click instead.
+ * - The **camera**: `start()` must be called synchronously inside the gate
+ *   click (getUserMedia runs in the user-gesture window — iOS is strict). The
+ *   8 s timeout covers the camera alone: permission, stream, first frame.
+ *   Then the session waits for the model, however long the network takes, and
+ *   a rAF loop feeds `detectForVideo` at ~30 Hz — only when the video frame has
+ *   advanced, only while the tab is visible — writing viewport-normalised
+ *   landmarks into the input bus. Nothing per frame touches React.
+ *
+ * Teardown: `stop()` (and on unmount) cancels the rAF, stops every track and
+ * removes the video — the camera light must be off within a second of leaving.
+ * The landmarker is closed on unmount; a load still in flight is aborted and
+ * released when it settles.
  */
 
-export type TrackerError = "denied" | "timeout" | "unsupported";
+export type TrackerError = "denied" | "timeout" | "unsupported" | "model";
 
 interface Options {
   input: HandsInput;
   onReady: () => void;
   onError: (reason: TrackerError) => void;
+  /** whole percent of the model download, null once it is done (or unknown) */
+  onProgress: (pct: number | null) => void;
 }
+
+/* ---- console filter ------------------------------------------------------ */
 
 // MediaPipe / TFLite route benign INFO lines through console.error (Emscripten's
 // printErr), which Next's dev overlay counts as issues. Filter only these known
-// markers for the sensor's lifetime; everything else passes straight through.
+// markers while a landmarker is loading or alive; everything else passes.
 const MP_NOISE = [
   "TensorFlow Lite XNNPACK",
   "Created TensorFlow Lite",
@@ -55,6 +71,174 @@ const MP_NOISE = [
 const isMpNoise = (a: unknown) =>
   typeof a === "string" && MP_NOISE.some((m) => a.includes(m));
 
+// One patch for the page, reference-counted: a load still settling from a
+// previous mount and a new mount's load share it, so neither can restore the
+// console from under the other. Restored when the last lease is released.
+let filterLeases = 0;
+let unpatchConsole: (() => void) | null = null;
+
+function leaseConsoleFilter(): () => void {
+  if (filterLeases++ === 0) {
+    const o = { error: console.error, warn: console.warn, info: console.info, log: console.log };
+    console.error = (...a: unknown[]) => { if (!isMpNoise(a[0])) o.error(...a); };
+    console.warn = (...a: unknown[]) => { if (!isMpNoise(a[0])) o.warn(...a); };
+    console.info = (...a: unknown[]) => { if (!isMpNoise(a[0])) o.info(...a); };
+    console.log = (...a: unknown[]) => { if (!isMpNoise(a[0])) o.log(...a); };
+    unpatchConsole = () => {
+      console.error = o.error;
+      console.warn = o.warn;
+      console.info = o.info;
+      console.log = o.log;
+    };
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    if (--filterLeases === 0) {
+      unpatchConsole?.();
+      unpatchConsole = null;
+    }
+  };
+}
+
+/* ---- the model ----------------------------------------------------------- */
+
+interface Warm {
+  promise: Promise<HandLandmarker>;
+  landmarker: HandLandmarker | null;
+  settled: boolean;
+  failed: boolean;
+  /** the mount is gone: whatever resolves now is closed at once */
+  disposed: boolean;
+  abort: AbortController;
+  releaseConsole: () => void;
+}
+
+/**
+ * The task file, fetched with a byte count and re-streamed for MediaPipe: the
+ * download runs in parallel with the wasm load (which reads the stream only
+ * once the runtime is up), and the count is exact. A content-encoded response
+ * (rare for a .task) would make the encoded length undershoot: the percent is
+ * clamped under 100 until the stream ends.
+ */
+async function fetchModel(
+  signal: AbortSignal,
+  onProgress: (pct: number | null) => void,
+): Promise<ReadableStreamDefaultReader<Uint8Array>> {
+  const res = await fetch(HAND_MODEL, { signal });
+  if (!res.ok || !res.body) throw new Error(`model ${res.status}`);
+  const total = Number(res.headers.get("content-length")) || 0;
+  const source = res.body.getReader();
+  let loaded = 0;
+  let last = -1;
+  const report = (pct: number | null) => {
+    if (pct === last) return;
+    last = pct ?? -1;
+    onProgress(pct);
+  };
+  if (total > 0) report(0);
+  const out = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        for (;;) {
+          const { done, value } = await source.read();
+          if (done) break;
+          loaded += value.byteLength;
+          controller.enqueue(value);
+          if (total > 0) report(Math.min(99, Math.floor((loaded / total) * 100)));
+        }
+        controller.close();
+        report(null);
+      } catch (e) {
+        controller.error(e);
+        report(null);
+      }
+    },
+  });
+  return out.getReader();
+}
+
+/** The HandLandmarker, self-hosted from /public/mediapipe — no CDN at runtime. */
+async function loadLandmarker(w: Warm, onProgress: (pct: number | null) => void): Promise<HandLandmarker> {
+  // forVisionTasks only resolves paths (and probes SIMD); the wasm itself is
+  // fetched by createFromOptions, alongside the model stream started here.
+  const [vision, model] = await Promise.all([
+    FilesetResolver.forVisionTasks(MEDIAPIPE_WASM),
+    fetchModel(w.abort.signal, onProgress),
+  ]);
+  const create = (delegate: "GPU" | "CPU", modelAssetBuffer: ReadableStreamDefaultReader<Uint8Array>) =>
+    HandLandmarker.createFromOptions(vision, {
+      baseOptions: { modelAssetBuffer, delegate },
+      runningMode: "VIDEO",
+      numHands: 2,
+      minHandDetectionConfidence: 0.6,
+      minHandPresenceConfidence: 0.6,
+      minTrackingConfidence: 0.6,
+    });
+  try {
+    return await create("GPU", model);
+  } catch (e) {
+    // No usable WebGL for the delegate (software GL, blocked GPU): the CPU
+    // path is slower but works. The stream was consumed: fetch again (the
+    // browser cache has it now).
+    if (w.abort.signal.aborted) throw e;
+    return create("CPU", await fetchModel(w.abort.signal, onProgress));
+  }
+}
+
+function startWarm(onProgress: (pct: number | null) => void): Warm {
+  const w: Warm = {
+    promise: null as unknown as Promise<HandLandmarker>,
+    landmarker: null,
+    settled: false,
+    failed: false,
+    disposed: false,
+    abort: new AbortController(),
+    releaseConsole: leaseConsoleFilter(),
+  };
+  w.promise = loadLandmarker(w, onProgress).then(
+    (lm) => {
+      w.settled = true;
+      if (w.disposed) {
+        lm.close();
+        w.releaseConsole();
+        throw new Error("disposed");
+      }
+      w.landmarker = lm;
+      return lm;
+    },
+    (e: unknown) => {
+      // Nothing is loading any more: the filter goes now, not at unmount (a
+      // retry replaces this warm-up, which would otherwise never be released).
+      w.settled = true;
+      w.failed = true;
+      w.releaseConsole();
+      throw e;
+    },
+  );
+  w.promise.catch(() => {}); // observed by start(); never unhandled
+  return w;
+}
+
+/** Unmount: close the landmarker, or abort the load and release once it settles. */
+function disposeWarm(w: Warm): void {
+  w.disposed = true;
+  if (w.settled) {
+    // The graph logs its own closing lines: release right after.
+    w.landmarker?.close();
+    w.landmarker = null;
+    w.releaseConsole();
+    return;
+  }
+  w.abort.abort();
+  // A wasm load that never settles must not keep the console patched forever.
+  const grace = setTimeout(w.releaseConsole, CONSOLE_FILTER_GRACE_MS);
+  w.promise.catch(() => {}).finally(() => clearTimeout(grace));
+}
+
+/* ---- the camera session -------------------------------------------------- */
+
 interface Session {
   alive: boolean;
   stream: MediaStream | null;
@@ -62,19 +246,39 @@ interface Session {
   landmarker: HandLandmarker | null;
   raf: number;
   timer: ReturnType<typeof setTimeout> | null;
-  restoreConsole: (() => void) | null;
-  /** loadModel() cannot be cancelled: the console stays patched until it settles */
-  modelSettled: boolean;
 }
 
-export function useHandTracker({ input, onReady, onError }: Options) {
+export function useHandTracker({ input, onReady, onError, onProgress }: Options) {
   const session = useRef<Session | null>(null);
+  const warmRef = useRef<Warm | null>(null);
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
+  const onProgressRef = useRef(onProgress);
   useEffect(() => {
     onReadyRef.current = onReady;
     onErrorRef.current = onError;
-  }, [onReady, onError]);
+    onProgressRef.current = onProgress;
+  }, [onReady, onError, onProgress]);
+
+  // The model, once per mount; a failed load is replaced on the next start().
+  const warm = useCallback((): Warm => {
+    const current = warmRef.current;
+    if (current && !current.failed) return current;
+    const w = startWarm((pct) => onProgressRef.current(pct));
+    warmRef.current = w;
+    return w;
+  }, []);
+
+  useEffect(() => {
+    // No permission needed: start now unless the visitor asked to save data,
+    // in which case the ~20 MB wait for the click.
+    const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+    if (!saveData && typeof WebAssembly !== "undefined") warm();
+    return () => {
+      if (warmRef.current) disposeWarm(warmRef.current);
+      warmRef.current = null;
+    };
+  }, [warm]);
 
   const stop = useCallback(() => {
     const s = session.current;
@@ -89,13 +293,8 @@ export function useHandTracker({ input, onReady, onError }: Options) {
       s.video.srcObject = null;
       s.video.remove();
     }
-    s.landmarker?.close();
-    // Restore now, settled or not: a wasm fetch that never resolves would
-    // otherwise leave the console patched for the rest of the visit. A late
-    // MediaPipe INFO line may reach the console; the null keeps the load's
-    // own restore in start() from clobbering a newer session's patch.
-    s.restoreConsole?.();
-    s.restoreConsole = null;
+    // The landmarker belongs to the mount (warm), not the session.
+    s.landmarker = null;
     input.clearHands();
   }, [input]);
 
@@ -105,16 +304,7 @@ export function useHandTracker({ input, onReady, onError }: Options) {
       onErrorRef.current("unsupported");
       return;
     }
-    const s: Session = {
-      alive: true,
-      stream: null,
-      video: null,
-      landmarker: null,
-      raf: 0,
-      timer: null,
-      restoreConsole: null,
-      modelSettled: false,
-    };
+    const s: Session = { alive: true, stream: null, video: null, landmarker: null, raf: 0, timer: null };
     session.current = s;
 
     const fail = (reason: TrackerError) => {
@@ -124,22 +314,13 @@ export function useHandTracker({ input, onReady, onError }: Options) {
     };
 
     // getUserMedia FIRST, straight off the click (the permission prompt must
-    // open inside the user-gesture window). The model loads in parallel — it
-    // needs no stream — so the wait is the longer of the two, not their sum.
+    // open inside the user-gesture window). The model is already loading —
+    // since the gate mounted, or from here after a failure / under save-data.
     const stream = navigator.mediaDevices.getUserMedia({ video: VIDEO_CONSTRAINTS, audio: false });
-    patchConsole(s);
-    const model = loadModel(s);
-    model
-      .catch((e: unknown) => {
-        // A stopped session throws on purpose; anything else is the model.
-        if (s.alive) fail("unsupported");
-        throw e;
-      })
-      .finally(() => {
-        s.modelSettled = true;
-        if (!s.alive) s.restoreConsole?.();
-      })
-      .catch(() => {});
+    const model = warm().promise;
+    // The camera alone — permission, stream, first frame — within 8 s. The
+    // model has no clock: its progress shows in the gate while it downloads.
+    s.timer = setTimeout(() => fail("timeout"), INIT_TIMEOUT_MS);
 
     stream
       .catch((e: unknown) => {
@@ -162,14 +343,23 @@ export function useHandTracker({ input, onReady, onError }: Options) {
             fail("denied");
           };
         }
-        // Everything after the grant — video, model, first frame — within 8 s.
-        s.timer = setTimeout(() => fail("timeout"), INIT_TIMEOUT_MS);
-        return Promise.all([attachVideo(s, granted), model]).then(() => true as const);
+        return attachVideo(s, granted).then(() => true as const);
       })
       .then((ok) => {
         if (ok === undefined || !s.alive) return;
+        // The camera is up: the timeout is met. Now the model, however long.
         if (s.timer) clearTimeout(s.timer);
         s.timer = null;
+        return model.then(
+          (lm) => lm,
+          (e: unknown) => {
+            throw Object.assign(new Error("model"), { reason: "model" as TrackerError, cause: e });
+          },
+        );
+      })
+      .then((lm) => {
+        if (!lm || !s.alive) return;
+        s.landmarker = lm;
         loop(s, input);
         // A short warm-up while the reticles find the hands.
         s.timer = setTimeout(() => {
@@ -178,35 +368,16 @@ export function useHandTracker({ input, onReady, onError }: Options) {
         }, WARMUP_MS);
       })
       .catch((e: unknown) => {
-        // "unsupported" is reserved for a missing API and a model that will
-        // not load (handled above); everything on the camera side is "denied".
+        // The camera side is "denied", the model side "model"; anything else
+        // (a video that will not play) reads as the camera not responding.
         const reason = (e as { reason?: TrackerError } | null)?.reason;
-        fail(reason ?? (s.modelSettled && !s.landmarker ? "unsupported" : "denied"));
+        fail(reason ?? "timeout");
       });
-  }, [input, stop]);
+  }, [input, stop, warm]);
 
   useEffect(() => stop, [stop]);
 
   return { start, stop };
-}
-
-function patchConsole(s: Session): void {
-  const originals = {
-    error: console.error,
-    warn: console.warn,
-    info: console.info,
-    log: console.log,
-  };
-  console.error = (...a: unknown[]) => { if (!isMpNoise(a[0])) originals.error(...a); };
-  console.warn = (...a: unknown[]) => { if (!isMpNoise(a[0])) originals.warn(...a); };
-  console.info = (...a: unknown[]) => { if (!isMpNoise(a[0])) originals.info(...a); };
-  console.log = (...a: unknown[]) => { if (!isMpNoise(a[0])) originals.log(...a); };
-  s.restoreConsole = () => {
-    console.error = originals.error;
-    console.warn = originals.warn;
-    console.info = originals.info;
-    console.log = originals.log;
-  };
 }
 
 /** The 1 px off-screen video. Resolves once it plays. */
@@ -227,34 +398,6 @@ function attachVideo(s: Session, stream: MediaStream): Promise<void> {
       video.play().then(resolve).catch(reject);
     };
   });
-}
-
-/** The HandLandmarker, self-hosted from /public/mediapipe — no CDN at runtime. */
-async function loadModel(s: Session): Promise<void> {
-  const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
-  if (!s.alive) throw new Error("stopped");
-  const create = (delegate: "GPU" | "CPU") =>
-    HandLandmarker.createFromOptions(vision, {
-      baseOptions: { modelAssetPath: HAND_MODEL, delegate },
-      runningMode: "VIDEO",
-      numHands: 2,
-      minHandDetectionConfidence: 0.6,
-      minHandPresenceConfidence: 0.6,
-      minTrackingConfidence: 0.6,
-    });
-  let landmarker: HandLandmarker;
-  try {
-    landmarker = await create("GPU");
-  } catch {
-    // No usable WebGL for the delegate (software GL, blocked GPU): the CPU
-    // path is slower but works.
-    landmarker = await create("CPU");
-  }
-  if (!s.alive) {
-    landmarker.close();
-    throw new Error("stopped");
-  }
-  s.landmarker = landmarker;
 }
 
 /** The detection loop. Results go into the input bus; React never sees them. */

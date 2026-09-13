@@ -73,6 +73,12 @@ export default function App({ copy }: { copy: HandsCopy }) {
   const [phase, setPhase] = useState<Phase>("gate");
   const [mode, setMode] = useState<Mode>("pointer");
   const [error, setError] = useState<TrackerError | null>(null);
+  // The model download (started at mount): its percent reaches React only
+  // while the gate is waiting on it, so the drift behind the veil does not
+  // re-render a hundred times for a bar nobody sees.
+  const [modelPct, setModelPct] = useState<number | null>(null);
+  const modelPctRef = useRef<number | null>(null);
+  const phaseRef = useRef<Phase>("gate");
   const [guide, setGuide] = useState<GuideKind>("hidden");
   const [guideDevice, setGuideDevice] = useState<Device>("pointer");
   // The caption under an opened print: the text stays while it fades out.
@@ -130,6 +136,7 @@ export default function App({ copy }: { copy: HandsCopy }) {
   const tracker = useHandTracker({
     input,
     onReady: () => {
+      phaseRef.current = "running";
       setPhase("running");
       showGuide(false);
       focusStage();
@@ -137,14 +144,21 @@ export default function App({ copy }: { copy: HandsCopy }) {
     onError: (reason) => {
       // Back to the gate under the dialog: the camera button is live again
       // for a retry, and the pointer is one click away.
+      phaseRef.current = "gate";
       setError(reason);
       setPhase("gate");
+    },
+    onProgress: (pct) => {
+      modelPctRef.current = pct;
+      if (phaseRef.current === "starting") setModelPct(pct);
     },
   });
 
   const startCamera = useCallback(() => {
     input.setMode("camera", "hand");
     setMode("camera");
+    phaseRef.current = "starting";
+    setModelPct(modelPctRef.current);
     setPhase("starting");
     tracker.start(); // getUserMedia inside the click
   }, [input, tracker]);
@@ -160,6 +174,7 @@ export default function App({ copy }: { copy: HandsCopy }) {
     input.setMode("pointer", coarse ? "touch" : "pointer");
     setMode("pointer");
     setError(null);
+    phaseRef.current = "running";
     setPhase("running");
     showGuide(false);
     focusStage();
@@ -307,6 +322,7 @@ export default function App({ copy }: { copy: HandsCopy }) {
         <Gate
           copy={copy}
           starting={phase === "starting"}
+          progress={modelPct}
           onCamera={startCamera}
           onPointer={startPointer}
         />
@@ -321,7 +337,10 @@ export default function App({ copy }: { copy: HandsCopy }) {
         <div className="hands-error" role="alertdialog" aria-modal="true" aria-labelledby="hands-error-title">
           <div className="hands-error-card">
             <p id="hands-error-title" className="hands-error-title">
-              {error === "timeout" ? copy.errTimeout : error === "unsupported" ? copy.errUnsupported : copy.errDenied}
+              {error === "timeout" ? copy.errTimeout
+                : error === "unsupported" ? copy.errUnsupported
+                : error === "model" ? copy.errModel
+                : copy.errDenied}
             </p>
             <p className="hands-error-body">{copy.errBody}</p>
             <div className="hands-error-actions">

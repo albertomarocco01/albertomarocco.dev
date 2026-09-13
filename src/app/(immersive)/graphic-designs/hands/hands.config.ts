@@ -40,8 +40,13 @@ export const VIDEO_CONSTRAINTS: MediaTrackConstraints = {
 export const VIDEO_ASPECT = 4 / 3;
 export const MEDIAPIPE_WASM = "/mediapipe/1.0.1/wasm";
 export const HAND_MODEL = "/mediapipe/1.0.1/hand_landmarker.task";
-/** Whole camera path (permission → model → first frame) must be up within this. */
+/** The camera alone — permission, stream, first frame — must be up within this.
+ *  The model (wasm + task, ~20 MB) loads from the gate's mount and has no clock:
+ *  its download progress shows in the gate instead. */
 export const INIT_TIMEOUT_MS = 8000;
+/** Unmount with the model still loading: its console filter is released when
+ *  the load settles, or after this many ms, whichever first. */
+export const CONSOLE_FILTER_GRACE_MS = 15000;
 /** After the model is up, the reticles get this long to find the hands. */
 export const WARMUP_MS = 1000;
 /** detectForVideo cadence (~30 Hz); the render loop is independent. */

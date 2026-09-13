@@ -22,6 +22,8 @@ export interface HandsCopy {
   enable: string;
   pointerMode: string;
   initializing: string;
+  /** the camera is up but the model is still downloading: `{pct}` is replaced (whole percent) */
+  downloading: string;
   privacy: string;
   /**
    * Onboarding card, bottom-centre: after the gate until the first gesture
@@ -41,6 +43,8 @@ export interface HandsCopy {
   errDenied: string;
   errTimeout: string;
   errUnsupported: string;
+  /** the hand model (wasm / task file) failed to load — a network problem, retry offered */
+  errModel: string;
   errBody: string;
   errButton: string;
   errRetry: string;
@@ -90,6 +94,7 @@ const en: HandsCopy = {
   enable: "enable the camera",
   pointerMode: "or use the pointer",
   initializing: "initializing",
+  downloading: "downloading the model… {pct} %",
   privacy:
     "the camera is processed locally, in your browser. nothing is recorded, stored or sent anywhere.",
   guideHand: [
@@ -111,6 +116,7 @@ const en: HandsCopy = {
   errDenied: "the camera isn't available",
   errTimeout: "the camera isn't responding",
   errUnsupported: "this browser can't read the camera",
+  errModel: "the hand model didn't load",
   errBody:
     "Allow the camera to use your hands — or carry on with the pointer and the keyboard. Nothing changes in the piece.",
   errButton: "continue with the pointer",
@@ -136,6 +142,7 @@ const it: HandsCopy = {
   enable: "attiva la fotocamera",
   pointerMode: "oppure usa il puntatore",
   initializing: "avvio in corso",
+  downloading: "scarico il modello… {pct} %",
   privacy:
     "la fotocamera viene elaborata in locale, nel tuo browser. niente viene registrato, salvato o inviato da nessuna parte.",
   guideHand: [
@@ -157,6 +164,7 @@ const it: HandsCopy = {
   errDenied: "la fotocamera non è disponibile",
   errTimeout: "la fotocamera non risponde",
   errUnsupported: "questo browser non riesce a leggere la fotocamera",
+  errModel: "il modello delle mani non si è caricato",
   errBody:
     "Consenti la fotocamera per usare le mani — oppure continua con il puntatore e la tastiera. Il pezzo non cambia.",
   errButton: "continua con il puntatore",
