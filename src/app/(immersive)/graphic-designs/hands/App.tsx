@@ -260,7 +260,7 @@ export default function App({ copy }: { copy: HandsCopy }) {
   return (
     <div
       ref={stageRef}
-      className={`hands-stage is-${phase}${guide !== "hidden" ? " is-guide" : ""}`}
+      className={`hands-stage is-${phase} is-${mode}${guide !== "hidden" ? " is-guide" : ""}`}
       role="application"
       aria-label={copy.aria}
       tabIndex={0}

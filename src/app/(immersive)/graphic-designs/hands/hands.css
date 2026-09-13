@@ -26,7 +26,6 @@
   /* the space: #000 at the edges, the site's near-black at the centre — no
      floor, no room, no fog; the canvas above it is transparent */
   background: radial-gradient(70% 60% at 50% 50%, #0a0a0c, #000 78%);
-  touch-action: none;
   outline: none;
   -webkit-user-select: none;
   user-select: none;
@@ -38,6 +37,12 @@
   width: 100% !important;
   height: 100% !important;
   display: block;
+}
+/* Touch on the prints is the input only in pointer mode (a finger holds, two
+   fingers tear): only there does the canvas take every gesture. On the gate,
+   in camera mode and over the chrome the page keeps its pinch-zoom. */
+.hands-stage.is-running.is-pointer .hands-canvas {
+  touch-action: none;
 }
 /* ---- the fallbacks (no WebGL, context lost) ---- */
 .hands-fallback {
