@@ -196,11 +196,11 @@ export function useWindPhysics({
         // pinned @mediapipe/tasks-vision@1.0.1 package + the float16 model).
         // No third-party CDN at runtime: kills the @latest version-drift trap
         // and the per-visit IP leak to jsdelivr/Google.
-        const vision = await FilesetResolver.forVisionTasks("/mediapipe/wasm");
+        const vision = await FilesetResolver.forVisionTasks("/mediapipe/1.0.1/wasm");
         if (!isMounted) return;
         const faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
           baseOptions: {
-            modelAssetPath: "/mediapipe/face_landmarker.task",
+            modelAssetPath: "/mediapipe/1.0.1/face_landmarker.task",
             delegate: "GPU"
           },
           outputFaceBlendshapes: false,
