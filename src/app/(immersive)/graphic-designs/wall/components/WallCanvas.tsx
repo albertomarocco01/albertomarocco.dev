@@ -1,5 +1,6 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Canvas, type Frameloop, type RootState } from "@react-three/fiber";
+import type { WebGLRenderer } from "three";
 import { Bloom, EffectComposer, SMAA } from "@react-three/postprocessing";
 import { BLOOM, CAMERA, PRESETS, SOFTWARE, type LoopVariant } from "../wall.config";
 import { isSoftwareRenderer } from "@/lib/webgl-caps";
@@ -58,20 +59,34 @@ export function WallCanvas({
   onSoftware: (software: boolean) => void;
   onContextLost: (lost: boolean) => void;
 }) {
+  const [renderer, setRenderer] = useState<WebGLRenderer | null>(null);
   const onCreated = useCallback(
     ({ gl }: RootState) => {
-      const canvas = gl.domElement;
       onSoftware(isSoftwareRenderer(gl.getContext()));
-      // Without preventDefault the browser drops the context for good; with it
-      // the GPU may restore it. Meanwhile the chrome shows a message and the exit.
-      canvas.addEventListener("webglcontextlost", (e) => {
-        e.preventDefault();
-        onContextLost(true);
-      });
-      canvas.addEventListener("webglcontextrestored", () => onContextLost(false));
+      setRenderer(gl);
     },
-    [onContextLost, onSoftware],
+    [onSoftware],
   );
+
+  // Without preventDefault the browser drops the context for good; with it the
+  // GPU may restore it. Meanwhile the chrome shows a message and the exit. An
+  // effect keyed on the renderer, so the pair of listeners leaves with the
+  // canvas instead of outliving it.
+  useEffect(() => {
+    if (!renderer) return;
+    const canvas = renderer.domElement;
+    const onLost = (e: Event) => {
+      e.preventDefault();
+      onContextLost(true);
+    };
+    const onRestored = () => onContextLost(false);
+    canvas.addEventListener("webglcontextlost", onLost);
+    canvas.addEventListener("webglcontextrestored", onRestored);
+    return () => {
+      canvas.removeEventListener("webglcontextlost", onLost);
+      canvas.removeEventListener("webglcontextrestored", onRestored);
+    };
+  }, [renderer, onContextLost]);
 
   return (
     <Canvas
