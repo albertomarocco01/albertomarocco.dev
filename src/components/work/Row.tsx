@@ -94,7 +94,14 @@ export function Row({
           duration: reducedMotion ? 0 : TIMING.reveal,
           ease: FIELD_EASE,
           overwrite: "auto",
-          onComplete: syncScrollLimit,
+          onComplete: () => {
+            // Hand the height back to CSS once open: `.reveal-inner` is a
+            // clamp() of the viewport height, so the px the tween landed on
+            // would leave a gap (or clip it) after the next resize. The close
+            // tween reads the live px from `auto` on its own.
+            gsap.set(reveal, { height: "auto" });
+            syncScrollLimit();
+          },
         });
         gsap.to(inner, {
           opacity: 1,
