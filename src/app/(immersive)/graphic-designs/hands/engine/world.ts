@@ -187,6 +187,10 @@ export class World {
   });
   private focusId: number | null = null;
   private kbd = { x: 0, y: 0, vx: 0, vy: 0, holding: null as Body | null };
+  /** per-frame holders, reused: slot 0 / 1 the hands, KBD_SLOT the keyboard */
+  private holders: Holder[] = [0, 1, KBD_SLOT].map((slot) => ({
+    slot, present: false, pinchEnter: false, pinchExit: false, holdX: 0, holdY: 0, velX: 0, velY: 0,
+  }));
   private lastPush = -1e9;
   /** focus mode: the print at the centre (also while it leaves), or null */
   opened: Body | null = null;
@@ -204,18 +208,29 @@ export class World {
   /* ---- lifecycle ------------------------------------------------------ */
 
   load(): void {
+    let warned = false;
     PRINTS.forEach((url, index) => {
-      this.loader.load(url, (texture) => {
-        if (this.disposed) {
-          texture.dispose();
-          return;
-        }
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.anisotropy = this.anisotropy;
-        texture.generateMipmaps = true;
-        texture.minFilter = THREE.LinearMipmapLinearFilter;
-        this.addCard(index, texture);
-      });
+      this.loader.load(
+        url,
+        (texture) => {
+          if (this.disposed) {
+            texture.dispose();
+            return;
+          }
+          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.anisotropy = this.anisotropy;
+          texture.generateMipmaps = true;
+          texture.minFilter = THREE.LinearMipmapLinearFilter;
+          this.addCard(index, texture);
+        },
+        undefined,
+        // A print that will not load is skipped: the drift has one card fewer.
+        () => {
+          if (this.disposed || warned) return;
+          warned = true;
+          console.warn(`[hands] a print failed to load and was skipped: ${url}`);
+        },
+      );
     });
   }
 
@@ -402,24 +417,28 @@ export class World {
     kbdMove: { x: number; y: number },
   ): void {
     this.time = now;
-    const holders: Holder[] = hands.map((h, slot) => ({
-      slot,
-      present: h.present,
-      pinchEnter: h.pinchEnter,
-      pinchExit: h.pinchExit,
-      holdX: h.holdX,
-      holdY: h.holdY,
-      velX: h.velX,
-      velY: h.velY,
-    }));
-    holders.push(this.keyboardHolder(commands, kbdMove, dt));
+    // Filled in place every frame: the two hands, then the keyboard (slot 2).
+    const holders = this.holders;
+    for (let slot = 0; slot < 2; slot++) {
+      const h = hands[slot];
+      const o = holders[slot];
+      o.present = h.present;
+      o.pinchEnter = h.pinchEnter;
+      o.pinchExit = h.pinchExit;
+      o.holdX = h.holdX;
+      o.holdY = h.holdY;
+      o.velX = h.velX;
+      o.velY = h.velY;
+    }
+    this.keyboardHolder(commands, kbdMove, dt, holders[KBD_SLOT]);
 
     // A fist opens what the hand holds (read before the releases below) or
-    // the print nearest the palm.
-    const fistOpens: { body: Body | null; x: number; y: number }[] = [];
-    hands.forEach((h, slot) => {
-      if (h.fistEnter) fistOpens.push({ body: this.heldBy(slot), x: h.fistX, y: h.fistY });
-    });
+    // the print nearest the palm. Rare: allocated only when it happens.
+    let fistOpens: { body: Body | null; x: number; y: number }[] | null = null;
+    for (let slot = 0; slot < 2; slot++) {
+      const h = hands[slot];
+      if (h.fistEnter) (fistOpens ??= []).push({ body: this.heldBy(slot), x: h.fistX, y: h.fistY });
+    }
 
     for (const h of hands) if (h.pushed) this.push(h.pushX, h.pushY, now, h.pushDirX, h.pushDirY);
     for (const p of pushes) this.push(p.x, p.y, now);
@@ -427,7 +446,7 @@ export class World {
 
     this.applyHolds(holders, now);
     for (const t of taps) this.open(this.nearestWhole(t.x, t.y));
-    for (const f of fistOpens) this.open(f.body ?? this.nearestWhole(f.x, f.y));
+    if (fistOpens) for (const f of fistOpens) this.open(f.body ?? this.nearestWhole(f.x, f.y));
 
     this.reunite(now);
     this.hover(hands, dt);
@@ -486,7 +505,8 @@ export class World {
     commands: KeyboardCommand[],
     move: { x: number; y: number },
     dt: number,
-  ): Holder {
+    out: Holder,
+  ): void {
     const k = this.kbd;
     let pinchEnter = false;
     let pinchExit = false;
@@ -543,16 +563,13 @@ export class World {
     const by = this.vh / 2;
     k.x = Math.max(-bx, Math.min(bx, k.x));
     k.y = Math.max(-by, Math.min(by, k.y));
-    return {
-      slot: KBD_SLOT,
-      present: true,
-      pinchEnter,
-      pinchExit,
-      holdX: k.x,
-      holdY: k.y,
-      velX: k.vx,
-      velY: k.vy,
-    };
+    out.present = true;
+    out.pinchEnter = pinchEnter;
+    out.pinchExit = pinchExit;
+    out.holdX = k.x;
+    out.holdY = k.y;
+    out.velX = k.vx;
+    out.velY = k.vy;
   }
 
   private focusedBody(): Body | null {

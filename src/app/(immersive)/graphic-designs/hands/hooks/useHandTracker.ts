@@ -90,9 +90,12 @@ export function useHandTracker({ input, onReady, onError }: Options) {
       s.video.remove();
     }
     s.landmarker?.close();
-    // The model load cannot be cancelled and keeps logging through
-    // console.error until it settles; restore only once it has (see start()).
-    if (s.modelSettled) s.restoreConsole?.();
+    // Restore now, settled or not: a wasm fetch that never resolves would
+    // otherwise leave the console patched for the rest of the visit. A late
+    // MediaPipe INFO line may reach the console; the null keeps the load's
+    // own restore in start() from clobbering a newer session's patch.
+    s.restoreConsole?.();
+    s.restoreConsole = null;
     input.clearHands();
   }, [input]);
 
@@ -259,6 +262,11 @@ function loop(s: Session, input: HandsInput): void {
   const video = s.video!;
   const landmarker = s.landmarker!;
   const buffers = [new Float32Array(42), new Float32Array(42)];
+  // The mapped detections, reused every detection (≤ 2 hands).
+  const mapped = [
+    { pts: new Float32Array(42), u: 0, v: 0 },
+    { pts: new Float32Array(42), u: 0, v: 0 },
+  ];
   // Per-slot wrist position (viewport-normalised) from the last frame, for
   // keeping a hand in the slot it had — MediaPipe's result order can swap.
   const prev: ({ u: number; v: number } | null)[] = [null, null];
@@ -291,19 +299,22 @@ function loop(s: Session, input: HandsInput): void {
     const gx = (A >= Av ? 1 : Av / A) * REACH_GAIN;
     const gy = (A >= Av ? A / Av : 1) * REACH_GAIN;
 
-    const mapped = hands.slice(0, 2).map((lm) => {
-      const pts = new Float32Array(42);
+    const count = Math.min(2, hands.length);
+    for (let h = 0; h < count; h++) {
+      const lm = hands[h];
+      const m = mapped[h];
       for (let i = 0; i < 21; i++) {
         const p = lm[i];
-        pts[i * 2] = 0.5 + (1 - p.x - 0.5) * gx;
-        pts[i * 2 + 1] = 0.5 + (p.y - 0.5) * gy;
+        m.pts[i * 2] = 0.5 + (1 - p.x - 0.5) * gx;
+        m.pts[i * 2 + 1] = 0.5 + (p.y - 0.5) * gy;
       }
-      return { pts, u: pts[0], v: pts[1] };
-    });
+      m.u = m.pts[0];
+      m.v = m.pts[1];
+    }
 
     // Assign detections to slots: keep each hand where it was.
     const assignment: (number | null)[] = [null, null];
-    if (mapped.length === 2 && prev[0] && prev[1]) {
+    if (count === 2 && prev[0] && prev[1]) {
       const d = (i: number, j: number) => Math.hypot(mapped[i].u - prev[j]!.u, mapped[i].v - prev[j]!.v);
       const straight = d(0, 0) + d(1, 1);
       const swapped = d(0, 1) + d(1, 0);
@@ -312,7 +323,8 @@ function loop(s: Session, input: HandsInput): void {
     } else {
       const free = [true, true];
       const pending: number[] = [];
-      mapped.forEach((m, i) => {
+      for (let i = 0; i < count; i++) {
+        const m = mapped[i];
         let best = -1;
         let bestD = 0.3;
         for (let j = 0; j < 2; j++) {
@@ -322,7 +334,7 @@ function loop(s: Session, input: HandsInput): void {
         }
         if (best >= 0) { assignment[best] = i; free[best] = false; }
         else pending.push(i);
-      });
+      }
       for (const i of pending) {
         const j = free.indexOf(true);
         if (j >= 0) { assignment[j] = i; free[j] = false; }
