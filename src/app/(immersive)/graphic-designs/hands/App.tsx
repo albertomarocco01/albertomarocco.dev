@@ -156,7 +156,7 @@ export default function App({ copy }: { copy: HandsCopy }) {
   useEffect(() => {
     if (phase === "running") return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") exit();
+      if (e.key === "Escape" && !e.repeat && !e.altKey && !e.ctrlKey && !e.metaKey) exit();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

@@ -43,6 +43,13 @@ export function useKeyboardHands({
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      // Browser chords are not ours: Alt+Arrow is history, Ctrl/Cmd+key is
+      // the browser's (tabs, print, find).
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      // Auto-repeat acts only for the arrows (a held print keeps moving) and
+      // Tab. Escape held on an opened print closes it and stops there: leaving
+      // takes a second, distinct press.
+      if (e.repeat && !e.key.startsWith("Arrow") && e.key !== "Tab") return;
       if (e.key === "Escape") {
         e.preventDefault();
         // An opened print closes first; the next Escape leaves the demo.
@@ -56,9 +63,6 @@ export function useKeyboardHands({
         return;
       }
       if (isChrome(e)) return;
-      // Browser chords are not ours: Alt+Arrow is history, Ctrl/Cmd+key is
-      // the browser's (tabs, print, find).
-      if (e.altKey || e.ctrlKey || e.metaKey) return;
       switch (e.key) {
         case "Tab": {
           // With a print open there is nothing else to cycle: let focus move
@@ -75,33 +79,29 @@ export function useKeyboardHands({
           break;
         }
         case "Enter":
-          if (e.repeat) return;
           e.preventDefault();
           command("open");
           break;
         case "Backspace":
           e.preventDefault();
-          if (e.repeat || !isOpen()) return;
+          if (!isOpen()) return;
           command("close");
           break;
         case " ":
         case "Spacebar":
           e.preventDefault();
-          if (e.repeat) return;
           command("toggleHold");
           break;
         case "t":
         case "T":
-          if (e.repeat) return;
           command("tear");
           break;
         case "p":
         case "P":
-          if (e.repeat) return;
           command("push");
           break;
         case "d":
-          if (process.env.NODE_ENV === "development" && !e.repeat) onDebug?.();
+          if (process.env.NODE_ENV === "development") onDebug?.();
           break;
         case "ArrowLeft":
           e.preventDefault();
