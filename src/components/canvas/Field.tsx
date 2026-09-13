@@ -49,6 +49,7 @@ export function Field() {
       detach.current?.();
       detach.current = null;
       fieldState.lost = false;
+      fieldState.staticOnly = false;
       document.documentElement.classList.remove("canvas-live");
     };
   }, []);
@@ -88,7 +89,12 @@ export function Field() {
         onCreated={(state: RootState) => {
           const root = document.documentElement;
           root.classList.add("canvas-live");
-          if (isSoftwareRenderer(state.gl.getContext())) setStaticOnly(true);
+          // Published as well as held: the melt lives in another subtree and
+          // must know not to keep the loop alive (NameMeltView).
+          if (isSoftwareRenderer(state.gl.getContext())) {
+            fieldState.staticOnly = true;
+            setStaticOnly(true);
+          }
 
           // Context loss: the DOM copies (the h1 under the melt, the /about
           // <img>s, the gen-row plates) take the pixels back — `lost` is read

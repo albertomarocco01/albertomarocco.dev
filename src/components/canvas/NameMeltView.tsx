@@ -169,8 +169,11 @@ function MeltScene({ ioRef }: { ioRef: React.RefObject<MeltIO> }) {
     // The texture is the gate: the tremble below has no envelope, so from the
     // first raster the GPU copy owns these pixels — until the canvas loses its
     // context (field-state.ts), when the DOM h1 takes them back. Opacity (not
-    // visibility) keeps the h1 in the a11y tree.
-    const alive = io.tex != null && !fieldState.lost;
+    // visibility) keeps the h1 in the a11y tree. A software renderer never
+    // opens it: the tremble's frame floor would keep a CPU-rasterised canvas
+    // rendering at 20fps under a field that is meant to be one static frame.
+    const alive =
+      io.tex != null && !fieldState.lost && !fieldState.staticOnly;
     if (alive !== melting.current) {
       melting.current = alive;
       mesh.visible = alive;

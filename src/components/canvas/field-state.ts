@@ -22,6 +22,9 @@ export const fieldState = {
   /** the shared canvas lost its WebGL context (Field.tsx): every view hands its
    *  pixels back to the DOM until the context is restored */
   lost: false,
+  /** software-rendered WebGL (Field.tsx): the field paints one static frame,
+   *  and no view may keep the demand loop running on its own */
+  staticOnly: false,
 };
 
 type OrbLike = { x: number; y: number; r: number };
