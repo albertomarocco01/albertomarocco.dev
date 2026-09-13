@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Frameloop } from "@react-three/fiber";
 import type { WallCopy } from "./copy";
-import { LOOP, PRESETS, TOUR } from "./wall.config";
+import { LOOP, PRESETS, TIER, TOUR, type Tier } from "./wall.config";
 import { Hud } from "./components/Hud";
 import { Tour } from "./components/Tour";
 import { WallBus } from "./components/wall-bus";
@@ -35,6 +35,15 @@ const WALK_KEYS: Record<string, readonly [orbit: number, dolly: number]> = {
 
 const TOUR_LAST = TOUR.stations.length - 1;
 
+/** The quality tier, once at mount: phones and small or low-memory devices get the lighter room. */
+function pickTier(): Tier {
+  const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  const mobile =
+    coarse || window.innerWidth < TIER.mobileMaxWidth || (memory !== undefined && memory <= TIER.mobileMaxMemoryGb);
+  return mobile ? TIER.mobile : TIER.desktop;
+}
+
 export default function App({ copy }: { copy: WallCopy }) {
   const router = useRouter();
   const reduced = useReducedMotion();
@@ -42,6 +51,7 @@ export default function App({ copy }: { copy: WallCopy }) {
   const [webgl] = useState(hasWebGL2);
   const [contextLost, setContextLost] = useState(false);
   const [software, setSoftware] = useState(false);
+  const [tier] = useState(pickTier);
   const [bus] = useState(() => new WallBus());
   const [preset, setPreset] = useState(0);
   // Bumped on every choice, including re-choosing the view you are already on:
@@ -346,6 +356,7 @@ export default function App({ copy }: { copy: WallCopy }) {
           tour={tour}
           reduced={reduced}
           software={software}
+          tier={tier}
           frameloop={frameloop}
           bus={bus}
           onSoftware={setSoftware}

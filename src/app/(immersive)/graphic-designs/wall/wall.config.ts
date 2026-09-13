@@ -173,6 +173,12 @@ export const ROOM = {
   backLight: {
     ratio: 0.6,
     distance: 2.4,
+    /**
+     * On the mobile tier the service light is a point light in the same place,
+     * not a second area light (see `TIER`): candela, decay 2. Solved to land
+     * about the same irradiance on the cabinet backs as the area light does.
+     */
+    pointIntensity: 22,
   },
 } as const;
 
@@ -248,15 +254,53 @@ export const BACK = {
   metalness: 0.5,
 } as const;
 
-/** drei MeshReflectorMaterial — the glow on the floor is the hero detail. */
+/**
+ * Quality tiers. The mobile tier is picked once, at mount (App.tsx `pickTier`),
+ * on a coarse pointer, a viewport under `mobileMaxWidth` CSS px, or
+ * `navigator.deviceMemory` ≤ `mobileMaxMemoryGb`; everything else runs the
+ * desktop tier, which is the room as it has always been. The audit found the
+ * full chain on a phone — a 512² mirror render plus its blur, an eight-level
+ * bloom, SMAA and two area lights on a floor that fills the screen, at DPR
+ * 1.5. The mobile tier keeps the same room: the mirror at 256² with the same
+ * blur character, the bloom four levels deep (at a 500 px buffer the deeper
+ * mips are a handful of pixels), no SMAA (DPR 1.25 on a 390 px screen covers
+ * it), one area light — the service light behind the wall becomes a point
+ * light of the same tint — and DPR 1.25. The wall's own loop and its LED
+ * surface are untouched on both. `SOFTWARE` overrides either tier.
+ */
+export const TIER = {
+  mobileMaxWidth: 720,
+  mobileMaxMemoryGb: 4,
+  desktop: {
+    /** the canvas' device-pixel-ratio cap */
+    dpr: 1.5,
+    /** the floor's mirror render: target size, and drei's blur (see REFLECTOR) */
+    reflector: { resolution: 512, blur: [400, 120] as [number, number] },
+    /** bloom mip levels */
+    bloomLevels: 8,
+    /** SMAA in the composer chain */
+    smaa: true,
+    /** the service light behind the wall: a second area light, or a point light */
+    backLight: "rect" as "rect" | "point",
+  },
+  mobile: {
+    dpr: 1.25,
+    reflector: { resolution: 256, blur: [200, 60] as [number, number] },
+    bloomLevels: 4,
+    smaa: false,
+    backLight: "point" as "rect" | "point",
+  },
+} as const;
+export type Tier = typeof TIER.desktop | typeof TIER.mobile;
+
+/**
+ * drei MeshReflectorMaterial — the glow on the floor is the hero detail. The
+ * mirror's resolution and blur are per tier (above). drei's blur is a TEXEL
+ * SIZE, so smaller numbers mean MORE blur; the vertical figure is a third of
+ * the horizontal on purpose: a reflection in a floor smears along the viewing
+ * direction, not across it.
+ */
 export const REFLECTOR = {
-  resolution: 512,
-  /**
-   * drei's blur is a TEXEL SIZE, so smaller numbers mean MORE blur. The
-   * vertical figure is a third of the horizontal on purpose: a reflection in a
-   * floor smears along the viewing direction, not across it.
-   */
-  blur: [400, 120] as [number, number],
   mixBlur: 0.85,
   /** the reflection is bright against a dark floor, so it carries most of the look */
   mixStrength: 9,
@@ -270,10 +314,11 @@ export const REFLECTOR = {
 
 /**
  * What the room drops to when WebGL is rasterised on the CPU (SwiftShader,
- * llvmpipe, WARP). Measured on SwiftShader, the full chain runs at 2.8 fps —
- * so the composer comes out, the reflector shrinks, the loop's clock stops and
- * the frameloop goes to demand: a still room that repaints when the visitor
- * moves. Everything still works, nothing is a slideshow.
+ * llvmpipe, WARP), on either tier. Measured on SwiftShader, the full chain
+ * runs at 2.8 fps — so the composer comes out, the reflector shrinks, the
+ * loop's clock stops and the frameloop goes to demand: a still room that
+ * repaints when the visitor moves. Everything still works, nothing is a
+ * slideshow.
  */
 export const SOFTWARE = {
   reflectorResolution: 192,
@@ -296,8 +341,8 @@ export const BLOOM = {
   luminanceThreshold: 0.045,
   luminanceSmoothing: 0.12,
   mipmapBlur: true,
-  /** SMAA instead of MSAA: the composer runs on a HalfFloat buffer at DPR 1.5 */
-  smaa: true,
+  /* SMAA (instead of MSAA — the composer runs on a HalfFloat buffer) and the
+     mip depth are per tier: see TIER. */
 } as const;
 
 /** Camera: four presets, a damped orbit that goes all the way round, and a walk. */

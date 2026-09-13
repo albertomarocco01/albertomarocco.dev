@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Canvas, type Frameloop, type RootState } from "@react-three/fiber";
 import type { WebGLRenderer } from "three";
 import { Bloom, EffectComposer, SMAA } from "@react-three/postprocessing";
-import { BLOOM, CAMERA, PRESETS, SOFTWARE, type LoopVariant } from "../wall.config";
+import { BLOOM, CAMERA, PRESETS, SOFTWARE, type LoopVariant, type Tier } from "../wall.config";
 import { isSoftwareRenderer } from "@/lib/webgl-caps";
 import { WallScene } from "./WallScene";
 import type { WallBus } from "./wall-bus";
@@ -25,12 +25,14 @@ const CAMERA_PROPS = {
 /**
  * The demo's own <Canvas> — not the site's shared one.
  *
- * DPR capped at 1.5 and `antialias: false`: the composer runs on a HalfFloat
- * buffer, so the driver's MSAA would be thrown away anyway. SMAA in the chain
- * costs one pass and cleans up the riser and cabinet edges, which are the only
- * hard geometry in the room. `multisampling={0}` is deliberate — the default is
- * 8, and a multisampled HalfFloat buffer at DPR 1.5 is hundreds of megabytes on
- * a large monitor for edges SMAA already handles.
+ * DPR capped per tier (1.5 desktop, 1.25 mobile) and `antialias: false`: the
+ * composer runs on a HalfFloat buffer, so the driver's MSAA would be thrown
+ * away anyway. SMAA in the chain costs one pass and cleans up the riser and
+ * cabinet edges, which are the only hard geometry in the room — on the desktop
+ * tier; on a phone at DPR 1.25 the edges are fine without it. `multisampling={0}`
+ * is deliberate — the default is 8, and a multisampled HalfFloat buffer at DPR
+ * 1.5 is hundreds of megabytes on a large monitor for edges SMAA already
+ * handles.
  *
  * The frameloop is owned by App (visibility + reduced motion + the software
  * path): R3F re-applies the prop on every Canvas render, so it cannot be set
@@ -43,6 +45,7 @@ export function WallCanvas({
   tour,
   reduced,
   software,
+  tier,
   frameloop,
   bus,
   onSoftware,
@@ -54,6 +57,8 @@ export function WallCanvas({
   tour: number | null;
   reduced: boolean;
   software: boolean;
+  /** picked once at mount (App): DPR, mirror size, bloom depth, SMAA, the service light */
+  tier: Tier;
   frameloop: Frameloop;
   bus: WallBus;
   onSoftware: (software: boolean) => void;
@@ -92,7 +97,7 @@ export function WallCanvas({
     <Canvas
       className="wall-canvas"
       style={{ position: "absolute", inset: 0 }}
-      dpr={software ? SOFTWARE.dpr : [1, 1.5]}
+      dpr={software ? SOFTWARE.dpr : [1, tier.dpr]}
       frameloop={frameloop}
       camera={CAMERA_PROPS}
       gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }}
@@ -105,6 +110,7 @@ export function WallCanvas({
         tour={tour}
         reduced={reduced}
         software={software}
+        tier={tier}
         bus={bus}
       />
       {/* disabled, not unmounted: with `enabled` false the composer drops to
@@ -116,8 +122,9 @@ export function WallCanvas({
           luminanceThreshold={BLOOM.luminanceThreshold}
           luminanceSmoothing={BLOOM.luminanceSmoothing}
           mipmapBlur={BLOOM.mipmapBlur}
+          levels={tier.bloomLevels}
         />
-        {BLOOM.smaa ? <SMAA /> : null}
+        {tier.smaa ? <SMAA /> : null}
       </EffectComposer>
     </Canvas>
   );

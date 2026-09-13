@@ -12,11 +12,12 @@ import {
   WALL,
   WALL_CENTRE_Y,
   type LoopVariant,
+  type Tier,
 } from "../wall.config";
 import { CameraRig } from "./CameraRig";
 import { LoopSource } from "./loop-source";
 import { LedWallMaterial } from "./wall-material";
-import { initRoomLight } from "./room-light";
+import { backLightIntensity, initBackLight, initRoomLight } from "./room-light";
 import { WallBack } from "./wall-back";
 import type { WallBus } from "./wall-bus";
 
@@ -33,15 +34,13 @@ import type { WallBus } from "./wall-bus";
  */
 /** 2:1, matching the wall. No depth: the source is one triangle. */
 const TARGET = { depthBuffer: false, stencilBuffer: false };
-/** the service light's usual intensity — the tour's "behind" station doubles it */
-const BACK_LIGHT = ROOM.wallLight.intensity * ROOM.backLight.ratio;
 /**
  * Ease the service light toward what the station wants: damped on the running
  * path, set outright on the still ones, where this is the only frame. A
  * module-scope helper because the light is state-held and the React compiler
  * rules forbid writing its fields from inside the component.
  */
-function driveBackLight(light: THREE.RectAreaLight, want: number, still: boolean, dt: number): void {
+function driveBackLight(light: THREE.Light, want: number, still: boolean, dt: number): void {
   light.intensity = still ? want : THREE.MathUtils.damp(light.intensity, want, TOUR.backLight.lambda, dt);
 }
 export function WallScene({
@@ -51,6 +50,7 @@ export function WallScene({
   tour,
   reduced,
   software,
+  tier,
   bus,
 }: {
   variant: LoopVariant;
@@ -60,6 +60,8 @@ export function WallScene({
   tour: number | null;
   reduced: boolean;
   software: boolean;
+  /** picked once at mount: the mirror's size, the bloom's depth, the service light's kind */
+  tier: Tier;
   bus: WallBus;
 }) {
   // both paths mean the same thing to the scene: no clock, no crossfade, and a
@@ -75,7 +77,9 @@ export function WallScene({
   const [loop] = useState(() => new LoopSource([fbo, held], variant));
   const [material] = useState(() => new LedWallMaterial(loop.texture, loop.snapshot));
   const [light] = useState(() => initRoomLight());
-  const [backLight] = useState(() => initRoomLight(BACK_LIGHT));
+  const [backLight] = useState(() => initBackLight(tier.backLight));
+  /** the service light's usual intensity — the tour's "behind" station doubles it */
+  const backBase = backLightIntensity(tier.backLight);
   const [back] = useState(() => new WallBack());
   /** seconds into the pitch station's pulse of the lamps; −1 when none runs */
   const pulseAt = useRef(-1);
@@ -158,7 +162,7 @@ export function WallScene({
 
     // the "behind" station lifts the service light
     const boost = tour === TOUR.backLightStation ? TOUR.backLight.boost : 1;
-    driveBackLight(backLight, BACK_LIGHT * boost, still, dt);
+    driveBackLight(backLight, backBase * boost, still, dt);
   }, -1);
 
   return (
@@ -185,7 +189,8 @@ export function WallScene({
           rotation={[0, Math.PI, 0]}
         />
       )}
-      {/* the service light: the same size, behind the wall, shining at its back */}
+      {/* the service light: behind the wall, shining at its back — an area light
+          of the same size on the desktop tier, a point light on the mobile one */}
       {ROOM.wallLight.enabled && (
         <primitive
           object={backLight}
@@ -198,8 +203,8 @@ export function WallScene({
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[ROOM.floorSize, ROOM.floorSize]} />
         <MeshReflectorMaterial
-          resolution={software ? SOFTWARE.reflectorResolution : REFLECTOR.resolution}
-          blur={software ? SOFTWARE.reflectorBlur : REFLECTOR.blur}
+          resolution={software ? SOFTWARE.reflectorResolution : tier.reflector.resolution}
+          blur={software ? SOFTWARE.reflectorBlur : tier.reflector.blur}
           mixBlur={REFLECTOR.mixBlur}
           mixStrength={REFLECTOR.mixStrength}
           mirror={REFLECTOR.mirror}

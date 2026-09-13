@@ -16,6 +16,11 @@ import { ROOM, WALL } from "../wall.config";
  * any rect-area light renders, or every surface it touches comes out black. The
  * call is idempotent and the tables are shared, so it is done here, once, and
  * this module is the only place that reaches into three's addons for lights.
+ *
+ * On the mobile tier the service light is a point light instead: an area light
+ * costs two LTC table reads and their integrals per fragment, on a floor that
+ * fills the screen, and the back of the wall does not need the second one to
+ * read. Same place, same tint, about the same light on the cabinet backs.
  */
 let initialised = false;
 
@@ -26,4 +31,14 @@ export function initRoomLight(intensity: number = ROOM.wallLight.intensity): THR
   }
   // colour is set every frame from the loop's current accent (see WallScene)
   return new THREE.RectAreaLight(0xffffff, intensity, WALL.width, WALL.height);
+}
+
+/** The service light's usual intensity on this tier — the tour's "behind" station doubles it. */
+export function backLightIntensity(kind: "rect" | "point"): number {
+  return kind === "rect" ? ROOM.wallLight.intensity * ROOM.backLight.ratio : ROOM.backLight.pointIntensity;
+}
+
+export function initBackLight(kind: "rect" | "point"): THREE.RectAreaLight | THREE.PointLight {
+  if (kind === "rect") return initRoomLight(backLightIntensity(kind));
+  return new THREE.PointLight(0xffffff, backLightIntensity(kind), 0, 2);
 }
