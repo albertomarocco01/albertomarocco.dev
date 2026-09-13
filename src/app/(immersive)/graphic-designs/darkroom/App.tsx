@@ -6,7 +6,7 @@ import { hasWebGL2 } from "@/lib/webgl-caps";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { useTabVisible } from "@/lib/use-tab-visible";
 import type { DarkroomCopy } from "./copy";
-import { STIR } from "./darkroom.config";
+import { STIR, TIER, type Tier } from "./darkroom.config";
 import { DarkroomCanvas } from "./components/DarkroomCanvas";
 import { Hud } from "./components/Hud";
 import { TrayBus, type DarkroomMode } from "./components/tray-bus";
@@ -24,6 +24,14 @@ import type { DarkroomCapabilities } from "./components/darkroom-engine";
 
 const isChrome = (t: EventTarget | null) => t instanceof Element && t.closest("a, button") !== null;
 
+/** The quality tier, once at mount: phones and small or low-memory devices get the lighter one. */
+function pickTier(): Tier {
+  const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  const mobile = coarse || window.innerWidth < TIER.mobileMaxWidth || (memory !== undefined && memory <= TIER.mobileMaxMemoryGb);
+  return mobile ? TIER.mobile : TIER.desktop;
+}
+
 export default function App({ copy }: { copy: DarkroomCopy }) {
   const router = useRouter();
   const reduced = useReducedMotion();
@@ -33,6 +41,7 @@ export default function App({ copy }: { copy: DarkroomCopy }) {
   const [contextLost, setContextLost] = useState(false);
   const [caps, setCaps] = useState<DarkroomCapabilities | null>(null);
   const [bus] = useState(() => new TrayBus());
+  const [tier] = useState(pickTier);
   const stageRef = useRef<HTMLDivElement>(null);
 
   // The brush path is one flag away from the fluid: reduced motion, no
@@ -142,6 +151,7 @@ export default function App({ copy }: { copy: DarkroomCopy }) {
         <DarkroomCanvas
           bus={bus}
           mode={mode}
+          tier={tier}
           frameloop={frameloop}
           onCapabilities={setCaps}
           onContextLost={setContextLost}

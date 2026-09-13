@@ -10,11 +10,13 @@ import {
   SIM,
   STIR,
   UI,
+  type Tier,
 } from "../darkroom.config";
 import type { DarkroomMode, Phase, TrayBus } from "./tray-bus";
 import {
   ADVECT_FRAG,
   AGITATE_FRAG,
+  BAKE_FRAG,
   COMPOSITE_FRAG,
   COVERAGE_FRAG,
   CURL_FRAG,
@@ -40,6 +42,10 @@ import {
  *   rasteriser: no fluid, no timers; the pointer paints exposure directly and
  *   prints advance on request. The mode can flip on the live engine (a
  *   prefers-reduced-motion toggle) without losing the print.
+ *
+ * The quality `tier` (darkroom.config.ts TIER) sets the grid sizes, the
+ * pressure iterations, the sub-step budget and whether the vorticity pass
+ * runs; it is fixed for the life of the engine.
  *
  * Every GPU resource is created here and released in `dispose()`. Targets are
  * owned by the class rather than drei's `useFBO` so ping-pong swaps and the
@@ -130,9 +136,17 @@ export interface DarkroomCapabilities {
   software: boolean;
 }
 
+/** A print's texture and, for an ImageBitmap source, the bitmap under it. */
+function disposeTexture(t: THREE.Texture) {
+  t.dispose();
+  const img = t.image as unknown;
+  if (typeof ImageBitmap !== "undefined" && img instanceof ImageBitmap) img.close();
+}
+
 export class DarkroomEngine {
   private readonly gl: THREE.WebGLRenderer;
   private readonly bus: TrayBus;
+  private readonly tier: Tier;
   private readonly floatOk: boolean;
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.Camera();
@@ -156,7 +170,7 @@ export class DarkroomEngine {
   // ── targets ──
   private fluid: FluidGrids | null = null;
   private exposure!: PingPong;
-  /** the outgoing print's exposure, frozen at the handover while it sinks */
+  /** the outgoing print, baked (tone, paper) at the handover while it sinks */
   private hold!: RT;
   private holdTex: THREE.Texture | null = null;
   private holdIndex = -1;
@@ -178,10 +192,17 @@ export class DarkroomEngine {
   private readonly remapMat: THREE.ShaderMaterial;
   private readonly exposureMat: THREE.ShaderMaterial;
   private readonly coverageMat: THREE.ShaderMaterial;
+  private readonly bakeMat: THREE.ShaderMaterial;
   private readonly compositeMat: THREE.ShaderMaterial;
 
   // ── prints ──
-  private readonly loader = new THREE.TextureLoader();
+  // ImageBitmapLoader decodes off the main thread (createImageBitmap); the
+  // TextureLoader (an <img> decoded on the main thread) is the fallback.
+  private readonly bitmapLoader =
+    typeof createImageBitmap === "function"
+      ? new THREE.ImageBitmapLoader().setOptions({ imageOrientation: "flipY", premultiplyAlpha: "none" })
+      : null;
+  private readonly imageLoader = this.bitmapLoader ? null : new THREE.TextureLoader();
   private readonly textures = new Map<number, THREE.Texture>();
   private readonly loading = new Set<number>();
   private readonly failures = new Map<number, number>();
@@ -222,9 +243,10 @@ export class DarkroomEngine {
   private sloshPhase = 0;
   private readonly slosh = new THREE.Vector2();
 
-  constructor(gl: THREE.WebGLRenderer, bus: TrayBus) {
+  constructor(gl: THREE.WebGLRenderer, bus: TrayBus, tier: Tier) {
     this.gl = gl;
     this.bus = bus;
+    this.tier = tier;
     this.floatOk = halfFloatRenderable(gl);
     this.prevAutoClear = gl.autoClear;
     // every pass overwrites its whole target — clearing first is wasted bandwidth
@@ -340,22 +362,31 @@ export class DarkroomEngine {
       u_size: { value: n },
     });
     const c = LOOK.curve;
+    const curve = new THREE.Vector4(c.lift, c.kneeMin, c.kneeMax, c.dmax);
+    this.bakeMat = makeMaterial(BAKE_FRAG, {
+      u_print: { value: this.placeholder },
+      u_exposure: { ...tex },
+      u_rect: { value: this.rect },
+      u_res: { value: this.res },
+      u_seed: { value: 0 },
+      u_grain: { value: LOOK.grain },
+      u_paperTex: { value: LOOK.paperTexture },
+      u_paperWhite: { value: LOOK.paperWhite },
+      u_curve: { value: curve },
+    });
     this.compositeMat = makeMaterial(COMPOSITE_FRAG, {
       u_print: { value: this.placeholder },
       u_exposure: { ...tex },
-      u_printOld: { value: this.placeholder },
-      u_exposureOld: { ...tex },
+      u_hold: { ...tex },
       u_velocity: { ...tex },
       u_dye: { ...tex },
       u_res: { value: this.res },
       u_aspectN: { value: this.aspectN },
       u_rect: { value: this.rect },
-      u_rectOld: { value: this.rectOld },
       u_velTexel: { value: this.velTexel },
       u_drain: { value: 1 },
       u_sink: { value: LOOK.sinkDepth },
       u_seed: { value: 0 },
-      u_seedOld: { value: 0 },
       u_fluid: { value: 0 },
       u_slosh: { value: this.slosh },
       u_refraction: { value: LOOK.refraction },
@@ -368,7 +399,7 @@ export class DarkroomEngine {
       u_safeRadius: { value: LOOK.safelightRadius },
       u_vignette: { value: LOOK.vignette },
       u_dyeShade: { value: LOOK.dyeShade },
-      u_curve: { value: new THREE.Vector4(c.lift, c.kneeMin, c.kneeMax, c.dmax) },
+      u_curve: { value: curve },
       u_amber: { value: AMBER },
     });
 
@@ -448,8 +479,8 @@ export class DarkroomEngine {
   /** Create the fluid grids for the current size; carry the liquid over from
    *  the old grids (a window drag must not still the tray mid-gesture). */
   private allocateFluid() {
-    const [vw, vh] = this.fluidGrid(SIM.velocityShort);
-    const [dw, dh] = this.fluidGrid(SIM.dyeShort);
+    const [vw, vh] = this.fluidGrid(this.tier.velocityShort);
+    const [dw, dh] = this.fluidGrid(this.tier.dyeShort);
     const old = this.fluid;
     if (old && old.vw === vw && old.vh === vh && old.dw === dw && old.dh === dh) return;
     this.velTexel.set(1 / vw, 1 / vh);
@@ -509,7 +540,7 @@ export class DarkroomEngine {
     // half-float support falls back to RGBA8 (the brush adds coarse steps, so
     // 8 bits are enough there)
     const long = Math.max(this.width, this.height) * dpr;
-    const scale = Math.min(1, Math.min(SIM.exposureLong, this.gl.capabilities.maxTextureSize) / long);
+    const scale = Math.min(1, Math.min(this.tier.exposureLong, this.gl.capabilities.maxTextureSize) / long);
     const ew = Math.max(2, Math.round(this.width * dpr * scale));
     const eh = Math.max(2, Math.round(this.height * dpr * scale));
     const format = this.floatOk ? THREE.RedFormat : THREE.RGBAFormat;
@@ -529,15 +560,15 @@ export class DarkroomEngine {
       this.clear(next.write);
       this.exposure = next;
     }
-    // the sinking print follows its own rect the same way, mid-handover
+    // the sinking print (baked: tone, paper) follows its own rect the same way, mid-handover
     const oldHold = this.hold as RT | undefined;
     if (!sameSize || !oldRectOld.equals(this.rectOld)) {
-      const next = makeTarget(ew, eh, format, type);
+      const next = makeTarget(ew, eh, this.floatOk ? THREE.RGFormat : THREE.RGBAFormat, type);
       if (oldHold && this.drain < 1) this.remap(oldHold.texture, oldRectOld, this.rectOld, next);
       else this.clear(next);
       oldHold?.dispose();
       this.hold = next;
-      this.compositeMat.uniforms.u_exposureOld.value = next.texture;
+      this.compositeMat.uniforms.u_hold.value = next.texture;
     }
   }
 
@@ -570,6 +601,8 @@ export class DarkroomEngine {
     this.draw(this.coverageMat, this.coverageRT);
     this.blit(this.exposure.read.texture, this.exposure.write, 1, 0, false);
     this.remap(this.exposure.read.texture, this.rect, this.rect, this.exposure.write);
+    this.bake();
+    this.clear(this.hold);
     this.composite();
   }
 
@@ -594,50 +627,80 @@ export class DarkroomEngine {
     const idx = wrap(i);
     if (this.textures.has(idx) || this.loading.has(idx) || this.broken.has(idx)) return;
     this.loading.add(idx);
-    this.loader.load(
-      PRINTS[idx],
-      (tex) => {
-        this.loading.delete(idx);
-        if (this.disposed) {
-          tex.dispose();
-          return;
-        }
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.wrapS = THREE.ClampToEdgeWrapping;
-        tex.wrapT = THREE.ClampToEdgeWrapping;
-        tex.minFilter = THREE.LinearMipmapLinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        tex.needsUpdate = true;
-        this.textures.set(idx, tex);
-        this.onPrintReady(idx);
-      },
-      undefined,
-      () => {
-        this.loading.delete(idx);
-        if (this.disposed) return;
-        const n = (this.failures.get(idx) ?? 0) + 1;
-        this.failures.set(idx, n);
-        if (n < 2) {
-          this.requestPrint(idx); // one retry
-        } else {
-          this.broken.add(idx);
-          this.onPrintBroken(idx);
-        }
-      },
-    );
+    const onLoad = (tex: THREE.Texture) => {
+      this.loading.delete(idx);
+      if (this.disposed) {
+        disposeTexture(tex);
+        return;
+      }
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = THREE.ClampToEdgeWrapping;
+      tex.wrapT = THREE.ClampToEdgeWrapping;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      tex.needsUpdate = true;
+      this.textures.set(idx, tex);
+      this.onPrintReady(idx);
+    };
+    const onError = () => {
+      this.loading.delete(idx);
+      if (this.disposed) return;
+      const n = (this.failures.get(idx) ?? 0) + 1;
+      this.failures.set(idx, n);
+      if (n < 2) {
+        this.requestPrint(idx); // one retry
+      } else {
+        this.broken.add(idx);
+        this.onPrintBroken(idx);
+      }
+    };
+    if (this.bitmapLoader) {
+      // flipY is baked into the bitmap (the loader's imageOrientation): a
+      // WebGL upload ignores UNPACK_FLIP_Y for ImageBitmap sources
+      this.bitmapLoader.load(
+        PRINTS[idx],
+        (bitmap) => {
+          const tex = new THREE.CanvasTexture(bitmap);
+          tex.flipY = false;
+          onLoad(tex);
+        },
+        undefined,
+        onError,
+      );
+    } else {
+      this.imageLoader!.load(PRINTS[idx], onLoad, undefined, onError);
+    }
   }
 
-  /** The first print, or the one a handover is waiting on. */
+  /** The first print, or the one the tray is showing as a black placeholder
+   *  while it loads (a handover on a slow network): the texture goes in under
+   *  whatever has been developed meanwhile — the strokes are kept, remapped
+   *  from the placeholder's rect onto the print's own. */
   private onPrintReady(idx: number) {
-    if (this.phase === "dissolving") {
-      if (idx === this.drainTarget && !this.printTex) {
-        this.bindPrint(idx);
-        if (this.drain >= 1) this.settle();
-      }
-    } else if (!this.printTex && idx === this.index) {
-      this.bindPrint(idx);
-      this.settle();
+    if (idx !== this.index || this.printTex) return;
+    const first = !this.started && this.phase === "developing";
+    this.swapPrintTexture(idx);
+    if (first) this.settle();
+    else if (this.phase === "dissolving" && this.drain >= 1) this.settle();
+  }
+
+  /** Bind a late texture to the print already in the tray, keeping its exposure. */
+  private swapPrintTexture(idx: number) {
+    const tex = this.textures.get(idx) ?? null;
+    if (!tex) return;
+    const oldRect = this.rect.clone();
+    this.printTex = tex;
+    this.compositeMat.uniforms.u_print.value = tex;
+    this.coverageMat.uniforms.u_print.value = tex;
+    this.fitRect(tex, this.rect);
+    if (!oldRect.equals(this.rect)) {
+      // the placeholder was 4:5 — the strokes follow the paper's real shape
+      this.remap(this.exposure.read.texture, oldRect, this.rect, this.exposure.write);
+      this.exposure.swap();
     }
+    this.coverageDirty = true;
+    this.publish(true);
+    this.wakeFn?.();
   }
 
   /** A print that will never load must not leave the tray waiting: skip it. */
@@ -675,7 +738,7 @@ export class DarkroomEngine {
     const keep = new Set([this.index, wrap(this.index + 1), wrap(this.index - 1), this.drainTarget, this.holdIndex]);
     for (const [i, t] of this.textures) {
       if (!keep.has(i)) {
-        t.dispose();
+        disposeTexture(t);
         this.textures.delete(i);
       }
     }
@@ -718,7 +781,6 @@ export class DarkroomEngine {
     this.compositeMat.uniforms.u_drain.value = 1;
     this.holdTex = null;
     this.holdIndex = -1;
-    this.compositeMat.uniforms.u_printOld.value = this.placeholder;
     this.publish(true);
     this.wakeFn?.();
   }
@@ -734,14 +796,13 @@ export class DarkroomEngine {
     const target = this.nextAvailable(this.index + dir, dir);
     if (this.phase !== "dissolving") {
       if (this._mode === "fluid") {
-        const u = this.compositeMat.uniforms;
-        this.blit(this.exposure.read.texture, this.hold, 1, 0, false);
+        // the outgoing print's developed look, baked once: the composite then
+        // develops one print a frame, not two, while it sinks
+        this.bake();
         this.holdTex = this.printTex;
         this.holdIndex = this.index;
         this.rectOld.copy(this.rect);
-        u.u_printOld.value = this.printTex ?? this.placeholder;
-        u.u_seedOld.value = u.u_seed.value;
-        u.u_drain.value = 0;
+        this.compositeMat.uniforms.u_drain.value = 0;
         this.drain = 0;
         this.dissolveDur = dur;
       } else {
@@ -799,7 +860,7 @@ export class DarkroomEngine {
     // caught up, and a slow GPU (a frame over 50 ms) gets one step per frame so
     // the sub-stepping cannot spiral
     this.acc += dt;
-    const budget = dt > 0.05 ? 1 : SIM.maxSubsteps;
+    const budget = dt > 0.05 ? 1 : this.tier.maxSubsteps;
     let steps = 0;
     while (this.acc >= SIM.dt && steps < budget) {
       this.acc -= SIM.dt;
@@ -908,13 +969,15 @@ export class DarkroomEngine {
     this.draw(this.advectVel, vel.write);
     vel.swap();
 
-    // 2. vorticity confinement (low — developer, not smoke)
-    this.curlMat.uniforms.u_velocity.value = vel.read.texture;
-    this.draw(this.curlMat, f.curl);
-    this.vorticityMat.uniforms.u_velocity.value = vel.read.texture;
-    this.vorticityMat.uniforms.u_curl.value = f.curl.texture;
-    this.draw(this.vorticityMat, vel.write);
-    vel.swap();
+    // 2. vorticity confinement (low — developer, not smoke; the mobile tier skips it)
+    if (this.tier.vorticity) {
+      this.curlMat.uniforms.u_velocity.value = vel.read.texture;
+      this.draw(this.curlMat, f.curl);
+      this.vorticityMat.uniforms.u_velocity.value = vel.read.texture;
+      this.vorticityMat.uniforms.u_curl.value = f.curl.texture;
+      this.draw(this.vorticityMat, vel.write);
+      vel.swap();
+    }
 
     // 3. forces: pointer, agitation, autonomous current
     this.injectPointers(dt, accept);
@@ -926,7 +989,7 @@ export class DarkroomEngine {
     this.draw(this.divergenceMat, f.divergence);
     this.blit(pressure.read.texture, pressure.write, SIM.pressureCarry, 0, false);
     pressure.swap();
-    for (let i = 0; i < SIM.pressureIterations; i++) {
+    for (let i = 0; i < this.tier.pressureIterations; i++) {
       this.pressureMat.uniforms.u_pressure.value = pressure.read.texture;
       this.pressureMat.uniforms.u_divergence.value = f.divergence.texture;
       this.draw(this.pressureMat, pressure.write);
@@ -1231,6 +1294,15 @@ export class DarkroomEngine {
 
   // ── output ──────────────────────────────────────────────────────────────
 
+  /** The print in the tray, developed as it stands, into the hold (tone, paper). */
+  private bake() {
+    const u = this.bakeMat.uniforms;
+    u.u_print.value = this.printTex ?? this.placeholder;
+    u.u_exposure.value = this.exposure.read.texture;
+    u.u_seed.value = this.compositeMat.uniforms.u_seed.value;
+    this.draw(this.bakeMat, this.hold);
+  }
+
   private composite() {
     const u = this.compositeMat.uniforms;
     u.u_exposure.value = this.exposure.read.texture;
@@ -1312,12 +1384,13 @@ export class DarkroomEngine {
       this.remapMat,
       this.exposureMat,
       this.coverageMat,
+      this.bakeMat,
       this.compositeMat,
     ]) {
       m.dispose();
     }
     this.geometry.dispose();
-    for (const t of this.textures.values()) t.dispose();
+    for (const t of this.textures.values()) disposeTexture(t);
     this.textures.clear();
     this.placeholder.dispose();
     this.gl.setRenderTarget(null);

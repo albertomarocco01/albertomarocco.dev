@@ -259,41 +259,10 @@ void main() {
 }
 `;
 
-/** The composite: print under the liquid → development curve → paper → room.
- *  Through a handover (`u_drain` 0 → 1) the outgoing print — `u_printOld`
- *  with its exposure frozen in `u_exposureOld` — sinks over the incoming one:
- *  deeper under the liquid, darker, its grain gone. */
-export const COMPOSITE_FRAG = /* glsl */ `${HEAD}
-uniform sampler2D u_print;
-uniform sampler2D u_exposure;
-uniform sampler2D u_printOld;
-uniform sampler2D u_exposureOld;
-uniform sampler2D u_velocity;
-uniform sampler2D u_dye;
-uniform vec2 u_res;
-uniform vec2 u_aspectN;
-uniform vec4 u_rect;
-uniform vec4 u_rectOld;
-uniform vec2 u_velTexel;
-uniform float u_drain;
-uniform float u_sink;
-uniform float u_seed;
-uniform float u_seedOld;
-uniform float u_fluid;
-uniform vec2 u_slosh;
-uniform float u_refraction;
-uniform float u_specular;
-uniform float u_specularSpeed;
-uniform float u_grain;
-uniform float u_paperTex;
-uniform float u_paperWhite;
-uniform float u_safeAlpha;
-uniform float u_safeRadius;
-uniform float u_vignette;
-uniform float u_dyeShade;
-uniform vec4 u_curve;
-uniform vec3 u_amber;
-
+/** The development curve, shared by the composite (the print in the tray) and
+ *  the bake (the finished print, frozen once at the handover). Needs `u_res`,
+ *  `u_paperTex`, `u_paperWhite`, `u_curve` declared by the including shader. */
+const DEVELOP_GLSL = /* glsl */ `
 float hash21(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
   p += dot(p, p + 45.32);
@@ -308,9 +277,6 @@ float vnoise(vec2 p) {
   float c = hash21(i + vec2(0.0, 1.0));
   float d = hash21(i + vec2(1.0, 1.0));
   return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-vec3 toSRGB(vec3 c) {
-  return mix(12.92 * c, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
 }
 
 /** One print under the liquid, seen at uvR: its developed tone (linear) and
@@ -340,6 +306,64 @@ vec2 develop(sampler2D printTex, sampler2D expTex, vec4 rect, float seed, float 
   tone *= 1.0 + grain * 2.0 * grainAmt * lift;
   return vec2(tone, paper);
 }
+`;
+
+/** The bake: the finished print's developed look — tone and paper coverage —
+ *  rendered once into the hold target at the start of a handover, so the
+ *  composite reads it back with one texture tap instead of developing the
+ *  outgoing print again every frame while it sinks. */
+export const BAKE_FRAG = /* glsl */ `${HEAD}
+uniform sampler2D u_print;
+uniform sampler2D u_exposure;
+uniform vec4 u_rect;
+uniform vec2 u_res;
+uniform float u_seed;
+uniform float u_grain;
+uniform float u_paperTex;
+uniform float u_paperWhite;
+uniform vec4 u_curve;
+${DEVELOP_GLSL}
+void main() {
+  vec2 d = develop(u_print, u_exposure, u_rect, u_seed, u_grain, vUv);
+  fragColor = vec4(d, 0.0, 1.0);
+}
+`;
+
+/** The composite: print under the liquid → development curve → paper → room.
+ *  Through a handover (`u_drain` 0 → 1) the outgoing print — baked into
+ *  `u_hold` (tone, paper) — sinks over the incoming one: deeper under the
+ *  liquid, darker, thinner. */
+export const COMPOSITE_FRAG = /* glsl */ `${HEAD}
+uniform sampler2D u_print;
+uniform sampler2D u_exposure;
+uniform sampler2D u_hold;
+uniform sampler2D u_velocity;
+uniform sampler2D u_dye;
+uniform vec2 u_res;
+uniform vec2 u_aspectN;
+uniform vec4 u_rect;
+uniform vec2 u_velTexel;
+uniform float u_drain;
+uniform float u_sink;
+uniform float u_seed;
+uniform float u_fluid;
+uniform vec2 u_slosh;
+uniform float u_refraction;
+uniform float u_specular;
+uniform float u_specularSpeed;
+uniform float u_grain;
+uniform float u_paperTex;
+uniform float u_paperWhite;
+uniform float u_safeAlpha;
+uniform float u_safeRadius;
+uniform float u_vignette;
+uniform float u_dyeShade;
+uniform vec4 u_curve;
+uniform vec3 u_amber;
+${DEVELOP_GLSL}
+vec3 toSRGB(vec3 c) {
+  return mix(12.92 * c, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
+}
 
 void main() {
   vec2 uv = vUv;
@@ -361,11 +385,11 @@ void main() {
   vec2 nw = develop(u_print, u_exposure, u_rect, u_seed, u_grain, uvR);
   vec3 col = paperTint * nw.x * nw.y;
 
-  // ── the handover: the finished print sinks — deeper under the liquid, darker,
-  //    its grain going — and the next one comes up underneath it ──
+  // ── the handover: the finished print (baked once, see BAKE_FRAG) sinks —
+  //    deeper under the liquid, darker — and the next one comes up under it ──
   if (u_drain < 1.0) {
     float keep = 1.0 - u_drain;
-    vec2 od = develop(u_printOld, u_exposureOld, u_rectOld, u_seedOld, u_grain * keep, uv + shift * (1.0 + u_sink * u_drain));
+    vec2 od = texture(u_hold, uv + shift * (1.0 + u_sink * u_drain)).xy;
     // darker as it goes (× keep) and thinner over the print beneath (× keep again)
     vec3 old = paperTint * od.x * od.y * keep;
     col = old + col * (1.0 - od.y * keep);

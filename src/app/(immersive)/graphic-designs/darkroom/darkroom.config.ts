@@ -25,22 +25,55 @@ export const PRINTS: readonly string[] = [
   "/vortex/images/img_039.webp", // courtyard, old print (alpha)
 ];
 
-/** Stable fluids: grid sizes, solver, damping. */
+/**
+ * Quality tiers. The mobile tier is picked once, at mount (App.tsx), on a
+ * coarse pointer, a viewport under `mobileMaxWidth` CSS px, or
+ * `navigator.deviceMemory` ≤ `mobileMaxMemoryGb`; everything else runs the
+ * desktop tier. The audit's 332 ms frame on an iPhone was the desktop tier —
+ * 20 Jacobi iterations, ~30 passes a step, the composite at DPR 1.5. The
+ * mobile tier keeps the look: the grids at 0.75×, the pressure solve at 8
+ * iterations (a viscous, slow developer converges early), no vorticity pass
+ * (its strength is 3 — a texel-scale whisper), the composite at DPR ≤ 1.25.
+ * `SIM` below is shared by both.
+ */
+export const TIER = {
+  mobileMaxWidth: 720,
+  mobileMaxMemoryGb: 4,
+  desktop: {
+    /** velocity grid, short side in texels (aspect-corrected → square texels) */
+    velocityShort: 256,
+    /** developer dye grid, short side in texels */
+    dyeShort: 512,
+    /** exposure buffer, LONG side cap in texels (display resolution below that) */
+    exposureLong: 1024,
+    /** Jacobi iterations for the pressure solve */
+    pressureIterations: 20,
+    /** long frames are sub-stepped up to this many fixed steps */
+    maxSubsteps: 3,
+    /** the vorticity confinement pass (curl + force) */
+    vorticity: true,
+    /** the canvas' device-pixel-ratio cap */
+    dpr: 1.5,
+  },
+  mobile: {
+    velocityShort: 192,
+    dyeShort: 384,
+    exposureLong: 768,
+    pressureIterations: 8,
+    maxSubsteps: 2,
+    vorticity: false,
+    dpr: 1.25,
+  },
+} as const;
+export type Tier = typeof TIER.desktop | typeof TIER.mobile;
+
+/** Stable fluids: solver and damping (the grid sizes are per tier, above). */
 export const SIM = {
-  /** velocity grid, short side in texels (aspect-corrected → square texels) */
-  velocityShort: 256,
-  /** developer dye grid, short side in texels */
-  dyeShort: 512,
-  /** exposure buffer, LONG side cap in texels (display resolution below that) */
-  exposureLong: 1024,
   /** fluid grids, LONG side cap in texels — an extreme aspect scales the whole
    *  grid down instead of asking the GPU for a texture it cannot make */
   gridLongMax: 2048,
-  /** fixed timestep; long frames are sub-stepped up to `maxSubsteps` */
+  /** fixed timestep; long frames are sub-stepped up to the tier's `maxSubsteps` */
   dt: 1 / 60,
-  maxSubsteps: 3,
-  /** Jacobi iterations for the pressure solve */
-  pressureIterations: 20,
   /** pressure warm start: last frame's field scaled by this before iterating */
   pressureCarry: 0.8,
   /** per-step multipliers — developer is viscous and slow */

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+import type { Tier } from "../darkroom.config";
 import { DarkroomEngine } from "./darkroom-engine";
 import type { DarkroomMode, TrayBus } from "./tray-bus";
 
@@ -10,7 +11,7 @@ import type { DarkroomMode, TrayBus } from "./tray-bus";
  * positive priority hands the rendering to us, so R3F never draws its own
  * (empty) scene. Renders nothing itself.
  */
-export function DarkroomScene({ bus, mode }: { bus: TrayBus; mode: DarkroomMode }) {
+export function DarkroomScene({ bus, mode, tier }: { bus: TrayBus; mode: DarkroomMode; tier: Tier }) {
   const gl = useThree((s) => s.gl);
   const size = useThree((s) => s.size);
   const dpr = useThree((s) => s.viewport.dpr);
@@ -18,7 +19,7 @@ export function DarkroomScene({ bus, mode }: { bus: TrayBus; mode: DarkroomMode 
   const engineRef = useRef<DarkroomEngine | null>(null);
 
   useEffect(() => {
-    const engine = new DarkroomEngine(gl, bus);
+    const engine = new DarkroomEngine(gl, bus, tier);
     engineRef.current = engine;
     const canvas = gl.domElement;
     const onRestore = () => engine.recover();
@@ -28,7 +29,7 @@ export function DarkroomScene({ bus, mode }: { bus: TrayBus; mode: DarkroomMode 
       engineRef.current = null;
       engine.dispose();
     };
-  }, [gl, bus]);
+  }, [gl, bus, tier]);
 
   // in brush mode the loop runs on demand: the engine registers `invalidate`
   // on the bus so any input wakes exactly one frame
