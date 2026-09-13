@@ -179,6 +179,18 @@ export interface Dictionary {
   };
   /** route-level error boundary for the main site (boundary-copy.ts) */
   error: ErrorText;
+  /** the site's 404 (app/not-found.tsx) */
+  notFound: {
+    /** mono label over the title — the status code, same in both locales */
+    label: string;
+    title: string;
+    body: string;
+    /** the two ways onward: the home, and the demo index */
+    home: string;
+    demos: string;
+    /** aria-label for that little nav */
+    navAria: string;
+  };
   /** the /graphic-designs index */
   gd: {
     metaTitle: string;
@@ -366,6 +378,14 @@ const en: Dictionary = {
     phoneLabel: "call",
   },
   error: ERROR_COPY.en,
+  notFound: {
+    label: "404",
+    title: "This page does not exist.",
+    body: "The address may be mistyped, or the page has moved. The work and the demos are still where they were.",
+    home: "← back home",
+    demos: "the graphic designs →",
+    navAria: "Where to go next",
+  },
   gd: {
     metaTitle: "Merge — Graphic Designs",
     metaDescription:
@@ -577,6 +597,14 @@ const it: Dictionary = {
     phoneLabel: "chiama",
   },
   error: ERROR_COPY.it,
+  notFound: {
+    label: "404",
+    title: "Questa pagina non esiste.",
+    body: "L'indirizzo potrebbe essere sbagliato, o la pagina si è spostata. I lavori e le demo sono ancora al loro posto.",
+    home: "← torna alla home",
+    demos: "i graphic designs →",
+    navAria: "Dove andare",
+  },
   gd: {
     metaTitle: "Merge — Graphic Designs",
     metaDescription:
