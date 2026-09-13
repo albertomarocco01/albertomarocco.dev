@@ -12,6 +12,12 @@ import { isSoftwareRenderer } from "@/lib/webgl-caps";
 // immersive demos): SwiftShader / llvmpipe / Microsoft Basic Render etc. paint a
 // single static frame instead of looping a fullscreen fbm on the CPU.
 
+// Cap DPR at 1.5: the ambient field paints fullscreen continuously, and the
+// soft noise reads identically at 1.5 as at 2 — cheaper everywhere. Held as a
+// constant because it is handed to R3F twice: at configure, and again whenever
+// the display's ratio changes (see onCreated).
+const DPR_RANGE: [number, number] = [1, 1.5];
+
 /**
  * The single persistent WebGL canvas for the whole app. Fixed, transparent, and
  * pointer-inert; it only paints where a <View> scissors it (the ambient white
@@ -77,9 +83,7 @@ export function Field() {
           pointerEvents: "none",
         }}
         frameloop="demand"
-        // Cap DPR at 1.5: the ambient field paints fullscreen continuously, and
-        // the soft noise reads identically at 1.5 as at 2 — cheaper everywhere.
-        dpr={[1, 1.5]}
+        dpr={DPR_RANGE}
         gl={{
           alpha: true,
           antialias: false,
@@ -118,9 +122,38 @@ export function Field() {
           };
           el.addEventListener("webglcontextlost", onLost);
           el.addEventListener("webglcontextrestored", onRestored);
+
+          // `dpr` is resolved once, at configure: a window dragged to a
+          // monitor of another density (or zoomed) kept the old ratio — soft
+          // on a 2x screen, wasteful the other way. Two signals, one check: a
+          // `resolution` query matching the current ratio flips the moment it
+          // changes (the melt re-rasterises on the same trick, NameMeltView),
+          // and `resize` — which zoom always fires, and which some browsers
+          // send instead of the query's change event. Either way R3F is only
+          // handed the range again when the ratio really moved; it re-reads
+          // devicePixelRatio and resizes the drawing buffer.
+          let dprMq: MediaQueryList | null = null;
+          let applied = window.devicePixelRatio;
+          const syncDpr = () => {
+            if (window.devicePixelRatio === applied) return;
+            applied = window.devicePixelRatio;
+            state.setDpr(DPR_RANGE);
+            state.invalidate();
+            watchDpr();
+          };
+          const watchDpr = () => {
+            dprMq?.removeEventListener("change", syncDpr);
+            dprMq = window.matchMedia(`(resolution: ${applied}dppx)`);
+            dprMq.addEventListener("change", syncDpr);
+          };
+          watchDpr();
+          window.addEventListener("resize", syncDpr);
+
           detach.current = () => {
             el.removeEventListener("webglcontextlost", onLost);
             el.removeEventListener("webglcontextrestored", onRestored);
+            dprMq?.removeEventListener("change", syncDpr);
+            window.removeEventListener("resize", syncDpr);
           };
         }}
       >
