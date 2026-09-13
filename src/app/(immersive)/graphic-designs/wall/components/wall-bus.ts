@@ -22,8 +22,8 @@ export class WallBus {
   private readonly walking = { orbit: 0, dolly: 0 };
   /** which way the next loop switch wipes: +1 left → right, −1 right → left */
   private sweep = 1;
-  /** App's "the camera has landed on station n" listener — the card and the staging follow it */
-  private settleFn: ((station: number) => void) | null = null;
+  /** "the camera has landed on station n": App's card and the scene's staging both listen */
+  private readonly settleFns = new Set<(station: number) => void>();
   /** the tour label: the button, where it was last put, and whether it shows */
   private label: HTMLElement | null = null;
   private labelX = Number.NaN;
@@ -80,14 +80,15 @@ export class WallBus {
     this.last = Number.NaN; // force the next sample to paint
   }
 
-  /** App registers what happens when a station is reached (and null on unmount). */
-  registerSettle(fn: ((station: number) => void) | null): void {
-    this.settleFn = fn;
+  /** Listen for a station being reached; returns the unsubscribe. */
+  addSettle(fn: (station: number) => void): () => void {
+    this.settleFns.add(fn);
+    return () => void this.settleFns.delete(fn);
   }
 
   /** The camera rig: the flight to `station` has landed, or there was nothing to fly. */
   settle(station: number): void {
-    this.settleFn?.(station);
+    for (const fn of this.settleFns) fn(station);
   }
 
   /** The HUD calls this with the tour label (and null on unmount). */

@@ -117,20 +117,25 @@ export function WallScene({
     invalidate(); // when nothing is running, the change needs a frame of its own
   }, [loop, variant, still, invalidate, bus]);
 
-  // The pitch station: once the camera has settled at 0.9 m, the lamps
+  // The pitch station: once the camera has landed at 0.9 m, the lamps
   // dissolve into a flat surface and resolve again — one beat, to show what
-  // the pitch is. Not on the still paths: those get no continuous motion.
+  // the pitch is. "Landed" is the rig's own `settle`, the same signal the card
+  // waits for: a timer of `flightSeconds` fired early whenever frames ran long
+  // (the flight advances by a clamped dt, so on a slow CPU it takes longer
+  // than its nominal length) and the lamps dissolved with the camera still
+  // in the air. Not on the still paths: those get no continuous motion.
   useEffect(() => {
-    if (tour !== TOUR.pulseStation || still) return;
-    const id = window.setTimeout(() => {
-      pulseAt.current = 0;
-    }, TOUR.flightSeconds * 1000);
-    return () => {
-      window.clearTimeout(id);
-      pulseAt.current = -1;
-      material.setContrast(LED.contrast);
-    };
-  }, [tour, still, material]);
+    if (still) return;
+    return bus.addSettle((station) => {
+      if (station === TOUR.pulseStation) pulseAt.current = 0;
+    });
+  }, [bus, still]);
+  // leaving the station — a step, a view, a close — puts the lamps back
+  useEffect(() => {
+    if (tour === TOUR.pulseStation) return;
+    pulseAt.current = -1;
+    material.setContrast(LED.contrast);
+  }, [tour, material]);
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.1);

@@ -235,7 +235,6 @@ export function CameraRig({
 }) {
   const invalidate = useThree((state) => state.invalidate);
   const ref = useRef<CameraControlsImpl | null>(null);
-  const first = useRef(true);
   // read inside the framing effects, never a dependency of them: an OS "reduce
   // motion" flip must not yank a visitor back to the pose they orbited away from
   const reducedRef = useRef(reduced);
@@ -262,12 +261,12 @@ export function CameraRig({
 
   // Keyed on the nonce as well as the index, so choosing the view you are
   // already on re-frames the room. `invalidate` is what makes that land on the
-  // demand frameloop, where no frame runs on its own.
+  // demand frameloop, where no frame runs on its own. The mount is skipped on
+  // the nonce itself rather than a "first run" flag: StrictMode runs the
+  // effect twice at mount, and a flag consumed by the first run let the
+  // second one fly the camera to the pose it was already standing on.
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return; // `attach` already framed PRESETS[0]
-    }
+    if (presetNonce === 0) return; // `attach` already framed PRESETS[0]
     const c = ref.current;
     if (!c) return;
     idle.current = 0;

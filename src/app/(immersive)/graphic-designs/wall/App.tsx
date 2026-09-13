@@ -149,7 +149,7 @@ export default function App({ copy }: { copy: WallCopy }) {
   // The rig reports through the bus because the flight is its own tween —
   // a timer here would only be a guess at when it ends.
   useEffect(() => {
-    bus.registerSettle((station) => {
+    const off = bus.addSettle((station) => {
       if (tourRef.current !== station) return;
       window.clearTimeout(cardTimer.current);
       cardTimer.current = window.setTimeout(
@@ -159,7 +159,7 @@ export default function App({ copy }: { copy: WallCopy }) {
       if (station === TOUR.paletteStation) stepLoop(1);
     });
     return () => {
-      bus.registerSettle(null);
+      off();
       window.clearTimeout(cardTimer.current);
     };
   }, [bus, reduced, stepLoop]);
