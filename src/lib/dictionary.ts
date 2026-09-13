@@ -166,7 +166,8 @@ export interface Dictionary {
   /** the /xperiments index */
   xperiments: PageText;
   footer: {
-    vat: string;
+    /** the P.IVA line; unset until the real number exists (DECISIONS: NEED REAL VALUES) */
+    vat?: string;
     /** the link to /about's contact panel — its text, an arrow follows it */
     contact: string;
     /** the Instagram link's text — the app's glyph follows it (no arrow) */
@@ -359,7 +360,6 @@ const en: Dictionary = {
     lede: "Real-time generative work — shaders, LED walls, installations. Each one is painted live by the shared WebGL canvas: open a row to watch it run.",
   },
   footer: {
-    vat: "P.IVA — placeholder",
     contact: "contact",
     instagram: "instagram",
     phone: CONTACT.telDisplay,
@@ -571,7 +571,6 @@ const it: Dictionary = {
     lede: "Lavoro generativo in tempo reale — shader, led wall, installazioni. Ognuno è dipinto dal vivo dal canvas WebGL condiviso: apri una riga per vederlo girare.",
   },
   footer: {
-    vat: "P.IVA — placeholder",
     contact: "contatti",
     instagram: "instagram",
     phone: CONTACT.telDisplay,

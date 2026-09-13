@@ -287,7 +287,10 @@ the look was reasoned from the shader math, not machine-verified visually.)
   "sito in costruzione" placeholder — the deep link may not exist yet. The
   page states no relationship (it is a bare link); if he competes or coaches
   *for* the team, say so in the panel's copy.
-- **P.IVA `00000000000`** in the footer is a placeholder.
+- **P.IVA — send the real number.** Until then the footer shows none:
+  `footer.vat` is optional and unset in both dictionaries, and `Footer.tsx`
+  renders the span only when it has a value. Never ship a made-up number — set
+  the real one as `vat: "P.IVA 01234567890"` in both locales of `dictionary.ts`.
 - **Instagram** links to `instagram.com/albertomarocco` (guessed handle).
 - **"Studio — next"** is a coming-soon row; its link points to `#work` until the
   real project/route exists.
