@@ -35,12 +35,13 @@ const nextConfig: NextConfig = {
         source: "/graphic-designs/hands",
         headers: [{ key: "Permissions-Policy", value: "camera=(self)" }],
       },
-      // Content-addressed static payloads that never change without a rename:
-      // the MediaPipe wasm + face model (~13MB) and the vortex image set (~3MB).
-      // Without this they ship as `public, max-age=0` and get revalidated on
-      // every visit to the two demos.
+      // Static payloads that never change without a rename (DECISIONS: "immutable
+      // means renamed, never overwritten"): the MediaPipe wasm + models under a
+      // folder named after the pinned @mediapipe/tasks-vision version (bump the
+      // package → copy into a new folder), and the vortex image set. Without
+      // this they ship as `public, max-age=0` and get revalidated on every visit.
       {
-        source: "/mediapipe/:path*",
+        source: "/mediapipe/:version(\\d+\\.\\d+\\.\\d+)/:path*",
         headers: [
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
         ],
