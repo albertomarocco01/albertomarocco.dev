@@ -1,7 +1,17 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { VortexChunkVeil } from "@/components/vortex/components/VortexVeil.jsx";
+import { LOADER_TAG } from "@/lib/boundary-copy";
+import { useLocale } from "@/lib/use-locale";
 import type { VortexCopy } from "./copy";
+
+// While the three/r3f chunk downloads there used to be a black div; this is the
+// same veil the textures get afterwards, with the site's loading tag. The
+// `loading` component gets no props, so it reads the locale off <html lang>.
+function ChunkVeil() {
+  return <VortexChunkVeil label={LOADER_TAG[useLocale()]} />;
+}
 
 // The vortex is browser-only (WebGL, postprocessing, GSAP-driven three refs).
 // ssr:false keeps the whole tree — three/r3f/drei/postprocessing — off the
@@ -12,7 +22,7 @@ const VortexExperience = dynamic(
     import("@/components/vortex/VortexExperience").then(
       (m) => m.VortexExperience,
     ),
-  { ssr: false },
+  { ssr: false, loading: ChunkVeil },
 );
 
 // `.vortex-immersive` restores a normal cursor over the site-wide `body { cursor:

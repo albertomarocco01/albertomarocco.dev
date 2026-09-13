@@ -8,6 +8,8 @@ import { VortexLayout } from './VortexLayout.jsx';
 import { GalleryScene } from './GalleryScene.jsx';
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import { useReducedMotion } from '../utils/reducedMotion.js';
+import { useRingStage } from '../utils/useOuterRings.js';
+import { hasWebGL2 } from '@/lib/webgl-caps';
 
 export function VortexScene({
   copy,
@@ -26,38 +28,17 @@ export function VortexScene({
   const { postProcessing } = SCENE_CONFIG;
   const reduceMotion = useReducedMotion();
   const [contextLost, setContextLost] = useState(false);
+  // Read here, in the DOM root, and handed down (see utils/useOuterRings.js).
+  const ringStage = useRingStage(SCENE_CONFIG.rings.layers.length);
 
-  // Detect WebGL up front so an unsupported browser gets a message instead of a
-  // silent black canvas.
-  const webglSupported = useMemo(() => {
-    if (typeof document === 'undefined') return true;
-    try {
-      const c = document.createElement('canvas');
-      return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl')));
-    } catch {
-      return false;
-    }
-  }, []);
-
-  const FALLBACK_STYLE = {
-    position: 'absolute',
-    inset: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    textAlign: 'center',
-    padding: '2rem',
-    background: '#000',
-    color: 'rgba(255,255,255,0.72)',
-    font: "600 0.78rem/1.6 'Inter', sans-serif",
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    zIndex: 3,
-  };
+  // three r186 is WebGL2-only: the old probe accepted WebGL1 and let such a
+  // browser fall through to the route's generic error page instead of this
+  // message. The shared probe releases its context right away (audit B20).
+  const webglSupported = useMemo(() => hasWebGL2(), []);
 
   if (!webglSupported) {
     return (
-      <div style={FALLBACK_STYLE}>
+      <div className="vortex-fallback" role="alert">
         {copy.noWebgl}
       </div>
     );
@@ -113,6 +94,7 @@ export function VortexScene({
         <VortexLayout
           phase={phase}
           selectedCardId={selectedCardId}
+          ringStage={ringStage}
           onCardSelect={onCardSelect}
           onCarouselImageClick={onCarouselImageClick}
           onSelectionComplete={onSelectionComplete}
@@ -149,7 +131,7 @@ export function VortexScene({
       )}
     </Canvas>
     {contextLost && (
-      <div style={FALLBACK_STYLE}>
+      <div className="vortex-fallback" role="alert">
         {copy.contextLost}
       </div>
     )}

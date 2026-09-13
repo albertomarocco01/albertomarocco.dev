@@ -22,12 +22,20 @@
   overflow: hidden;
 }
 /* Keep the kiosk's exact framing (1536×960) on every screen: the stage letterboxes
-   a fixed-aspect frame, so camera.aspect never changes — faithful, crisp, fluid. */
+   a fixed-aspect frame, so camera.aspect never changes — faithful, crisp, fluid.
+   Sized against the dynamic viewport where the browser has it (100vh on iOS is
+   the height with the toolbar hidden, so the frame ran taller than the visible
+   stage and its centre sat below the visible centre — audit B20); the vh line
+   stays as the fallback. pan-y pinch-zoom: a swipe on the cards no longer
+   scrolls or rubber-bands the page, and zoom still works (WCAG 1.4.4). */
 .vortex-frame {
   position: relative;
   aspect-ratio: 1536 / 960;
   width: min(100vw, calc(100vh * 1536 / 960));
+  width: min(100vw, calc(100dvh * 1536 / 960));
   height: min(100vh, calc(100vw * 960 / 1536));
+  height: min(100dvh, calc(100vw * 960 / 1536));
+  touch-action: pan-y pinch-zoom;
 }
 /* On portrait screens the letterboxed landscape frame collapses to a thin strip
    with tiny tap targets. Fill the width instead — the r3f canvas re-fits its
@@ -154,7 +162,40 @@
 .vortex-back:focus-visible {
   color: var(--ink);
   border-color: var(--ink-dim);
-  outline: none;
+}
+/* Keyboard focus gets the site's amber ring (I15); on touch the padding grows
+   so the two controls reach a 44 px target (I14). */
+.vortex-exit:focus-visible,
+.vortex-back:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+@media (pointer: coarse) {
+  .vortex-exit,
+  .vortex-back {
+    padding: 0.85rem 1rem;
+  }
+}
+/* No-WebGL / context-lost message over the stage: the site's mono register, the
+   sentence as written in copy.ts, announced as an alert by VortexScene. */
+.vortex-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  background: #000;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.7;
+  letter-spacing: 0.06em;
+}
+.vortex-fallback > * {
+  max-width: 34rem;
 }
 /* Phones: the centred title and the top-left exit button share one 1.4rem band
    and overlap from ~390px down (the title is nowrap and tracked at 0.42em, so it

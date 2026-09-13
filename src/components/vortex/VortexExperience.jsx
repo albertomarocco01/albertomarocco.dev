@@ -3,8 +3,9 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader } from "@react-three/drei";
 import { VortexScene } from "./components/VortexScene.jsx";
+import { VortexVeil } from "./components/VortexVeil.jsx";
+import { releaseTextures } from "./utils/textures.js";
 // The demo's own stylesheet, loaded with the demo like the other four demos load
 // theirs (audit S13) — not from globals.css, which every site page pays for.
 import "./vortex.css";
@@ -41,6 +42,10 @@ export function VortexExperience({ copy, exitHref = "/graphic-designs" }) {
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
+
+  // The 54 textures live in useLoader's cache and on the GPU for as long as
+  // something keeps them; leaving the route is that moment (audit S2).
+  useEffect(() => () => releaseTextures(), []);
 
   // ── Scene 1: vortex card clicked ───────────────────────────────────────────
   const handleCardSelect = useCallback((cardId) => {
@@ -89,6 +94,10 @@ export function VortexExperience({ copy, exitHref = "/graphic-designs" }) {
 
   useEffect(() => {
     const onKey = (e) => {
+      // A held key steps once (Esc/Backspace held used to walk gallery →
+      // carousel → idle → exit), and browser shortcuts (Alt+←, Ctrl/⌘ combos)
+      // are not ours. Audit B8.
+      if (e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
       // Enter/Space from idle opens the carousel (keyboard path into the flow).
       // Carousel/gallery keys are handled inside CarouselRing (it owns activeIndex).
       // Don't hijack the keys when the exit/back chrome is focused.
@@ -161,11 +170,9 @@ export function VortexExperience({ copy, exitHref = "/graphic-designs" }) {
         </button>
       )}
 
-      {/* Progress overlay while the 54 textures load (replaces the black screen). */}
-      <Loader
-        containerStyles={{ background: "#000" }}
-        dataInterpolation={(p) => copy.loading.replace("{p}", p.toFixed(0))}
-      />
+      {/* Progress veil while the first ring's textures load; the other rings
+          follow one at a time on idle without it (replaces drei's Loader). */}
+      <VortexVeil copy={copy} />
     </div>
   );
 }
