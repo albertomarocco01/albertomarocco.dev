@@ -6,6 +6,7 @@ import type { WorkText } from "@/lib/i18n";
 import { TIMING } from "@/lib/motion";
 import { isTouchOnly } from "@/lib/scroll-intent";
 import { useApp } from "@/components/providers/AppProvider";
+import { useFieldAllowed } from "@/components/canvas/field-gate";
 import { Row } from "./Row";
 
 /**
@@ -28,7 +29,10 @@ export function WorkRows({
   section: string;
   items: Record<string, WorkText>;
 }) {
-  const { reducedMotion, fieldReady } = useApp();
+  const { reducedMotion } = useApp();
+  // The gen rows' auras ride the shared field: same gate as FieldMount, so a
+  // row never mounts a <View> onto a canvas that was not allowed to exist.
+  const fieldReady = useFieldAllowed();
   const [openId, setOpenId] = useState<string | null>(null);
 
   const touch = useRef(false);

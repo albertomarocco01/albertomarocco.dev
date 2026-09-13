@@ -2,7 +2,7 @@
 
 import { Component, type ReactNode } from "react";
 import dynamic from "next/dynamic";
-import { useApp } from "@/components/providers/AppProvider";
+import { useFieldAllowed } from "./field-gate";
 
 // Client-only, code-split: three/r3f never enter the initial chunk.
 const Field = dynamic(() => import("./Field").then((m) => m.Field), {
@@ -28,13 +28,13 @@ class FieldBoundary extends Component<{ children: ReactNode }, { dead: boolean }
 }
 
 /**
- * Mounts the shared WebGL field once the app is entered and idle. Under reduced
- * motion we skip WebGL entirely (no GPU work, no animation) — gen rows fall back
- * to their designed static amber plate.
+ * Mounts the shared WebGL field once the app is idle — and only where it can
+ * be enjoyed (field-gate.ts: not under reduced motion, not on a save-data /
+ * low-memory / few-core device). Where it is skipped nothing else mounts a
+ * <View> either, and the gen rows keep their designed static amber plate.
  */
 export function FieldMount() {
-  const { fieldReady, reducedMotion } = useApp();
-  if (reducedMotion || !fieldReady) return null;
+  if (!useFieldAllowed()) return null;
   return (
     <FieldBoundary>
       <Field />

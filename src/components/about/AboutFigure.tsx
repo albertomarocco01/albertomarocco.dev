@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Image, { type StaticImageData } from "next/image";
 import type { CSSProperties } from "react";
-import { useApp } from "@/components/providers/AppProvider";
+import { useFieldAllowed } from "@/components/canvas/field-gate";
 
 // Client-only, code-split: the GPU figure (and its three/drei imports) rides
 // the same deferred path as the field — never in the page's first chunk.
@@ -15,10 +15,10 @@ const FigureView = dynamic(
 /**
  * One cut-out photo on /about. The <img> is the figure: server-rendered, the
  * page's LCP element, toned and bottom-faded in CSS. Once the shared field is
- * allowed to exist (past first paint + idle, no reduced motion — the same gates
- * as FieldMount) a <View> mounts over it and the canvas takes the pixels over,
- * so the field's near orbs can pass in front of the person (FigureView.tsx).
- * Both load the same file, so the handover costs no second download.
+ * allowed to exist (field-gate.ts — the same gate as FieldMount) a <View>
+ * mounts over it and the canvas takes the pixels over, so the field's near
+ * orbs can pass in front of the person (FigureView.tsx). Both load the same
+ * file, so the handover costs no second download.
  *
  * `--ar` is the photo's own aspect: the <figure> is sized from height alone and
  * the box, the <img> and the GPU plane all share one rectangle. `--fig-fade`
@@ -44,7 +44,7 @@ export function AboutFigure({
   /** above the fold on load — preload the file (the first panel's figure) */
   preload?: boolean;
 }) {
-  const { fieldReady, reducedMotion } = useApp();
+  const fieldAllowed = useFieldAllowed();
   const style = {
     "--ar": `${image.width} / ${image.height}`,
     "--fig-fade": `${Math.round(bottom * 100)}%`,
@@ -65,9 +65,7 @@ export function AboutFigure({
         fetchPriority={preload ? "high" : undefined}
         draggable={false}
       />
-      {fieldReady && !reducedMotion && (
-        <FigureView src={image.src} bottom={bottom} />
-      )}
+      {fieldAllowed && <FigureView src={image.src} bottom={bottom} />}
     </figure>
   );
 }
