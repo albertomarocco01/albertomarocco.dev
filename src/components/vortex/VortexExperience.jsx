@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader } from "@react-three/drei";
 import { VortexScene } from "./components/VortexScene.jsx";
+// The demo's own stylesheet, loaded with the demo like the other four demos load
+// theirs (audit S13) — not from globals.css, which every site page pays for.
+import "./vortex.css";
 
 /**
  * VortexExperience — web port of the kiosk "Vortice di Immagini" (App 1).
