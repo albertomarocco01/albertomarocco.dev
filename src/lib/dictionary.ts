@@ -13,6 +13,11 @@
 // error boundary loads with its segment on every page, and importing the
 // dictionaries there shipped both of them, in full, to every visitor.
 //
+// Every key here has a consumer: the `Dictionary` type forces each string into
+// both languages, so a key nobody reads costs a translation for nothing — when
+// a component stops reading one, delete it here too (the error boundaries read
+// ERROR_COPY from ./boundary-copy directly, so it is not mirrored here).
+//
 // The five immersive demos under /graphic-designs keep their copy next to
 // themselves (see (immersive)/graphic-designs/*/copy.ts) — same cookie +
 // dictionary approach, typed against
@@ -20,12 +25,11 @@
 // own and doesn't belong in the site dictionary.
 
 import type { Locale } from "./locale";
-import { ERROR_COPY, LOADER_TAG, type ErrorText } from "./boundary-copy";
+import { LOADER_TAG } from "./boundary-copy";
 import { CONTACT } from "./contact";
 
 export { DEFAULT_LOCALE, OG_LOCALE, isLocale } from "./locale";
 export type { Locale } from "./locale";
-export type { ErrorText } from "./boundary-copy";
 
 /** Translatable text for one work row, keyed by the work `id`. */
 export interface WorkText {
@@ -101,15 +105,13 @@ export interface Dictionary {
   };
   nav: {
     skip: string;
-    work: string;
-    about: string;
-    contact: string;
-    /** aria-label for the topbar <nav> landmark */
-    primary: string;
-    /** the three work routes, spelled out in the topbar */
+    /** the four routes, spelled out in the topbar */
     websites: string;
     graphic: string;
     xperiments: string;
+    about: string;
+    /** aria-label for the topbar <nav> landmark */
+    primary: string;
   };
   locale: {
     /** aria-label for the toggle group */
@@ -138,18 +140,14 @@ export interface Dictionary {
       xperiments: string;
     };
   };
+  /** the rows of /websites and /xperiments, keyed by work id (see lib/work.ts) */
   work: {
-    /** section landmark label */
-    aria: string;
-    /** visible label per section, keyed by section id (see WORK_SECTIONS) */
-    sections: Record<string, string>;
     items: Record<string, WorkText>;
   };
+  /** /about has no visible title: the three panels carry their own headlines */
   about: {
-    label: string;
     metaTitle: string;
     metaDescription: string;
-    title: string;
     /** aria-label for the 01 / 02 / 03 panel pager */
     pagerAria: string;
     /** mono cue at the foot of the first panel */
@@ -177,8 +175,6 @@ export interface Dictionary {
     /** aria-label for the phone link ("call" / "chiama") */
     phoneLabel: string;
   };
-  /** route-level error boundary for the main site (boundary-copy.ts) */
-  error: ErrorText;
   /** the site's 404 (app/not-found.tsx) */
   notFound: {
     /** mono label over the title — the status code, same in both locales */
@@ -193,9 +189,10 @@ export interface Dictionary {
   };
   /** the /graphic-designs index */
   gd: {
+    /** the <title> form of the name — a middle dot, so the layout's " — " suffix never makes three dashes */
     metaTitle: string;
     metaDescription: string;
-    back: string;
+    /** mono section label over the title (plural, like the nav) */
     label: string;
     title: string;
     lede: string;
@@ -213,13 +210,11 @@ const en: Dictionary = {
   },
   nav: {
     skip: "skip to content",
-    work: "work",
-    about: "about",
-    contact: "contact",
-    primary: "primary",
     websites: "websites",
     graphic: "graphic designs",
     xperiments: "xperiments",
+    about: "about",
+    primary: "primary",
   },
   locale: {
     label: "language",
@@ -236,17 +231,11 @@ const en: Dictionary = {
     cue: "open",
     teasers: {
       websites: "Websites",
-      graphic: "Merge Graphic Designs",
+      graphic: "Merge — Graphic Designs",
       xperiments: "XPERIMENTS",
     },
   },
   work: {
-    aria: "Work",
-    sections: {
-      websites: "websites",
-      graphic: "graphic design",
-      experiments: "xperiments",
-    },
     items: {
       "vini-montarello": {
         meta: "web · 2025",
@@ -261,12 +250,6 @@ const en: Dictionary = {
           "Spirits brand site — Mediterranean meets Jamaica. Cinematic video hero, age gate, drinks & stockists.",
         cue: "visit site",
         alt: "Toretto Blend homepage — the embossed bottle label lit in amber, reading RUM Jamaica & Liquore ai fiori d'arancio",
-      },
-      "merge-graphic-designs": {
-        meta: "graphic · 2025",
-        description:
-          "Selected graphic design — identities, posters, type. A merged set, viewable in one place.",
-        cue: "open gallery",
       },
       "liminal-field": {
         meta: "installation · led · 2025",
@@ -289,11 +272,9 @@ const en: Dictionary = {
     },
   },
   about: {
-    label: "about",
     metaTitle: "About",
     metaDescription:
-      "Creative technologist and full-stack developer in Turin, calisthenics endurance athlete and coach — and every way to get in touch.",
-    title: "About",
+      "Computer scientist by training, creative technologist by choice; calisthenics endurance athlete and coach in Turin — and every way to get in touch.",
     pagerAria: "Page sections",
     scrollCue: "scroll",
     panels: {
@@ -350,10 +331,10 @@ const en: Dictionary = {
           email: "email",
           phone: "phone",
           instagram: "instagram",
-          where: "based in",
+          where: "where",
         },
         where: "Turin, Italy",
-        note: "replies within a couple of days · en / it",
+        note: "replies within a couple of days · it / en",
       },
     },
   },
@@ -377,7 +358,6 @@ const en: Dictionary = {
     phone: CONTACT.telDisplay,
     phoneLabel: "call",
   },
-  error: ERROR_COPY.en,
   notFound: {
     label: "404",
     title: "This page does not exist.",
@@ -387,11 +367,10 @@ const en: Dictionary = {
     navAria: "Where to go next",
   },
   gd: {
-    metaTitle: "Merge — Graphic Designs",
+    metaTitle: "Merge · Graphic Designs",
     metaDescription:
       "Selected graphic work, merged into interactive demos. Open one to explore it in the browser.",
-    back: "← back",
-    label: "graphic design",
+    label: "graphic designs",
     title: "Merge — Graphic Designs",
     lede: "Selected graphic work, merged into interactive demos. Open one to explore it.",
     cta: "enter demo",
@@ -432,13 +411,11 @@ const it: Dictionary = {
   },
   nav: {
     skip: "salta al contenuto",
-    work: "lavori",
-    about: "about",
-    contact: "contatti",
-    primary: "principale",
     websites: "siti",
     graphic: "graphic designs",
     xperiments: "xperiments",
+    about: "chi sono",
+    primary: "principale",
   },
   locale: {
     label: "lingua",
@@ -455,17 +432,11 @@ const it: Dictionary = {
     cue: "apri",
     teasers: {
       websites: "Siti web",
-      graphic: "Merge Graphic Designs",
+      graphic: "Merge — Graphic Designs",
       xperiments: "XPERIMENTS",
     },
   },
   work: {
-    aria: "Lavori",
-    sections: {
-      websites: "siti web",
-      graphic: "graphic design",
-      experiments: "xperiments",
-    },
     items: {
       "vini-montarello": {
         meta: "web · 2025",
@@ -480,12 +451,6 @@ const it: Dictionary = {
           "Sito di brand per uno spirit — il Mediterraneo che incontra la Giamaica. Hero video cinematografico, age gate, drink e punti vendita.",
         cue: "visita il sito",
         alt: "Homepage di Toretto Blend — l'etichetta in rilievo della bottiglia illuminata d'ambra, con la scritta RUM Jamaica & Liquore ai fiori d'arancio",
-      },
-      "merge-graphic-designs": {
-        meta: "grafica · 2025",
-        description:
-          "Grafica selezionata — identità, manifesti, caratteri. Una raccolta unica, da sfogliare in un solo posto.",
-        cue: "apri la gallery",
       },
       "liminal-field": {
         meta: "installazione · led · 2025",
@@ -508,11 +473,9 @@ const it: Dictionary = {
     },
   },
   about: {
-    label: "about",
-    metaTitle: "About",
+    metaTitle: "Chi sono",
     metaDescription:
-      "Creative technologist e full-stack developer a Torino, atleta di calisthenics endurance e coach — e tutti i modi per mettersi in contatto.",
-    title: "About",
+      "Informatico per formazione, creative technologist per scelta; atleta di calisthenics endurance e coach a Torino — e tutti i modi per scrivermi.",
     pagerAria: "Sezioni della pagina",
     scrollCue: "scorri",
     panels: {
@@ -596,7 +559,6 @@ const it: Dictionary = {
     phone: CONTACT.telDisplay,
     phoneLabel: "chiama",
   },
-  error: ERROR_COPY.it,
   notFound: {
     label: "404",
     title: "Questa pagina non esiste.",
@@ -606,11 +568,10 @@ const it: Dictionary = {
     navAria: "Dove andare",
   },
   gd: {
-    metaTitle: "Merge — Graphic Designs",
+    metaTitle: "Merge · Graphic Designs",
     metaDescription:
       "Una selezione di lavori grafici, riuniti in demo interattive. Aprine una per esplorarla nel browser.",
-    back: "← indietro",
-    label: "graphic design",
+    label: "graphic designs",
     title: "Merge — Graphic Designs",
     lede: "Una selezione di lavori grafici, riuniti in demo interattive. Aprine una per esplorarla.",
     cta: "entra nella demo",
@@ -638,7 +599,7 @@ const it: Dictionary = {
       wall: {
         title: "Parete — LED Wall",
         meta: "anteprima 3d · led wall · 2026",
-        desc: "Un led wall di 6 × 3 m in una stanza buia, con i loop generativi che girano dal vivo. Passa dietro, tra i cabinet e i cavi, cambia palette, o segui il tour che racconta com’è fatto un led wall.",
+        desc: "Un led wall di 6 × 3 m in una stanza buia, con i loop generativi che girano dal vivo. Passa dietro, tra i cabinet e i cavi, cambia palette, o segui il tour che racconta com'è fatto un led wall.",
       },
     },
   },
