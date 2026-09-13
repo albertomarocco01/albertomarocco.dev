@@ -24,6 +24,12 @@ const FigureView = dynamic(
  * the box, the <img> and the GPU plane all share one rectangle. `--fig-fade`
  * is the bottom dissolve for the <img> mask; `bottom` is the same number for
  * the shader.
+ *
+ * `preload` marks the first panel's figure — the page's LCP element: it gets
+ * the head preload link, eager loading and `fetchPriority="high"`, so the
+ * browser fetches it ahead of the fonts and the chunks instead of at the
+ * default image priority. No `sizes`: the file is `unoptimized` (one URL, no
+ * srcset), so there is nothing for `sizes` to choose from.
  */
 export function AboutFigure({
   image,
@@ -55,6 +61,8 @@ export function AboutFigure({
         fill
         unoptimized
         preload={preload}
+        loading={preload ? "eager" : undefined}
+        fetchPriority={preload ? "high" : undefined}
         draggable={false}
       />
       {fieldReady && !reducedMotion && (

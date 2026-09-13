@@ -8,7 +8,7 @@ import { FigureMaterial, type FigureMaterialImpl } from "./figure-material";
 import { BLOB_COUNT } from "./field-glsl";
 import { fieldState } from "./field-state";
 import { getBubbleParams } from "./bubble-params";
-import { isTrackingHeld, onTrackingHold } from "@/lib/track-motion";
+import { holdTracking, isTrackingHeld, onTrackingHold } from "@/lib/track-motion";
 
 // FigureMaterial must be extended once; importing for its side effect.
 void FigureMaterial;
@@ -26,6 +26,14 @@ void FigureMaterial;
  * ambient field already renders. It asks for every frame only while its own
  * fade-in runs, and while a DOM driver holds tracking (track-motion.ts: the
  * panel slide), so the GPU copy keeps step with the DOM text beside it.
+ *
+ * Layout reads: the two boxes the shader needs (the tracker's, the clipping
+ * panel's) are cached, not measured per frame — two forced reflows a frame
+ * per figure, on top of the one drei's View already pays, was most of the
+ * ~7 layout reads per idle frame the audit found. They are re-read while a
+ * hold says the page is moving, and marked stale by resize, any scroll and
+ * the end of any transition (the track's slide settles a hair after the hold
+ * that announced it).
  */
 
 const REVEAL_RATE = 3.2; // fade-in lerp rate once the texture is up (~1s)
@@ -44,7 +52,17 @@ type FigureIO = {
   dim: number;
   /** bottom dissolve, as a fraction of the box (mirrors the <img>'s mask) */
   bottom: number;
+  /** cached boxes of `track` and `clip` (see the header); null = never read */
+  rect: DOMRect | null;
+  clipRect: DOMRect | null;
+  /** something moved since the last read — re-measure on the next frame */
+  dirty: boolean;
 };
+
+/** How long a scroll or resize keeps the figure at full frame rate: long
+ *  enough to outlast one event's worth of settling, short enough that a
+ *  page at rest pays nothing. */
+const MOVE_HOLD_MS = 150;
 
 /** The in-canvas half: texture, uniforms, keep-alive. Runs through the View's portal. */
 function FigureScene({
@@ -158,12 +176,18 @@ function FigureScene({
     // asks for a frame of its own.
     m.uniforms.u_time.value += delta;
 
-    // Where the box sits on screen, in the field's UV (y up). Read every frame:
-    // the panel track slides it, and the field's orbs are viewport-fixed.
-    const r = io.track.getBoundingClientRect();
+    // Where the box sits on screen, in the field's UV (y up) — the orbs are
+    // viewport-fixed. Measured only while a hold says the page is moving or
+    // after something marked the cached box stale (see the header).
+    const held = isTrackingHeld();
+    if (held || io.dirty || !io.rect) {
+      io.rect = io.track.getBoundingClientRect();
+      io.clipRect = io.clip ? io.clip.getBoundingClientRect() : null;
+      io.dirty = false;
+    }
+    const r = io.rect;
     const vw = Math.max(window.innerWidth, 1);
     const vh = Math.max(window.innerHeight, 1);
-    const held = isTrackingHeld();
     // Off screen — the panel above or below the viewport: drei's View skips the
     // draw, so skip the uniform work too and, above all, don't ask for frames.
     // The fade-in above still advances on whatever the field renders (so the
@@ -183,8 +207,8 @@ function FigureScene({
       r.height / vh,
     );
     m.uniforms.u_aspect.value = vw / vh;
-    if (io.clip) {
-      const k = io.clip.getBoundingClientRect();
+    const k = io.clipRect;
+    if (k) {
       m.uniforms.u_clip.value.set(
         k.left / vw,
         1 - k.bottom / vh,
@@ -237,6 +261,9 @@ export function FigureView({ src, bottom }: { src: string; bottom: number }) {
     clip: null,
     dim: 1,
     bottom,
+    rect: null,
+    clipRect: null,
+    dirty: true,
   });
 
   useEffect(() => {
@@ -257,12 +284,35 @@ export function FigureView({ src, bottom }: { src: string; bottom: number }) {
       io.dim = Number.isFinite(raw) ? raw : 1;
     };
     readDim();
-    window.addEventListener("resize", readDim);
+    // The cached boxes go stale when anything moves them: a resize; a scroll
+    // — of the document, or of a panel scrolling inside itself on a short
+    // viewport (capture, so element scrolls are seen too) — which also holds
+    // tracking for a beat so the GPU copy gets frames to follow the <img>
+    // with; and the end of any transition, so the track's slide is read once
+    // more where it actually settled.
+    const moved = () => {
+      io.dirty = true;
+      holdTracking(MOVE_HOLD_MS);
+    };
+    const settled = () => {
+      io.dirty = true;
+    };
+    const onResize = () => {
+      readDim();
+      moved();
+    };
+    window.addEventListener("resize", onResize);
+    document.addEventListener("scroll", moved, { capture: true, passive: true });
+    document.addEventListener("transitionend", settled, true);
     return () => {
-      window.removeEventListener("resize", readDim);
+      window.removeEventListener("resize", onResize);
+      document.removeEventListener("scroll", moved, true);
+      document.removeEventListener("transitionend", settled, true);
       io.host?.classList.remove("is-live"); // hand the pixels back to the <img>
       io.track = null;
       io.clip = null;
+      io.rect = null;
+      io.clipRect = null;
     };
   }, [bottom]);
 
