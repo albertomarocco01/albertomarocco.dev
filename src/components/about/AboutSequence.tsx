@@ -148,7 +148,14 @@ export function AboutSequence() {
 
     // The move. A queued (focus) jump waits for the running move to settle
     // rather than interrupting it; everything else is simply dropped.
-    function go(to: number, queue = false) {
+    //
+    // `follow`: a gesture (key, wheel, swipe) moved the page while focus may
+    // still sit on a link of the panel it left — the next Tab would then land
+    // on that panel's next link and `onFocusIn` would drag the track straight
+    // back. So the gesture also moves focus, onto the arriving panel's root
+    // (`tabIndex=-1` in about/page.tsx), and Tab continues from there. Focus-
+    // driven moves (Tab into a panel, the pager, the CTA) never steal focus.
+    function go(to: number, queue = false, follow = false) {
       const next = Math.max(0, Math.min(last, to));
       if (busy) {
         if (queue && next !== idx) pending = next;
@@ -162,6 +169,9 @@ export function AboutSequence() {
       apply();
       clearTimers();
       safety = window.setTimeout(release, MOVE_MS + SETTLE_MS + 120);
+      // preventScroll: focus() would scroll the stage (an overflow-hidden box
+      // still scrolls for focus), and `pin` would then have to undo it.
+      if (follow) panels[idx].focus({ preventScroll: true });
     }
     const onTransitionEnd = (e: TransitionEvent) => {
       if (e.target !== track || e.propertyName !== "transform") return;
@@ -210,7 +220,7 @@ export function AboutSequence() {
       const dir = acc > 0 ? 1 : -1;
       acc = 0;
       if (panelScrolls(dir)) return;
-      go(idx + dir);
+      go(idx + dir, false, true);
       tail = true;
     };
 
@@ -229,7 +239,7 @@ export function AboutSequence() {
       if (busy) return;
       const dir = dy > 0 ? 1 : -1;
       if (panelScrolls(dir)) return; // the finger is scrolling the panel itself
-      go(idx + dir);
+      go(idx + dir, false, true);
     };
 
     // ---- keys ----
@@ -239,24 +249,26 @@ export function AboutSequence() {
       // Space on a button is its click; leave it to the button.
       const onControl =
         t instanceof HTMLElement && /^(button|input|textarea|select)$/i.test(t.tagName);
+      // Every key moves focus along with the track (see `go`), so from a
+      // link on the panel just left, Tab continues on the panel arrived at.
       switch (e.key) {
         case " ":
           if (onControl) return;
-          go(idx + (e.shiftKey ? -1 : 1));
+          go(idx + (e.shiftKey ? -1 : 1), false, true);
           break;
         case "ArrowDown":
         case "PageDown":
-          go(idx + 1);
+          go(idx + 1, false, true);
           break;
         case "ArrowUp":
         case "PageUp":
-          go(idx - 1);
+          go(idx - 1, false, true);
           break;
         case "End":
-          go(last);
+          go(last, false, true);
           break;
         case "Home":
-          go(0);
+          go(0, false, true);
           break;
       }
     };

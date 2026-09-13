@@ -26,6 +26,13 @@ export async function generateMetadata(): Promise<Metadata> {
 // the one above it, in any panel.
 const stagger = (i: number) => ({ "--i": i }) as CSSProperties;
 
+// Each panel root is a programmatic focus target (`tabIndex={-1}`): when a
+// gesture turns the page, AboutSequence moves focus onto the arriving panel so
+// the next Tab continues inside it instead of dragging the track back to the
+// link it left. Never a visible control, so no ring: the UA's focus outline
+// would draw along the viewport edge.
+const PANEL_FOCUS = { outline: "none" } as CSSProperties;
+
 const PANEL_IDS = ["01", "02", "03"] as const;
 
 /** Eyebrow, headline (with its italic run) and body of one panel. */
@@ -82,7 +89,12 @@ export default async function About() {
         <div className="about-track">
           {/* 01 — the degree + the tech path. `is-active` is the driver's; on
               a fresh load it lands once the veil lifts. */}
-          <section className="about-panel" aria-labelledby="about-path">
+          <section
+            className="about-panel"
+            aria-labelledby="about-path"
+            tabIndex={-1}
+            style={PANEL_FOCUS}
+          >
             <div className="about-inner">
               <PanelCopy text={path} as="h1" id="about-path">
                 {/* The panel says what the work is; these are the doors to it.
@@ -122,6 +134,8 @@ export default async function About() {
           <section
             className="about-panel about-panel--mirror"
             aria-labelledby="about-discipline"
+            tabIndex={-1}
+            style={PANEL_FOCUS}
           >
             <div className="about-inner">
               <AboutFigure
@@ -174,6 +188,8 @@ export default async function About() {
             id="contact"
             className="about-panel about-panel--contact"
             aria-labelledby="about-contact"
+            tabIndex={-1}
+            style={PANEL_FOCUS}
           >
             <div className="about-inner">
               <PanelCopy text={contact} as="h2" id="about-contact" />
