@@ -33,7 +33,27 @@ export function HandsScene({ copy, input, reticles, worldRef, reducedMotion, onE
   // between the canvas and the message before anything mounts.
   const webgl = useMemo(() => hasWebGL2(), []);
   const [contextLost, setContextLost] = useState(false);
+  const [renderer, setRenderer] = useState<THREE.WebGLRenderer | null>(null);
   const visible = useTabVisible();
+
+  // Context loss on the canvas: without preventDefault the browser drops the
+  // context for good; with it the GPU can restore, and we say so meanwhile.
+  // An effect (not onCreated) so the listeners leave with the component.
+  useEffect(() => {
+    if (!renderer) return;
+    const canvas = renderer.domElement;
+    const onLost = (e: Event) => {
+      e.preventDefault();
+      setContextLost(true);
+    };
+    const onRestored = () => setContextLost(false);
+    canvas.addEventListener("webglcontextlost", onLost, false);
+    canvas.addEventListener("webglcontextrestored", onRestored, false);
+    return () => {
+      canvas.removeEventListener("webglcontextlost", onLost, false);
+      canvas.removeEventListener("webglcontextrestored", onRestored, false);
+    };
+  }, [renderer]);
 
   if (!webgl) {
     return <div className="hands-fallback" role="alert">{copy.noWebgl}</div>;
@@ -50,11 +70,7 @@ export function HandsScene({ copy, input, reticles, worldRef, reducedMotion, onE
         onCreated={({ gl }) => {
           gl.setClearColor(0x000000, 0); // the stage paints the ground
           gl.toneMapping = THREE.NoToneMapping;
-          const canvas = gl.domElement;
-          // Without preventDefault the browser drops the context for good; with
-          // it the GPU can restore, and we say so meanwhile.
-          canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); setContextLost(true); }, false);
-          canvas.addEventListener("webglcontextrestored", () => setContextLost(false), false);
+          setRenderer(gl);
         }}
       >
         <Field
@@ -79,6 +95,7 @@ function exposeForTests(world: World, input: HandsInput): void {
 }
 
 const NOMINAL_HAND = 0.11; // explicit hands: nominal size, fraction of the viewport height
+const ORIGIN: [number, number, number] = [0, 0, 0];
 
 function landmarkSample(pts: Float32Array, vw: number, vh: number, t: number, out: WorldSample): WorldSample {
   const X = (i: number) => (pts[i * 2] - 0.5) * vw;
@@ -151,6 +168,16 @@ function placeReticle(
   }
 }
 
+interface Rig {
+  trackers: [HandTracker, HandTracker];
+  states: [HandState, HandState];
+}
+
+function makeRig(): Rig {
+  const trackers: [HandTracker, HandTracker] = [new HandTracker(), new HandTracker()];
+  return { trackers, states: [trackers[0].state, trackers[1].state] };
+}
+
 function blankSample(): WorldSample {
   return {
     explicit: true, tipX: 0, tipY: 0, holdX: 0, holdY: 0, palmX: 0, palmY: 0,
@@ -171,9 +198,13 @@ function Field({ input, reticles, worldRef, reducedMotion, onEvent }: FieldProps
   const gl = useThree((s) => s.gl);
   const get = useThree((s) => s.get);
   const world = useRef<World | null>(null);
-  const trackers = useRef([new HandTracker(), new HandTracker()]);
+  // One tracker per slot; update() mutates and returns each tracker's own
+  // state object, so the array the world reads is built once, with them
+  // (lazily, on the first frame — a ref is not read during render).
+  const rigRef = useRef<Rig | null>(null);
   const samples = useRef([blankSample(), blankSample()]);
-  const layout = useRef({ w: 0, h: 0 });
+  /** canvas size in px and the world viewport at z = 0 — refreshed on resize only */
+  const layout = useRef({ w: 0, h: 0, vw: 1, vh: 1 });
   const reticleState = useRef([
     { on: false, pinch: false, fist: false },
     { on: false, pinch: false, fist: false },
@@ -193,9 +224,9 @@ function Field({ input, reticles, worldRef, reducedMotion, onEvent }: FieldProps
     // before the first frame (hidden tab, memory-cached images) and spawn
     // positions are only chosen once.
     const { size, camera, viewport } = get();
-    const v = viewport.getCurrentViewport(camera, [0, 0, 0]);
+    const v = viewport.getCurrentViewport(camera, ORIGIN);
     w.resize(v.width, v.height, size.height);
-    layout.current = { w: size.width, h: size.height };
+    layout.current = { w: size.width, h: size.height, vw: v.width, vh: v.height };
     w.load();
     // Development only: let a test script read the world and drive the bus.
     if (process.env.NODE_ENV === "development") exposeForTests(w, input);
@@ -215,40 +246,41 @@ function Field({ input, reticles, worldRef, reducedMotion, onEvent }: FieldProps
     const w = world.current;
     if (!w) return;
     const { size, camera, viewport } = state;
-    if (size.width !== layout.current.w || size.height !== layout.current.h) {
-      layout.current = { w: size.width, h: size.height };
-      const v = viewport.getCurrentViewport(camera, [0, 0, 0]);
+    const L = layout.current;
+    if (size.width !== L.w || size.height !== L.h) {
+      // getCurrentViewport allocates: only on a resize, never per frame.
+      const v = viewport.getCurrentViewport(camera, ORIGIN);
+      L.w = size.width;
+      L.h = size.height;
+      L.vw = v.width;
+      L.vh = v.height;
       w.resize(v.width, v.height, size.height);
     }
-    const v = viewport.getCurrentViewport(camera, [0, 0, 0]);
-    const vw = v.width;
-    const vh = v.height;
+    const vw = L.vw;
+    const vh = L.vh;
     const now = performance.now();
     const dt = Math.min(delta, 0.1);
 
     // Sources → world samples → tracked hands. In focus mode the open-palm
     // sweep is the close gesture (lower threshold, no cooldown).
     const focus = w.isOpen();
-    const states: HandState[] = [];
+    const rig = (rigRef.current ??= makeRig());
+    const hands = rig.states;
     for (let i = 0; i < 2; i++) {
       const s = input.slots[i];
       let sample: WorldSample | null = null;
       if (s?.kind === "landmarks") sample = landmarkSample(s.pts, vw, vh, s.t, samples.current[i]);
       else if (s?.kind === "explicit") sample = explicitSample(s.u, s.v, s.pinch, vw, vh, s.t, samples.current[i]);
-      trackers.current[i].focus = focus;
-      states.push(trackers.current[i].update(sample, now, dt));
+      rig.trackers[i].focus = focus;
+      rig.trackers[i].update(sample, now, dt);
     }
 
-    const toWorld = (p: { u: number; v: number }) => ({ x: (p.u - 0.5) * vw, y: (0.5 - p.v) * vh });
-    const pushes = input.drainPushes().map(toWorld);
-    const taps = input.drainTaps().map(toWorld);
-    // A flick's direction, aspect-corrected into world axes (v points down).
-    const flicks = input.drainFlicks().map((f) => ({ x: f.dx * vw, y: -f.dy * vh }));
-    const commands = input.drainCommands();
-
+    // The bus queues go to the world as written (viewport-normalised; it
+    // converts) and are emptied in place afterwards — nothing per frame.
     w.showFocus = input.lastDevice === "keyboard";
     w.hoverEnabled = input.lastDevice !== "touch";
-    w.update(now, dt, states, pushes, taps, flicks, commands, input.kbdMove);
+    w.update(now, dt, hands, input.pushes, input.taps, input.flicks, input.commands, input.kbdMove);
+    input.consume();
 
     // Reticles: DOM rings at the index tips, contracting while pinching,
     // filled while the hand is a fist.
@@ -257,7 +289,7 @@ function Field({ input, reticles, worldRef, reducedMotion, onEvent }: FieldProps
       for (let i = 0; i < 2; i++) {
         const el = els[i];
         if (!el) continue;
-        placeReticle(el, states[i], reticleState.current[i], vw, vh, size.width, size.height);
+        placeReticle(el, hands[i], reticleState.current[i], vw, vh, size.width, size.height);
       }
     }
   });

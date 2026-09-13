@@ -41,14 +41,14 @@ export class HandsInput {
   mode: InputMode;
   /** slots 0 / 1: the two hands (camera, pointer, touch); the keyboard is a third, virtual hand */
   slots: [HandSample | null, HandSample | null] = [null, null];
-  /** explicit pushes (double-click / -tap): drained each frame */
-  pushes: { u: number; v: number }[] = [];
-  /** clicks / taps (short, still, lone): open the print under them; drained each frame */
-  taps: { u: number; v: number }[] = [];
-  /** flicks / swipes while pressed: unit direction in (u, v); close the opened print; drained each frame */
-  flicks: { dx: number; dy: number }[] = [];
-  /** keyboard commands: drained each frame */
-  commands: KeyboardCommand[] = [];
+  /** explicit pushes (double-click / -tap): consumed each frame */
+  readonly pushes: { u: number; v: number }[] = [];
+  /** clicks / taps (short, still, lone): open the print under them; consumed each frame */
+  readonly taps: { u: number; v: number }[] = [];
+  /** flicks / swipes while pressed: unit direction in (u, v); close the opened print; consumed each frame */
+  readonly flicks: { dx: number; dy: number }[] = [];
+  /** keyboard commands: consumed each frame */
+  readonly commands: KeyboardCommand[] = [];
   /** arrow keys held right now: -1 / 0 / 1 per axis (v down) */
   kbdMove = { x: 0, y: 0 };
   /** the last device the visitor used — decides which legend / focus ring shows */
@@ -74,28 +74,12 @@ export class HandsInput {
     this.debugHands[1] = null;
   }
 
-  drainPushes(): { u: number; v: number }[] {
-    const out = this.pushes;
-    this.pushes = [];
-    return out;
-  }
-
-  drainTaps(): { u: number; v: number }[] {
-    const out = this.taps;
-    this.taps = [];
-    return out;
-  }
-
-  drainFlicks(): { dx: number; dy: number }[] {
-    const out = this.flicks;
-    this.flicks = [];
-    return out;
-  }
-
-  drainCommands(): KeyboardCommand[] {
-    const out = this.commands;
-    this.commands = [];
-    return out;
+  /** The frame loop has read the queues: empty them in place (no new arrays). */
+  consume(): void {
+    this.pushes.length = 0;
+    this.taps.length = 0;
+    this.flicks.length = 0;
+    this.commands.length = 0;
   }
 }
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
-import { ONBOARDING_MS, OPEN } from "./hands.config";
+import { HINT_SESSION_KEY, ONBOARDING_MS, OPEN } from "./hands.config";
 import { createInput } from "./engine/input";
 import type { Body, World, WorldEvent } from "./engine/world";
 import { useHandTracker, type TrackerError } from "./hooks/useHandTracker";
@@ -37,6 +37,21 @@ function segments(text: string) {
       {i < all.length - 1 && <span className="hands-legend-sep"> · </span>}
     </span>
   ));
+}
+
+/**
+ * Once per browser session (the tab's sessionStorage): the first call for a key
+ * returns false and marks it; every later call returns true. Storage can throw
+ * (private mode, blocked): then it is once per visit, from the caller's ref.
+ */
+function seenThisSession(key: string): boolean {
+  try {
+    if (sessionStorage.getItem(key)) return true;
+    sessionStorage.setItem(key, "1");
+  } catch {
+    // storage unavailable — fall back to once per visit
+  }
+  return false;
 }
 
 type Timer = ReturnType<typeof setTimeout> | null;
@@ -182,7 +197,8 @@ export default function App({ copy }: { copy: HandsCopy }) {
   });
 
   // A caption under the opened print, a beat after it settles; the hint on
-  // how to close it once per visit. Cleared by the close.
+  // how to close it once per session (a re-entry does not repeat it). Cleared
+  // by the close.
   const openCaption = useCallback(
     (bottom: number) => {
       clear(captionTimer);
@@ -198,8 +214,10 @@ export default function App({ copy }: { copy: HandsCopy }) {
         setCaption({ text: copy.captions[i], on: true, top });
         if (!hintShown.current) {
           hintShown.current = true;
-          setHint({ text: hintText, on: true });
-          hintTimer.current = setTimeout(() => setHint((h) => ({ ...h, on: false })), OPEN.hintMs);
+          if (!seenThisSession(HINT_SESSION_KEY)) {
+            setHint({ text: hintText, on: true });
+            hintTimer.current = setTimeout(() => setHint((h) => ({ ...h, on: false })), OPEN.hintMs);
+          }
         }
       }, OPEN.captionDelayMs);
     },

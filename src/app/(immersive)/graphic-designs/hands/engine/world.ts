@@ -406,17 +406,24 @@ export class World {
 
   /* ---- per frame ------------------------------------------------------ */
 
+  /**
+   * One frame. `pushes` / `taps` come viewport-normalised as the bus writes
+   * them (u right, v down, 0 → 1), `flicks` as unit directions in the same
+   * axes; they are converted here so the loop allocates nothing per frame.
+   */
   update(
     now: number,
     dt: number,
     hands: HandState[],
-    pushes: { x: number; y: number }[],
-    taps: { x: number; y: number }[],
-    flicks: { x: number; y: number }[],
+    pushes: readonly { u: number; v: number }[],
+    taps: readonly { u: number; v: number }[],
+    flicks: readonly { dx: number; dy: number }[],
     commands: KeyboardCommand[],
     kbdMove: { x: number; y: number },
   ): void {
     this.time = now;
+    const vw = this.vw;
+    const vh = this.vh;
     // Filled in place every frame: the two hands, then the keyboard (slot 2).
     const holders = this.holders;
     for (let slot = 0; slot < 2; slot++) {
@@ -441,11 +448,11 @@ export class World {
     }
 
     for (const h of hands) if (h.pushed) this.push(h.pushX, h.pushY, now, h.pushDirX, h.pushDirY);
-    for (const p of pushes) this.push(p.x, p.y, now);
-    for (const f of flicks) this.close(f.x, f.y);
+    for (const p of pushes) this.push((p.u - 0.5) * vw, (0.5 - p.v) * vh, now);
+    for (const f of flicks) this.close(f.dx * vw, -f.dy * vh);
 
     this.applyHolds(holders, now);
-    for (const t of taps) this.open(this.nearestWhole(t.x, t.y));
+    for (const t of taps) this.open(this.nearestWhole((t.u - 0.5) * vw, (0.5 - t.v) * vh));
     if (fistOpens) for (const f of fistOpens) this.open(f.body ?? this.nearestWhole(f.x, f.y));
 
     this.reunite(now);

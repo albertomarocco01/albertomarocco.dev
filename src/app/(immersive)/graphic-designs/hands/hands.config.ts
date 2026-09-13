@@ -221,3 +221,5 @@ export const FLICK_MIN_PX = 24;
 /* ---- HUD --------------------------------------------------------------- */
 /** The onboarding card stays this long after the gate (and on `?`) unless a gesture succeeds first. */
 export const ONBOARDING_MS = 10000;
+/** sessionStorage key: the "swipe to close" hint under the first caption shows once per browser session. */
+export const HINT_SESSION_KEY = "hands:hint-close";
