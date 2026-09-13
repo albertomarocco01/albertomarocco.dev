@@ -3,8 +3,9 @@ import { Fraunces, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
-import { getDictionary, getLocale, OG_LOCALE } from "@/lib/i18n";
+import { getDictionary, getLocale, OG_LOCALE, type Locale } from "@/lib/i18n";
 import { CONTACT } from "@/lib/contact";
+import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
 // Distinctive display serif — variable, with italic + optical size. Not Inter.
 const fraunces = Fraunces({
@@ -24,33 +25,38 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
 });
 
-const SITE = "https://albertomarocco.dev";
+// The bare title, once: the site's name is a brand token (seo.ts spells out
+// which spelling goes where) and "Creative Technologist" is the same in both
+// locales — the site's own Italian copy uses it verbatim.
+const TITLE = `${SITE_NAME} — Creative Technologist`;
 
 // `generateMetadata`, not a static `metadata` object: the description and
 // `og:locale` follow the `locale` cookie, so they have to be resolved per
 // request. The whole tree is already dynamic (the layout below awaits
-// `cookies()`), so this costs nothing extra. The titles are brand tokens and
-// "Creative Technologist" is the same in both locales — the site's own Italian
-// copy uses it verbatim — so they stay as they are.
+// `cookies()`), so this costs nothing extra. Child pages replace the title,
+// description, canonical, Open Graph and Twitter blocks through `pageMetadata`
+// (seo.ts); what stays from here is the base URL, the title template, the
+// icons/manifest links Next adds from the file conventions, and the OG image.
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
   const description = getDictionary(locale).meta.description;
   return {
-    metadataBase: new URL(SITE),
+    metadataBase: new URL(SITE_URL),
     title: {
-      default: "Alberto Marocco.dev — Creative Technologist",
-      template: "%s — Alberto Marocco.dev",
+      default: TITLE,
+      template: `%s — ${SITE_NAME}`,
     },
     description,
-    applicationName: "Alberto Marocco.dev",
-    authors: [{ name: "Alberto Marocco", url: SITE }],
+    applicationName: SITE_NAME,
+    authors: [{ name: "Alberto Marocco", url: SITE_URL }],
     creator: "Alberto Marocco",
+    // No "webgpu": the site ships WebGL2 and DECISIONS lists WebGPU as
+    // deliberately not attempted — a keyword should not promise otherwise.
     keywords: [
       "creative technologist",
       "full-stack developer",
       "generative visuals",
       "webgl",
-      "webgpu",
       "touchdesigner",
       "led walls",
       "turin",
@@ -61,14 +67,14 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       type: "website",
       locale: OG_LOCALE[locale],
-      url: SITE,
-      siteName: "Alberto Marocco.dev",
-      title: "Alberto Marocco.dev — Creative Technologist",
+      url: SITE_URL,
+      siteName: SITE_NAME,
+      title: TITLE,
       description,
     },
     twitter: {
       card: "summary_large_image",
-      title: "Alberto Marocco.dev — Creative Technologist",
+      title: TITLE,
       description,
     },
     robots: { index: true, follow: true },
@@ -86,21 +92,23 @@ export const viewport: Viewport = {
 
 // Person structured data — lets search/AI surface who this is, role, place and
 // socials as an entity, not just page text. Rendered once in the document body.
-const personLd = {
+// schema.org wants the bare address in `email` (no `mailto:`), and the town is
+// spelled in the page's language; the job title is the same in both.
+const personLd = (locale: Locale) => ({
   "@context": "https://schema.org",
   "@type": "Person",
   name: "Alberto Marocco",
-  url: SITE,
+  url: SITE_URL,
   jobTitle: "Creative Technologist",
-  email: `mailto:${CONTACT.email}`,
+  email: CONTACT.email,
   telephone: CONTACT.telDisplay,
   address: {
     "@type": "PostalAddress",
-    addressLocality: "Turin",
+    addressLocality: locale === "it" ? "Torino" : "Turin",
     addressCountry: "IT",
   },
   sameAs: [CONTACT.instagram],
-};
+});
 
 // Root layout holds only the document shell (html/body), fonts, metadata and
 // analytics. The site chrome (cursor, loader, Lenis, WebGL field, topbar) lives
@@ -114,7 +122,7 @@ export default async function RootLayout({
       <body>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(personLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(personLd(locale)) }}
         />
         {children}
         <Analytics />
