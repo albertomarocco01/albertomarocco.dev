@@ -205,7 +205,9 @@ export function HomeSequence() {
     // hydration), which would lock the home with the hero off-screen. Park
     // restoration while this owns the viewport and snap to the top — the veil is
     // still opaque, so both are unseen; Lenis re-syncs from the native scroll
-    // event. Cleanup hands restoration, the scroll and Lenis back.
+    // event. Cleanup hands restoration (whatever it was, not a hard-coded
+    // "auto"), the scroll and Lenis back.
+    const restoration = history.scrollRestoration;
     history.scrollRestoration = "manual";
     window.scrollTo(0, 0);
     // Only if nothing ever drove the page — see the hatch list above. `composed`
@@ -224,7 +226,7 @@ export function HomeSequence() {
         "home-scroll",
       );
       document.body.removeAttribute("data-lenis-prevent");
-      history.scrollRestoration = "auto";
+      history.scrollRestoration = restoration;
       if (hard.current != null) window.clearTimeout(hard.current);
       hard.current = null;
     };
@@ -260,20 +262,29 @@ export function HomeSequence() {
     // Where `p` tops out: flow mode has no curtain movement, so the
     // accumulator ends where the teasers do and the scroll takes over.
     const pTop = flow ? P_COMPOSED : P_MAX;
-    // A previous run may have unlocked the document (flow mode, or the mode
-    // just flipped). Every run starts locked and at the top — on a fresh load
-    // the mount effect already did both, so this is a no-op there.
-    root.classList.remove("home-scroll");
-    document.body.setAttribute("data-lenis-prevent", "");
-    window.scrollTo(0, 0);
-    let unlocked = false;
-    let slideTimer: number | null = null;
-    let slideRaf: number | null = null;
-
     // Returning to `/` inside the same page load: skip the show, keep the
     // chrome live. Everything starts composed, with the floor at P_REST so
     // the teasers and the curtain still answer upward intent.
     const replay = !composed;
+    // A run that follows a mode flip (`mode` bumped: a window dragged across
+    // 860px) with the page already composed hands the viewport straight over
+    // in flow mode — no re-lock, no scroll to the top, no slide to the footer
+    // (see `unlock`). The visitor resized a page they may have scrolled, and a
+    // resize must move nothing. Into desktop mode the re-lock stands: that
+    // layout is one fixed viewport and the hero has to be in it.
+    const handover = flow && !replay && mode > 0;
+    // A previous run may have unlocked the document (flow mode, or the mode
+    // just flipped). Every other run starts locked and at the top — on a
+    // fresh load the mount effect already did both, so this is a no-op there.
+    if (!handover) {
+      root.classList.remove("home-scroll");
+      document.body.setAttribute("data-lenis-prevent", "");
+      window.scrollTo(0, 0);
+    }
+    let unlocked = false;
+    let slideTimer: number | null = null;
+    let slideRaf: number | null = null;
+
     p.current = replay ? 0 : P_COMPOSED;
     floor.current = replay ? 0 : P_REST;
     if (replay) root.classList.add("hero-in");
@@ -342,7 +353,7 @@ export function HomeSequence() {
         // Flow mode: composing the teasers ends the loop and hands the
         // viewport over — every path to P_COMPOSED (clock, gesture, hatch)
         // comes through here, so this is the one place it can happen.
-        if (flow && !unlocked) unlock();
+        if (flow && !unlocked) unlock(!handover);
       }
     };
 
@@ -350,11 +361,14 @@ export function HomeSequence() {
     // page is an ordinary document: the lock is released, the footer drops
     // into flow under the home, Lenis gets the gesture back, and `input`
     // below is inert. `floor` pins `p` so nothing can fold the chrome again.
-    function unlock() {
+    // `slideAfter` false on a mode flip: the third movement is the opening's,
+    // not something a resize may replay on a page already in the open.
+    function unlock(slideAfter: boolean) {
       unlocked = true;
       floor.current = P_COMPOSED;
       root.classList.add("home-scroll");
       document.body.removeAttribute("data-lenis-prevent");
+      if (!slideAfter) return;
       slideTimer = window.setTimeout(() => {
         slideTimer = null;
         slide();

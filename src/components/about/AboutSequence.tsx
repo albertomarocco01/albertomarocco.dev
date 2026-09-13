@@ -99,7 +99,9 @@ export function AboutSequence() {
     // before its prevent checks (see HomeSequence).
     document.body.setAttribute("data-lenis-prevent", "");
     // A reload can restore a mid-page scroll position past the lock; park
-    // restoration while this owns the viewport (the veil hides the snap).
+    // restoration while this owns the viewport (the veil hides the snap) and
+    // hand back whatever it was, not a hard-coded "auto".
+    const restoration = history.scrollRestoration;
     history.scrollRestoration = "manual";
     window.scrollTo(0, 0);
 
@@ -342,7 +344,7 @@ export function AboutSequence() {
       clearTimers();
       root.classList.remove("about-live");
       document.body.removeAttribute("data-lenis-prevent");
-      history.scrollRestoration = "auto";
+      history.scrollRestoration = restoration;
     };
   }, [entered, reducedMotion]);
 
