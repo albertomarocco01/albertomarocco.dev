@@ -73,6 +73,9 @@ const fragment = /* glsl */ `
     if (cut <= 0.0) discard;
 
     vec4 c = texture2D(u_map, vUv);
+    // Six prints carry real transparency: nothing there, and no depth write
+    // that would hide the card behind (the material writes depth).
+    if (c.a < 0.02) discard;
     vec3 col = c.rgb * u_tint;
 
     // 1 px darker edge: the paper's thickness.
@@ -86,7 +89,7 @@ const fragment = /* glsl */ `
     fibre *= 0.7 + 0.3 * noise1(dot(vLocal, vec2(-u_lineN.y, u_lineN.x)) * u_freq * 23.0 + u_seed * 1.7);
     col = mix(col, vec3(0.90, 0.87, 0.80) * fibre, strip * 0.9);
 
-    gl_FragColor = vec4(col, u_opacity * cut);
+    gl_FragColor = vec4(col, u_opacity * cut * c.a);
     #include <colorspace_fragment>
   }
 `;
