@@ -136,9 +136,9 @@ export function Row({
   );
 
   const isGen = work.type === "gen";
-  // A real, optimized capture of the live site. next/image
-  // serves it lazily with a blur-up placeholder, sized to the reveal box (CLS 0),
-  // with a "visit site" overlay making the preview read as the clickable link.
+  // A real, optimized capture of the live site. next/image serves it with a
+  // blur-up placeholder, sized to the reveal box (CLS 0), with a "visit site"
+  // overlay making the preview read as the clickable link.
   const hasPreview = !isGen && !!work.image;
 
   const head = (
@@ -172,12 +172,21 @@ export function Row({
       >
         {hasPreview ? (
           <div className="reveal-media preview">
+            {/* `sizes` is the reveal box, which is the page's content column:
+                100vw minus twice `clamp(1.4rem, 5vw, 5rem)` up to the 1280px
+                wrap (90vw covers 448-1280px; 1152px is the box at 1280 and
+                within 3% of it up to 1600, where it settles at 1120). The old
+                "1120px" undershot the 1136-1152px desktop box. `eager`: both
+                rows sit in the first viewport, collapsed, and the first hover
+                opens onto a decoded image instead of a blur; not the LCP (a
+                collapsed row paints nothing), so no fetchPriority. */}
             <Image
               className="preview-img"
               src={work.image!}
               alt={text.alt ?? work.title}
               fill
-              sizes="(max-width: 720px) 92vw, (max-width: 1280px) 86vw, 1120px"
+              sizes="(max-width: 1280px) 90vw, 1152px"
+              loading="eager"
               placeholder="blur"
               draggable={false}
             />
