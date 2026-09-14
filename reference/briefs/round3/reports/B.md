@@ -109,3 +109,20 @@ unhandledrejection captured from document start on every page).
 4. `/xperiments` — Tab from the topbar: the first gen row opens with the amber ring, aura live; Tab again moves to the second.
 5. Low-end: in DevTools console before load, `Object.defineProperty(Navigator.prototype,'deviceMemory',{get:()=>1})` (or a Network throttling profile with Save-Data): no `<canvas>`, no three chunk in the Network panel, the amber plates and the DOM name stay.
 6. Zoom the browser to 200% with the field on screen: `document.querySelector('.field-canvas canvas').width` doubles (capped at 1.5× CSS px).
+
+## Owner pass — requests from the other packages (2026-09-14)
+
+After every package had committed, the requests the others could not apply
+to B-owned files were brought to this tree. Two arrived; the tree was clean
+(no predecessor WIP left in B's paths), tsc and eslint were run before the
+commit, and nothing outside B's ownership was touched. Neither request
+changes CSS or runtime behaviour, so no browser pass was needed for them.
+
+| from | request | outcome |
+|---|---|---|
+| A | `AboutSequence.tsx`: drop the `prefers-reduced-motion` re-read now that A5 (155efa4) makes `reducedMotion` real from the first client render. | **Already in the tree** — `7738b9f` (B9 · I19) removed the re-read in the same session that shared `scroll-intent.ts`; the effect reads `if (reducedMotion)` alone and no `matchMedia("(prefers-reduced-motion…")` remains under `components/about` or `components/home`. Not re-applied (nothing to change). |
+| C | `src/lib/work.ts`: two comments named dictionary keys that I9 (663137d) deleted — `WorkSection.id` "also the i18n key for its label (see dict.work.sections)", and the `graphic`-section note "entry (work.items["merge-graphic-designs"]) is left in place, unused". | **Applied as sent** → `59f8917`. The id doc now says what the id is for (`WorkRows` finds the section by it), the note says the entry went with the section. Comment-only. |
+
+Still open for the other owners (unchanged from the section above): A —
+`Cursor.tsx:18` → `isTouchOnly()`; C — `about.pagerItem` in the dictionary
+and the five DECISIONS entries.
