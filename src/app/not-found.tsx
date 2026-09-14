@@ -11,8 +11,9 @@ import { getDictionary, getLocale } from "@/lib/i18n";
  * here on purpose, so a mistyped address never boots three.js. The page carries
  * the little chrome it needs itself, in the section pages' own classes (the
  * topbar's wordmark, the mono label, the serif title, two ways onward, the
- * footer), and gives the pointer back, since globals.css hides it for a custom
- * cursor that is not here. Next stamps the response 404 + noindex.
+ * footer). The `.notfound` block in globals.css gives the pointer back — the
+ * site hides it for a custom cursor that is not here — and its two `.gd-back`
+ * links the section pages' hit box. Next stamps the response 404 + noindex.
  *
  * Locale from the cookie, like the layout: `not-found` takes no props but can
  * be async, so the words are right from the first byte — no fallback flash.
@@ -21,7 +22,7 @@ export default async function NotFound() {
   const dict = getDictionary(await getLocale());
   const { notFound } = dict;
   return (
-    <div className="notfound" style={{ cursor: "auto", minHeight: "100dvh" }}>
+    <div className="notfound">
       {/* `.in` is the topbar's settled state; the GSAP entrance that normally
           fades it in lives in Shell, which is not mounted here. */}
       <div className="topbar in">
@@ -40,17 +41,16 @@ export default async function NotFound() {
             <h1 className="page-title">{notFound.title}</h1>
             <p className="page-lede">{notFound.body}</p>
           </header>
-          {/* `.gd-back` is the section pages' small mono control; it sets
-              `cursor: none` for the custom cursor, so the pointer is restored
-              inline here. */}
+          {/* `.gd-back` is the section pages' small mono control; the pointer
+              it hides for the custom cursor comes back through `.notfound`. */}
           <nav
             aria-label={notFound.navAria}
-            style={{ display: "flex", flexWrap: "wrap", gap: "1rem 2.4rem" }}
+            style={{ display: "flex", flexWrap: "wrap", gap: "2rem 2.4rem" }}
           >
-            <Link href="/" className="gd-back" style={{ cursor: "pointer" }}>
+            <Link href="/" className="gd-back">
               {notFound.home}
             </Link>
-            <Link href="/graphic-designs" className="gd-back" style={{ cursor: "pointer" }}>
+            <Link href="/graphic-designs" className="gd-back">
               {notFound.demos}
             </Link>
           </nav>
