@@ -35,7 +35,7 @@ export interface Work {
 }
 
 export interface WorkSection {
-  /** section id — also the i18n key for its label (see dict.work.sections) */
+  /** section id — the route that renders the section asks WorkRows for it by this id */
   id: string;
   items: Work[];
 }
@@ -65,8 +65,8 @@ export const WORK_SECTIONS: WorkSection[] = [
     ],
   },
   // No `graphic` section: its only row was a self-link to /graphic-designs, which
-  // is now a first-class route in the topbar and a home teaser. Its dictionary
-  // entry (work.items["merge-graphic-designs"]) is left in place, unused.
+  // is now a first-class route in the topbar and a home teaser; its dictionary
+  // entry went with it (round 3, audit I9).
   {
     id: "experiments",
     items: [
