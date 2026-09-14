@@ -330,7 +330,9 @@ export function Loader({ tag }: { tag: string }) {
       hold.cancel();
       tl.kill();
     };
-  }, [pathname, reducedMotion]);
+    // `onHold` is a stable useCallback([]); listed so the effect's inputs are
+    // complete without ever re-running it on its account.
+  }, [pathname, reducedMotion, onHold]);
 
   // Lock scroll while the veil is up, and arm the safety dismissal. The lock is
   // released by `reveal()` (and on cleanup); the safety timeout force-dismisses
