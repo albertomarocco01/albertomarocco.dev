@@ -1414,6 +1414,30 @@ footer.foot a,
     cursor: pointer;
   }
 }
+/* ---- 404 (app/not-found.tsx) ----
+   Rendered inside the root layout only: no Shell, no custom Cursor, so the
+   pointer the site hides for it comes back here (like `body:has(.immersive)`
+   does for the demos) and its two mono links show the hand. The links are the
+   page's only controls, so their hit box is the demos' 44px rather than the
+   chrome's 40: the `.gd-back::before` from the tap-target block near the end
+   of this file, inset a little further. One row on desktop, two on a phone in
+   IT — the row gap keeps the two boxes from overlapping (text 14px + 15px of
+   box either side = 30px; 2rem leaves 2px clear). */
+.notfound {
+  cursor: auto;
+  min-height: 100dvh;
+}
+.notfound nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem 2.4rem;
+}
+.notfound .gd-back {
+  cursor: pointer;
+}
+.notfound .gd-back::before {
+  inset: -0.95rem -0.3rem;
+}
 .gd-head,
 .page-head {
   margin: 0 0 3.2rem;
