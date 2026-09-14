@@ -805,7 +805,11 @@ ones above.
   Hands`, `Tarassaco · Dandelion Wind` — while the visible h1 keeps the em
   dash (`Merge — Graphic Designs`). The vortex drops its "— Merge" suffix
   (`Image Vortex`). Every description, EN and IT, stays ≤ 160 characters
-  (dictionary: 92–154). Demo `copy.ts` files apply the same rule (D/E/F).
+  (dictionary: 92–154). Shipped in the demos' `copy.ts`: `Camera Oscura ·
+  Darkroom` (descriptions EN 131 / IT 134 characters, `80c8292`), `Mani ·
+  Hands` (152 / 155, `268f255`), `Tarassaco · Dandelion Wind` (158 / 154,
+  `09b3618`), `Image Vortex` (132 / 145, `5792230`), `Parete · LED Wall`
+  (155 / 159, `059e469`).
 - **Naming (I1, I2, I10).** The demo index is *Merge — Graphic Designs*
   everywhere it is a name (home teaser included — it fits the one-line teaser
   window at 1440 and 390 px); "graphic designs" is plural everywhere. In
@@ -826,7 +830,11 @@ ones above.
   `og:title`/`og:url` on every route, and setting `openGraph` without
   `images` dropped the OG image entirely). `pageMetadata` therefore writes
   the full block — type, site name, locale, url, title with the suffix,
-  description, the image — and Twitter alongside; every `page.tsx` calls it.
+  description, the image — and Twitter alongside. Every `page.tsx` calls it:
+  the index and the wall first (`50d08f3`, `adce0ea`), then /about, /websites
+  and /xperiments (`d38411a`), darkroom (`80c8292`), hands (`268f255`),
+  tarassaco (`09b3618`) and vortex (`5792230`). The home exports no metadata
+  of its own — its card is the layout's.
 - **Immutable means renamed, never overwritten (B4, S15).** Anything served
   under `Cache-Control: immutable` is content-addressed by its **path**: when
   the bytes change, the path changes. The folders under that header, both in
@@ -851,10 +859,14 @@ ones above.
   WebGL field, the custom cursor) is deliberately not mounted, so a mistyped
   URL never boots three.js. It borrows the section pages' classes (`.topbar
   .in` wordmark, `.sect-label`, `.page-title`, `.page-lede`, `.gd-back`, the
-  footer), reads the locale cookie (an async Server Component), and restores
-  the pointer inline because `globals.css` hides it for a custom cursor that
-  is not there. Next stamps it 404 + `noindex`; its `<title>` is the layout's
-  default (a root `not-found` cannot export metadata).
+  footer) and reads the locale cookie (an async Server Component). The
+  pointer the site hides for its custom cursor comes back through the
+  `.notfound` block in `globals.css` (A, `9c0dc93`), which also gives the two
+  `.gd-back` links the section pages' ≥ 40 px hit box — the page carries no
+  inline `cursor` styles (`8424257`); its little nav keeps a 2rem row gap so
+  the two boxes never overlap when the links wrap on a phone. Next stamps it
+  404 + `noindex`; its `<title>` is the layout's default (a root `not-found`
+  cannot export metadata).
 - **Fallbacks read the cookie on the server (I12).** The demos'
   `loading.tsx` is an async Server Component: the word is right from the
   first byte, and the partial prefetch still carries it (checked on the RSC
@@ -910,10 +922,15 @@ ones above.
   what keep it out of the build, and moving a folder the dev server watches
   is a Windows lock away from a crash. Move it out of `src/` by hand when
   the server is down, then drop the three lines.
-- **Left for the second C run (needs the other packages first):** the
-  DECISIONS entries and dictionary requests A/B/D/E/F hand over; the
-  `.notfound` CSS block (request to A) so the 404's inline `cursor` styles
-  can go.
+- **Owner pass (second C run).** Applied what the other packages handed over
+  once they had finished: their DECISIONS entries (the A, B, D, E, F
+  subsections here, with pointers from the older sections whose statements
+  they extend), `about.pagerItem` for the /about pager's accessible names
+  (`911c11c`, I11), the one-loop wording of the wall card (`aa1c574`, I4/I6),
+  the Vortex stylesheet in the README tree, and the 404 without inline styles
+  once A's `.notfound` block landed. Not re-done: the Vortex exit ring (E had
+  already written it, `cdabc8c`) and a lucide line to strike from the README
+  or this file (neither ever named it).
 
 ### D — Mani, Camera Oscura
 
