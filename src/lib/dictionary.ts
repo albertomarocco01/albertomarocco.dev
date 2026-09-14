@@ -150,6 +150,8 @@ export interface Dictionary {
     metaDescription: string;
     /** aria-label for the 01 / 02 / 03 panel pager */
     pagerAria: string;
+    /** accessible name of one pager button, followed by its index: "section 01" */
+    pagerItem: string;
     /** mono cue at the foot of the first panel */
     scrollCue: string;
     /** the three full-height panels: the degree + tech path, the discipline + coaching, the contacts */
@@ -276,6 +278,7 @@ const en: Dictionary = {
     metaDescription:
       "Computer scientist by training, creative technologist by choice; calisthenics endurance athlete and coach in Turin — and every way to get in touch.",
     pagerAria: "Page sections",
+    pagerItem: "section",
     scrollCue: "scroll",
     panels: {
       path: {
@@ -477,6 +480,7 @@ const it: Dictionary = {
     metaDescription:
       "Informatico per formazione, creative technologist per scelta; atleta di calisthenics endurance e coach a Torino — e tutti i modi per scrivermi.",
     pagerAria: "Sezioni della pagina",
+    pagerItem: "sezione",
     scrollCue: "scorri",
     panels: {
       path: {
