@@ -52,7 +52,9 @@ src/
                   BubbleControls / BubblePanel + bubble-params (dev-only
                   field tuner, `?tune`)
     providers/    AppProvider (reduced-motion / fieldReady), SmoothScroll
-    vortex/       the Image Vortex experience (JSX)
+    vortex/       the Image Vortex experience (JSX) + vortex.css, its
+                  stylesheet (loaded by VortexExperience.jsx; the other demos
+                  load theirs from their route folder)
     Footer, Hero
   lib/            work (content), contact (tokens), seo (site URL/name +
                   per-route metadata), motion, track-motion, dictionary (+ i18n

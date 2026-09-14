@@ -28,7 +28,10 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
 - **One stylesheet (`globals.css`)** with semantic classes rather than per-
   component CSS Modules. For a single hand-crafted page, one authored stylesheet
   is the craft and keeps 1:1 fidelity with the prototype at lowest risk. Design
-  tokens are extracted verbatim from the prototype.
+  tokens are extracted verbatim from the prototype. The five demos are the
+  exception: each loads its own stylesheet from its folder (Image Vortex's is
+  `components/vortex/vortex.css`) and `globals.css` carries no demo styles
+  (round 3, S13 — "Round 3 — A").
 
 ## Rendering architecture
 
@@ -174,7 +177,9 @@ current.
   CSS. The signature easing `cubic-bezier(0.22,1,0.36,1)` is registered as a GSAP
   `CustomEase` named `field`.
 - **Lenis** is mounted at the root and driven by the GSAP ticker (so scroll and
-  GSAP share one clock); disabled under reduced motion.
+  GSAP share one clock); disabled under reduced motion. Under the loading veil
+  it is held by a `prevent` predicate on `html.loading`, not stopped (round 3,
+  B11 — "Round 3 — A").
 - **The entrance is an orchestrated "opening".** `enter()` no longer just toggles
   a CSS cross-fade; a short GSAP timeline (the `field` ease) lifts + fades the
   gate name/CTA, blooms the white field briefly to carry through (a one-shot
@@ -185,7 +190,10 @@ current.
   opacities, so the matching CSS `transition`s on `.gate`/`.wrap`/`.topbar` were
   removed to avoid double-animation (`.gone` is gone; `.in` remains as the
   final/no-motion state). Under reduced motion the timeline is skipped entirely —
-  the gate isn't rendered and CSS shows the content instantly.
+  the gate isn't rendered and CSS shows the content instantly. *(Round 3: the
+  topbar's entrance, like the veil's own beat, plays once per page load; the
+  veil waits for the real page before it lifts; one navigation sweep runs at a
+  time — "Round 3 — A".)*
 
 ## /about — three panels, one gesture each, the person inside the field
 
@@ -517,7 +525,9 @@ Conventions that came out of the three at once:
   the scrollbar gutter (`html { scrollbar-gutter: stable }` was shrinking every
   `position: fixed; inset: 0` stage to 1425 px on a 1440 px window, off-centre,
   with a dead band on the right — Vortex and Tarassaco had shipped with it) and
-  restore `cursor: auto` once for the group instead of per demo.
+  restore `cursor: auto` once for the group instead of per demo. Round 3
+  releases the gutter the same way on the locked home and /about (B18, "Round
+  3 — A").
 - **A demo is a bus, not a prop tree.** Each has one mutable object the DOM
   writes and the frame loop reads (`TrayBus`, `HandsInput`, `WallBus`), mutated
   only through its own methods — the React compiler rules forbid writing to a
@@ -642,6 +652,77 @@ working tree and one index; `reference/briefs/round3/00-shared.md` has the
 rules, `reference/briefs/round3/reports/<pkg>.md` the per-package reports.
 Each package appends its own subsection here — **append, never rewrite** the
 ones above.
+
+### A — chrome, providers, globals.css
+
+- **Reduced motion is known before the first client render (B13, `155efa4`).**
+  `AppProvider` reads the synchronous `useSyncExternalStore` snapshot in
+  `lib/use-reduced-motion.ts`, whose `getServerSnapshot` returns the real media
+  query on the client (`false` on the server). The invariant this rests on:
+  **no server-rendered markup may branch on `reducedMotion`.** The loading veil
+  is always rendered and hidden by CSS under `reduce` (returning `null` left an
+  orphan server node React 19 silently skipped — no warning, no fiber), the
+  topbar takes `in` only on the motion path, WebGL mounts wait for
+  `fieldReady`. `entered` is latched during render, so toggling the OS setting
+  off later never hides the topbar again. Director-approved on the condition
+  that no server markup branches on the flag and hydration stays warning-free.
+- **The veil holds Lenis with a `prevent` predicate (B11, `972f236`)** keyed on
+  `html.loading` (`SmoothScroll.tsx`) — not `data-lenis-prevent` on `<body>`
+  (HomeSequence and AboutSequence own that attribute; the veil releasing it
+  would strip their lock) and not `lenis.stop()` (it kills pinch-zoom).
+  Director-approved.
+- **The veil lifts onto the real page, not `(site)/loading.tsx` (B19,
+  `41fbc09`).** Loader's `holdForPage()` pauses a timeline until `#main` has
+  no `[aria-busy="true"]` fallback and at least one child (a
+  MutationObserver), bounded by `VEIL_HOLD_MS` (2400 ms, counted from when the
+  fill parks) — the first load parks at 82 %, the nav sweep and the fast
+  dissolve park at the full bar. The 2 s safety dismissal stands aside during
+  a hold and is re-armed `SAFETY_AFTER_HOLD_MS` (1500 ms) after it resumes.
+  Both are tunables in `Loader.tsx`.
+- **The topbar entrance plays once per page load (B12, `db86fbe`)** — the
+  1.15 s hide + 1.2 s fade + `html.entering` field bloom — like the veil's own
+  beat: Loader exports `hasVeilPlayed()` and Shell reads it once at mount
+  (`useState(hasVeilPlayed)`), so a remount of the (site) layout on the way
+  back from a demo shows the bar outright.
+- **One navigation sweep at a time (B10, `b1732c1`).** A plain
+  `useLayoutEffect` whose cleanup kills the in-flight sweep (`useGSAP` with
+  `dependencies` and no `revertOnUpdate` never reverts between runs); an
+  interrupted fill hands its progress to the next sweep (`navProg`).
+- **The scrollbar gutter is released on the locked pages (B18, `be04359`).**
+  `scrollbar-gutter` goes to `auto` on the locked home
+  (`html.home-live:not(.home-scroll)`) and the locked /about
+  (`html.about-live`), exactly as on `.immersive`, so fixed layers span the
+  full window under classic scrollbars. The 15 px reflow happens under the
+  opaque veil in the same effect flush; flow mode gives the gutter back,
+  because the page scrolls again there.
+- **Keyboard focus is one amber ring on every site control (I15, `273b40c`).**
+  `--ring: #b07846` (the accent, opaque, ~5:1 on the void); `outline: 2px
+  solid var(--ring); outline-offset: 3px` on `:focus-visible`, in place of the
+  colour-only lift (~2.2:1 between states). Mouse focus stays invisible.
+  Deliberate exceptions: `.wrap:focus` (the programmatic skip-link target) and
+  the demos' exit links, which style their own controls — all five demos
+  adopted the same ring in this round (D, E, F below).
+- **Phones hold an 11 px mono floor and 40 px hit areas (I13, I14,
+  `2735afc`).** At ≤ 560 px the mono register floors at 0.7rem (11.2 px),
+  topbar included — 0.6875rem for the bar under 380 px, with tracking pulled
+  to 0.06em — while desktop keeps the finer 0.62–0.68rem hierarchy. The
+  chrome's small controls are ≥ 40 px tall on every pointer through absolutely
+  positioned pseudo-elements (the pager's tick is its `::before`, so its box is
+  `::after`). The one layout change for it: a 1.6rem row gap for wrapped
+  footer links and about CTAs on phones, so adjacent boxes never overlap.
+- **The Vortex demo's CSS lives in `src/components/vortex/vortex.css` (S13,
+  `9021b23`)**, imported by `VortexExperience.jsx`, as the other four demos
+  load theirs from their route folder; `globals.css` carries no demo styles.
+  `.vortex-immersive` / `.vortex-exit` keep their names as the shared idiom
+  the demo stylesheets copy. E owns the file from here.
+- **Bottom chrome adds `env(safe-area-inset-bottom, 0px)` (`7d190a6`)** now
+  that `viewport-fit=cover` is on (C5): footer bottom padding, the about
+  scroll cue, the phone pager, the contact panel's bottom padding, the home
+  flow footer.
+- **The custom cursor ignores touch and hides off-window (B25, `4bd24d3`).**
+  `pointerType === "touch"` is ignored and both marks fade out on a
+  `pointerout` with no `relatedTarget` (`.is-out`), so the dot never jumps
+  under a finger on a touch laptop and never stands at the window edge.
 
 ### C — copy, SEO, config, docs, covers
 
