@@ -980,3 +980,68 @@ ones above.
   Twitter card; descriptions EN 152 / IT 155 (hands) and 131 / 134 (darkroom)
   characters; the IT darkroom aria reads "Camera Oscura — sviluppo
   interattivo…" instead of the tautology (I10).
+
+### E — Tarassaco, Image Vortex
+
+- **Tarassaco has no WebGL of its own and therefore no `noWebgl` message** — a
+  deliberate exception to the I17 stage-semantics rule (director decision;
+  `d15b235`, `e0e0e6c`). `hasWebGL2()` only chooses the MediaPipe
+  `FaceLandmarker` delegate: GPU first, then CPU; if `detect()` throws mid-run
+  the wind stays on the microphone and the HUD's `aria-live` mode slot shows
+  `copy.contextLost` ("fotocamera persa — solo microfono"). Press-and-hold on
+  the stage is the touch equivalent of holding Space; the HUD hint switches by
+  pointer type.
+- **lucide-react is no longer a dependency (E5, `52f663e`).** The three gate
+  glyphs of Tarassaco (mic, camera, spinner) are inline SVGs in
+  `GateScene.tsx`; neither the README's stack list nor this file names it.
+- **Tarassaco layout tunables** live in `tarassaco/tarassaco.config.ts` (new,
+  `322a7f6`): `PHONE_MAX_WIDTH` 640 (must equal the `max-width: 640px` block
+  in `tarassaco.css`), `FLOWER_SIZE_DESKTOP/PHONE` 450 / 200,
+  `FLOWER_OFFSET_DESKTOP/PHONE`, `EXCLUSION_PAD` 30, `HINT_CLEARANCE` 48,
+  `MIN_TEXT_WIDTH_DESKTOP/PHONE` 200 / 176. The stage is `fixed; inset: 0;
+  overflow: hidden`; on short phones the poem's tail may clip under the HUD —
+  nothing scrolls, by design. `PretextLayout` measures with the container's
+  computed font (the poem is set in `var(--serif)` now) and re-measures on
+  `document.fonts.ready`.
+- **Tarassaco wind (E6; S12; `0e0f475`).** The dandelion's 140 seeds are
+  particles drawn on one 2D canvas covering the viewport (`GlowingDandelion`;
+  the hook's `WindParticle` interface — `set()` per frame, `ease()` for
+  recovery and reduced motion); a word flies once, as one CSS transition, the
+  moment the wind front reaches it (distance, lift, spin and duration from
+  force over mass) instead of being integrated every frame. Constants at the
+  top of `hooks/useWindPhysics.ts`: `WIND_FRONT_SPEED` 90 px per 60 Hz frame
+  (was a literal 180), `WORD_FLY_PX` 700, `WORD_FLY_MS` 1800,
+  `RECOVERY_SETTLE_MS` 3000 (keep equal to the 3 s of `.physics-recover` in
+  `tarassaco.css`), `REDUCED_SETTLE_PX` 60 / `REDUCED_SETTLE_MS` 500,
+  `SENSOR_TIMEOUT_MS` 9000 (armed by the gate click). Reduced motion: reveals
+  instant, one 0.5 s settle per word/seed, recovery a cut.
+- **Image Vortex loading (E10; S2; `5ef5c9c`).** Every card is its own Suspense
+  boundary; the first ring mounts after the canvas's first frame and each
+  further ring once the loading manager goes quiet after the previous one, on
+  `requestIdleCallback` (`utils/useOuterRings.js` — `useRingStage`, read in
+  `VortexScene` in the DOM root, never inside the `<Canvas>`: a `useProgress`
+  subscriber in the r3f root is updated mid-render of a suspending card and
+  React warns). Late cards fade in over 0.9 s. drei's `<Loader>` is replaced
+  by `VortexVeil` (lifts after the first ring, never returns); the `dynamic()`
+  chunk fallback shows the site's loading tag via the same inline-styled veil
+  (inline because it renders before the chunk that carries `vortex.css`). On
+  unmount the experience disposes every tracked texture and calls
+  `useLoader.clear` for the 54 URLs (`utils/textures.js`).
+- **Image Vortex stylesheet and keys (B8, B20; `cdabc8c`, `5792230`).** After
+  A's move (`9021b23`) `src/components/vortex/vortex.css` belongs to the demo:
+  `.vortex-frame` is sized in `100dvh` with the `100vh` line as fallback and
+  carries `touch-action: pan-y pinch-zoom`; the exit/back controls get the
+  2 px amber focus ring (`var(--ring)`) instead of `outline: none` and a 44 px
+  tap through `::before` on coarse pointers; `.vortex-fallback` is the
+  `role="alert"` no-WebGL / context-lost message. Keys: Escape / Backspace /
+  ArrowLeft ignore repeat and Alt / Ctrl / Meta. Title rule applied: vortex
+  `metaTitle` "Image Vortex", tarassaco "Tarassaco · Dandelion Wind"; both
+  descriptions under 160 characters; the IT step-back label keeps "← vortex"
+  (the piece's own word, not translated — I10).
+- **The five exits share one focus and tap idiom (I14, I15).** Tarassaco and
+  Vortex took the site's amber ring (`outline: 2px solid var(--ring);
+  outline-offset: 3px`) on `:focus-visible` and grow the exit's tap box on
+  `(pointer: coarse)` (`5fd876a`, `cdabc8c`); the copies in `darkroom.css`,
+  `hands.css` and `wall.css` followed in the same round (`191a4cc`,
+  `bd21e27`, `2ec2417`), so no demo stylesheet carries `outline: none` on its
+  exit any more.
