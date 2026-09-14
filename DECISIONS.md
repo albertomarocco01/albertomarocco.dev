@@ -538,7 +538,8 @@ Conventions that came out of the three at once:
   prop object's fields. Nothing at frame rate touches React.
 - **Keys are guarded.** Escape and the arrows ignore `altKey`/`ctrlKey`/
   `metaKey` and auto-repeat: Alt+← is browser back, and a held arrow would
-  restart a crossfade thirty times a second.
+  restart a crossfade thirty times a second. Mani and Image Vortex had drifted
+  from it (B7, B8) and were brought back in round 3 (`fe4e7f9`, `cdabc8c`).
 - **Escape leaves every demo.** Tarassaco was the one exception — its only
   way out was the corner link — so it now carries the same guarded handler
   as the other four. Five pieces in one section should answer the same key.
@@ -913,3 +914,69 @@ ones above.
   DECISIONS entries and dictionary requests A/B/D/E/F hand over; the
   `.notfound` CSS block (request to A) so the 404's inline `cursor` styles
   can go.
+
+### D — Mani, Camera Oscura
+
+- **Touch targets in the demos (D4, D11; I14; `bd21e27`, `191a4cc`).** Controls
+  that are text-like — the exit pill, "or use the pointer", "try the camera
+  again" — keep their visible size; on `(pointer: coarse)` an invisible
+  `::before` inset (44 px tall, 6 px wider on each side, centred on the
+  control) takes the tap. Bordered buttons get `min-height: 44px` instead. The
+  darkroom's `next print →`, the only control of the brush path, is 44 px tall
+  on every pointer. WCAG 2.5.8 without moving the hand-authored design.
+- **Mani loads MediaPipe at the gate (D3; S5; `25a9fe2`).** The wasm (~12 MB)
+  and the hand model (~8 MB) start downloading when the gate mounts — no
+  permission is needed — once per mount and shared by every camera start;
+  `navigator.connection.saveData` waits for the click instead. The task file
+  is fetched with a byte count and streamed into the landmarker
+  (`modelAssetBuffer`), so the gate can show "downloading the model… N %"
+  while the visitor waits on it. `INIT_TIMEOUT_MS` (8 s) now covers the camera
+  alone (permission → stream → first frame); the model has no clock. A model
+  that will not load gets its own dialog line (`errModel`) with the retry,
+  which re-runs the load. In `next dev`, React StrictMode runs the mount effect
+  twice: the first load is aborted at once — two model requests in the network
+  panel are expected there, not in production.
+- **Mani's console filter for MediaPipe's INFO lines (D3, D8; B24; `25a9fe2`)**
+  is one page-level patch, reference-counted (`leaseConsoleFilter` in
+  `useHandTracker.ts`), held while a load is in flight or a landmarker is
+  alive: a failed load releases it at once, an unmount aborts the load and
+  releases when it settles or after `CONSOLE_FILTER_GRACE_MS` (15 s). It
+  replaces the per-session patch, which could stay patched forever on a wasm
+  fetch that never resolved and which two overlapping mounts could restore
+  from under each other.
+- **Camera Oscura quality tiers (D10; S4; `ac5b38f`).** `TIER` in
+  `darkroom.config.ts`. The mobile tier is picked once at mount on a coarse
+  pointer, a viewport under `mobileMaxWidth` (720 CSS px) or
+  `navigator.deviceMemory <= mobileMaxMemoryGb` (4): grids at 0.75× (velocity
+  192, dye 384, exposure long side 768), 8 Jacobi iterations (desktop 20),
+  sub-step budget 2 (desktop 3), no vorticity pass (strength 3 is a
+  texel-scale whisper), canvas DPR ≤ 1.25 (desktop 1.5). On every tier the
+  handover now develops one print a frame: the finished print's look (tone,
+  paper) is baked once into the RG16F hold target (`BAKE_FRAG`) and the
+  composite reads it back with one tap while it sinks. The grid-size knobs
+  left `SIM` for the tiers.
+- **Camera Oscura prints (D12; B24; `ac5b38f`)** are loaded with
+  `ImageBitmapLoader` (`createImageBitmap`, off the main thread,
+  `imageOrientation: 'flipY'` because a WebGL upload ignores `UNPACK_FLIP_Y`
+  for ImageBitmap sources), `TextureLoader` as the fallback where
+  `createImageBitmap` is missing; a bitmap is closed with its texture. A print
+  that lands late — the tray showing the black placeholder after a handover on
+  a slow network — keeps whatever was developed on it meanwhile: the texture
+  goes in under the exposure, remapped from the placeholder's 4:5 rect onto
+  the print's own. Kept rather than blocked, so the tray never ignores a hand;
+  on a very slow network a vigorous stir on the placeholder can fix the print
+  the moment it lands — the accepted fault.
+- **Camera Oscura touch (D11; I16; `191a4cc`).** `touch-action` moved from the
+  whole stage (`none`, which disabled the page's pinch-zoom — WCAG 1.4.4) to
+  the canvas as `pinch-zoom`: one finger stirs, a two-finger pinch is the
+  browser's zoom, the chrome above the canvas keeps every gesture. Two-finger
+  stirring on touch is given up for it. Mani keeps `touch-action: none` on its
+  canvas in pointer mode only, because two fingers are its tear gesture
+  (`c9e0ab6`).
+- **Demo titles and cards (D9, D13; I7, B3; `268f255`, `80c8292`).** `metaTitle`
+  "Mani · Hands" and "Camera Oscura · Darkroom" (the middle dot, so the
+  layout's " — Alberto Marocco.dev" template never makes three dash-separated
+  segments); both demos' `page.tsx` use `pageMetadata` for their own OG /
+  Twitter card; descriptions EN 152 / IT 155 (hands) and 131 / 134 (darkroom)
+  characters; the IT darkroom aria reads "Camera Oscura — sviluppo
+  interattivo…" instead of the tautology (I10).
