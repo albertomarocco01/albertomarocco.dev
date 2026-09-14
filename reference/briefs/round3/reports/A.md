@@ -35,6 +35,26 @@ of Tarassaco — no `loading`, `html` overflow visible, body `hidden auto`,
 scroll by touch (`scrollBy`), keyboard (PageDown → 1038 px) and wheel on the
 phone viewport after a demo.
 
+## Requests applied (owner pass, 2026-09-14)
+
+The cross-owner requests the other packages could not apply themselves,
+taken once all six had finished. Each verified in headless Chrome (session
+`A-req-r3`, 1440×900 and the iPhone 14 viewport) against the dev server,
+console clean; tsc and eslint (zero findings) before the commits.
+
+| commit | request | what |
+|---|---|---|
+| `f08c1dd` | C → `LocaleToggle.tsx` (I12 · C10) | `persistLocale()` from `@/lib/locale` (`9419695`) replaces the toggle's own cookie line: `Secure` when served over https, plain on http so localhost keeps working. Verified: en → `document.cookie` `locale=en`, `html.lang` en; back → `locale=it`. |
+| `a9d03fc` | B → `Cursor.tsx` (I19) | `isTouchOnly()` from `lib/scroll-intent` (`7738b9f`) replaces the local `(hover: none)` matchMedia — same query, one place. Verified: a synthetic mouse `pointermove` moves the dot, a touch one is ignored. |
+| `0275152` | (own) | The one eslint warning on the chrome folder, left by `41fbc09`: `onHold` (a `useCallback([])`, stable) listed in the sweep effect's deps. Behaviour-neutral; the zero-findings bar. |
+| `9c0dc93` | C → `globals.css` (B2 · C4, I14) | `.notfound { cursor: auto; min-height: 100dvh }` and `.notfound .gd-back { cursor: pointer }` as sent. **Changed against the request:** its `padding: 0.9rem 0; margin: -0.9rem 0` is not applied — `.gd-back::before` (`2735afc`) already gives the hit box, and 0.9rem would have landed at 42.8 px; instead `.notfound .gd-back::before { inset: -0.95rem -0.3rem }` takes it from 39.6 to 44.4 px, the 44 the request asked for. **Added:** `.notfound nav { display: flex; flex-wrap: wrap; gap: 2rem 2.4rem }` — at 390 px the IT copy wraps onto two rows 30 px apart, where two 44 px boxes overlapped by 9.6 px; 2rem leaves them 1.6 px clear (the footer's own trade in `2735afc`). Verified with the inline styles stripped in-page: body `none`, `.notfound` `auto`, links/wordmark/footer `pointer`, boxes 44.4 px at 390 (IT two rows, EN one) and at 1440; rules served by the sheet. |
+| `8d80d80` | D → `vortex.css` (I14) | `.vortex-exit::before, .vortex-back::before` 44 px under `(pointer: coarse)`, the hands/darkroom/wall idiom (`bd21e27`, `191a4cc`, `2ec2417`), replacing E's `padding: 0.85rem 1rem` (`cdabc8c`), which reached ~42.6 px and changed the pill on touch. `.vortex-back` included: the pair shares the block and would otherwise differ on a phone. Verified: pill 32 px unchanged, the pseudo box 44 px centred on it, no padding rule left in the CSSOM. |
+
+Follow-ups for the other owners (not A's files):
+
+- **C, `src/app/not-found.tsx`:** remove `style={{ cursor: "auto", minHeight: "100dvh" }}` on `.notfound`, `style={{ cursor: "pointer" }}` on both `.gd-back` links, and `style={{ display: "flex", flexWrap: "wrap", gap: "1rem 2.4rem" }}` on the `nav` — the sheet carries all three now, and the inline 1rem row gap would put the overlap back.
+- **E, `tarassaco.css:259-263`:** `.tara-exit` is the one exit still growing its padding on coarse pointers; the `::before` idiom above (now in four of five demos) would make the fifth match.
+
 ## New tunables
 
 - `src/components/chrome/Loader.tsx` — `VEIL_HOLD_MS` (2400): how long a fill
@@ -93,3 +113,9 @@ phone viewport after a demo.
    (inspect the `::before`/`::after`); `/graphic-designs/vortex` still styled.
 8. Throttle the network (Slow 3G), click a nav link: the veil holds at the
    full bar until the page is in, up to 2.4 s, then lifts onto content.
+9. Requests: open a made-up URL — the pointer is visible, the two mono links
+   show the hand, and at 390 px in IT their two rows sit 32 px apart (inspect
+   `.gd-back::before`: 44 px each, not overlapping). Open the vortex with
+   touch emulation: the exit pill keeps its shape, its `::before` is 44 px
+   tall. Toggle en/it on `/`: `document.cookie` flips (with `Secure` on the
+   deployed https origin only).
