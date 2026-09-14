@@ -1,20 +1,16 @@
 "use client";
 
 import type { Dictionary, Locale } from "@/lib/i18n";
+import { persistLocale } from "@/lib/locale";
 
 const LOCALES: Locale[] = ["en", "it"];
-
-// Persist the choice for a year. Kept at module scope so the cookie write (a
-// side effect on the global `document`) stays out of the component body.
-function persistLocale(locale: Locale) {
-  document.cookie = `locale=${locale}; path=/; max-age=31536000; samesite=lax`;
-}
 
 /**
  * EN/IT switch for the topbar's left cluster. Two real buttons in the topbar's
  * mono/lowercase register: the active locale reads in `--ink`, the inactive in
  * `--ink-dim` (lifting toward `--ink` on hover/focus). Selecting the inactive
- * locale writes the `locale` cookie and reloads the document — deliberately not
+ * locale writes the `locale` cookie (through the shared writer in lib/locale,
+ * which adds `Secure` on https) and reloads the document — deliberately not
  * `router.refresh()`: a full load re-evaluates the Loader module (resetting its
  * `veilPlayed` flag), so the switch replays the whole first-load ceremony —
  * veil, fill, field bloom, entrance — in the new language, instead of swapping
