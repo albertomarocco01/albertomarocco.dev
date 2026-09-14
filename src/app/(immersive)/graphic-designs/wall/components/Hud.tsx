@@ -63,7 +63,7 @@ export function Hud({
     <>
       <div className={`wall-title${started ? " is-hidden" : ""}`} aria-hidden="true">
         <span className="wall-title-main">Parete</span>
-        <span className="wall-title-sub">{copy.subtitle}</span>
+        <span className="wall-title-sub">led wall</span>
         <span className="wall-title-keys">{copy.keyboardHint}</span>
       </div>
 

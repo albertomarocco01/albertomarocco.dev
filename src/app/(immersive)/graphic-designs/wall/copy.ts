@@ -14,9 +14,12 @@ import type { TourStationId } from "./wall.config";
  * palette's own keys, and the two trade terms on the spec line. Numbers and
  * units live in `wall.config.ts`; only the labels around them are here.
  *
- * "LED wall" is cased the way each locale's dictionary writes it — "LED wall"
- * in English (an acronym, also in the lowercase HUD register; "an LED wall"),
- * "led wall" in Italian, where the acronym is a common noun.
+ * "LED wall" is cased by register: prose — the title, the description, the
+ * aria strings, the card lines — writes "LED wall" in English ("an LED wall")
+ * and "led wall" in Italian, as the dictionary does in each language; the HUD
+ * strings (`spec.wall`, `tour.label`) are written lowercase because the mono
+ * register lowercases them on screen (`text-transform` in wall.css, the site's
+ * convention), so the source reads as the screen does.
  */
 export interface WallCopy {
   metaTitle: string;
@@ -28,8 +31,6 @@ export interface WallCopy {
   /** WebGL unavailable / context lost fallbacks */
   noWebgl: string;
   contextLost: string;
-  /** the cover's subtitle under "Parete" — English in both locales, cased as each writes the acronym */
-  subtitle: string;
   /** the keys, under the title cover; fades on the first interaction */
   keyboardHint: string;
   /** spec-sheet labels, bottom-left. The values come from wall.config.ts. */
@@ -81,10 +82,9 @@ const en: WallCopy = {
   exit: "← exit the demo",
   noWebgl: "This demo needs WebGL. Your browser or device doesn't support it.",
   contextLost: "The graphics context was lost. Reload the page to continue.",
-  subtitle: "LED wall",
   keyboardHint: "1 2 3 4 views · ← → palette · i tour · wasd walks · drag orbits · wheel dollies",
   spec: {
-    wall: "LED wall",
+    wall: "led wall",
     pitch: "pitch",
     cabinets: "cabinets",
     rig: "ground support · daisy-chain",
@@ -97,7 +97,7 @@ const en: WallCopy = {
   loopAria: "loop palette",
   decimal: ".",
   tour: {
-    label: "what is an LED wall? →",
+    label: "what is an led wall? →",
     aria: "what is an LED wall — a short tour in six stations",
     next: "next →",
     back: "← back",
@@ -165,7 +165,6 @@ const it: WallCopy = {
   exit: "← esci dalla demo",
   noWebgl: "Questa demo richiede WebGL. Il tuo browser o dispositivo non lo supporta.",
   contextLost: "Il contesto grafico è andato perso. Ricarica la pagina per continuare.",
-  subtitle: "led wall",
   keyboardHint: "1 2 3 4 viste · ← → palette · i tour · wasd per muoverti · trascina per girare · rotella per avvicinare",
   spec: {
     wall: "led wall",
