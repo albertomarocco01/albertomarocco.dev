@@ -2,11 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import { useApp } from "@/components/providers/AppProvider";
+import { isTouchOnly } from "@/lib/scroll-intent";
 
 /**
  * Custom cursor: a dot that snaps to the pointer + a ring that lags behind
- * (lerp 0.16) and grows over interactive elements. Disabled on touch and
- * under reduced motion (the CSS hides it; the effect also bails early).
+ * (lerp 0.16) and grows over interactive elements. Disabled on touch (the
+ * site's one touch predicate, shared with the work rows) and under reduced
+ * motion (the CSS hides it; the effect also bails early).
  */
 export function Cursor() {
   const { reducedMotion } = useApp();
@@ -15,7 +17,7 @@ export function Cursor() {
 
   useEffect(() => {
     if (reducedMotion) return;
-    if (window.matchMedia("(hover: none)").matches) return;
+    if (isTouchOnly()) return;
 
     const dot = dotRef.current;
     const ring = ringRef.current;
