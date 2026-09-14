@@ -8,11 +8,15 @@ import type { TourStationId } from "./wall.config";
  * these strings down as one prop. Typing both entries as `WallCopy` keeps
  * EN/IT parity compiler-enforced.
  *
- * The piece's own name — "Parete — LED Wall" — is a title, not copy, and stays
+ * The piece's own name — "Parete · LED Wall" — is a title, not copy, and stays
  * as-is in both locales, as does the loop's title ("Liminal Field"), the
  * four variant names (amber / ember / teal / violet), which are the shared
  * palette's own keys, and the two trade terms on the spec line. Numbers and
  * units live in `wall.config.ts`; only the labels around them are here.
+ *
+ * "LED wall" is cased the way each locale's dictionary writes it — "LED wall"
+ * in English (an acronym, also in the lowercase HUD register; "an LED wall"),
+ * "led wall" in Italian, where the acronym is a common noun.
  */
 export interface WallCopy {
   metaTitle: string;
@@ -24,6 +28,8 @@ export interface WallCopy {
   /** WebGL unavailable / context lost fallbacks */
   noWebgl: string;
   contextLost: string;
+  /** the cover's subtitle under "Parete" — English in both locales, cased as each writes the acronym */
+  subtitle: string;
   /** the keys, under the title cover; fades on the first interaction */
   keyboardHint: string;
   /** spec-sheet labels, bottom-left. The values come from wall.config.ts. */
@@ -68,16 +74,17 @@ export interface WallCopy {
 }
 
 const en: WallCopy = {
-  metaTitle: "Parete — LED Wall",
+  metaTitle: "Parete · LED Wall",
   metaDescription:
-    "A 6 × 3 m LED wall on an endless dark ground, running the generative loops live. Orbit it, walk round the back, switch loops, get close enough to see the pixel pitch — or take the short tour of what a LED wall is.",
-  aria: "Parete — 3D preview of a 6 by 3 metre LED wall. Drag to orbit, wheel to dolly, w a s d to walk, keys 1 2 3 4 for views (4 is the back), the left and right arrows or the swatches change the loop's palette. The i key or the label beside the wall opens a short tour of what a LED wall is: the down and up arrows, Space, the wheel or a vertical swipe move between its six stations; Escape closes the tour, and a second Escape exits the demo.",
+    "A 6 × 3 m LED wall in a dark room, running a generative loop live. Orbit it, walk round the back, switch palettes, or take the tour of what an LED wall is.",
+  aria: "Parete — 3D preview of a 6 by 3 metre LED wall. Drag to orbit, wheel to dolly, w a s d to walk, keys 1 2 3 4 for views (4 is the back), the left and right arrows or the swatches change the loop's palette. The i key or the label beside the wall opens a short tour of what an LED wall is: the down and up arrows, Space, the wheel or a vertical swipe move between its six stations; Escape closes the tour, and a second Escape exits the demo.",
   exit: "← exit the demo",
   noWebgl: "This demo needs WebGL. Your browser or device doesn't support it.",
   contextLost: "The graphics context was lost. Reload the page to continue.",
+  subtitle: "LED wall",
   keyboardHint: "1 2 3 4 views · ← → palette · i tour · wasd walks · drag orbits · wheel dollies",
   spec: {
-    wall: "led wall",
+    wall: "LED wall",
     pitch: "pitch",
     cabinets: "cabinets",
     rig: "ground support · daisy-chain",
@@ -90,8 +97,8 @@ const en: WallCopy = {
   loopAria: "loop palette",
   decimal: ".",
   tour: {
-    label: "what is a led wall? →",
-    aria: "what is a led wall — a short tour in six stations",
+    label: "what is an LED wall? →",
+    aria: "what is an LED wall — a short tour in six stations",
     next: "next →",
     back: "← back",
     close: "× close",
@@ -151,13 +158,14 @@ const en: WallCopy = {
 };
 
 const it: WallCopy = {
-  metaTitle: "Parete — LED Wall",
+  metaTitle: "Parete · LED Wall",
   metaDescription:
-    "Un led wall di 6 × 3 m su un pavimento buio senza fine, con i loop generativi dal vivo. Giraci intorno, passa dietro, cambia loop, avvicinati fino a vedere il pixel pitch — oppure segui il breve tour su cos'è un led wall.",
+    "Un led wall di 6 × 3 m in una stanza buia, con un loop generativo dal vivo. Giraci intorno, passa dietro, cambia palette, o segui il tour su cos'è un led wall.",
   aria: "Parete — anteprima 3D di un led wall di 6 per 3 metri. Trascina per orbitare, rotella per avvicinarti, w a s d per muoverti, tasti 1 2 3 4 per le viste (4 è il retro), le frecce sinistra e destra o i campioni di colore cambiano la palette del loop. Il tasto i o l'etichetta accanto alla parete aprono un breve tour su cos'è un led wall: le frecce giù e su, Spazio, la rotella o uno scorrimento verticale passano fra le sei tappe; Esc chiude il tour, un secondo Esc esce dalla demo.",
   exit: "← esci dalla demo",
   noWebgl: "Questa demo richiede WebGL. Il tuo browser o dispositivo non lo supporta.",
   contextLost: "Il contesto grafico è andato perso. Ricarica la pagina per continuare.",
+  subtitle: "led wall",
   keyboardHint: "1 2 3 4 viste · ← → palette · i tour · wasd per muoverti · trascina per girare · rotella per avvicinare",
   spec: {
     wall: "led wall",
