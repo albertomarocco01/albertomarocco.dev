@@ -1045,3 +1045,59 @@ ones above.
   `hands.css` and `wall.css` followed in the same round (`191a4cc`,
   `bd21e27`, `2ec2417`), so no demo stylesheet carries `outline: none` on its
   exit any more.
+
+### F — Parete
+
+- **A mobile tier for the room (S3; `217a089`).** `TIER` in `wall.config.ts` is
+  picked once at mount by `pickTier()` in `App.tsx` on a coarse pointer,
+  `innerWidth < TIER.mobileMaxWidth` (720 CSS px) or `navigator.deviceMemory ≤
+  TIER.mobileMaxMemoryGb` (4); `SOFTWARE` still overrides either tier. Desktop
+  = the room as it was (`dpr 1.5`, reflector 512² with blur [400, 120], bloom
+  8 levels, SMAA, a second `RectAreaLight` as the service light). Mobile keeps
+  the same room and leaves the wall's loop and LED surface untouched: `dpr
+  1.25`, reflector 256² with blur [200, 60] (the same blur character), bloom 4
+  levels (at a 500 px buffer the deeper mips are a handful of pixels), no SMAA
+  (DPR 1.25 on a 390 px screen covers it), and the service light behind the
+  wall becomes a `PointLight` of the same tint (`ROOM.backLight.pointIntensity`
+  22 cd, decay 2, solved for about the same light on the cabinet backs;
+  `room-light.ts` `initBackLight(kind)`). Measured on the iPhone 14 viewport,
+  real GPU: 60 fps at rest and during a flight, no frame over 33 ms, drawing
+  buffer 487 × 1055. `REFLECTOR.resolution/blur` and `BLOOM.smaa/levels` moved
+  into the tiers.
+- **The chrome's commands travel on the WallBus, never as Canvas props (S3;
+  `e8ca023`).** The view chosen, the tour station and the loop's palette are
+  set on the bus (`setPreset`, `setTour`, `setLoop(variant, sweep)`), each with
+  a sequence number, and read at the top of the frame: the camera rig at
+  `useFrame` priority −2 (before drei's controls update at −1) applies the
+  view and the station, the scene at −1 applies the palette, so a command
+  lands in the frame it was asked for and each setter also invalidates the
+  demand loop. The count moves even when the index does not, which is what
+  lets the view you already stand on be re-chosen and re-framed (the old
+  `presetNonce` is gone). `WallCanvas` is memoised and keeps as props only
+  what changes the tree or the renderer (`reduced`, `software`, `tier`,
+  `frameloop`, the bus, two stable setters); App keeps the HUD's React state
+  plus a ref of the loop index for a synchronous arrow step. Rule going
+  forward: nothing that changes per interaction is a Canvas prop. Related,
+  `382c5a7` (B23): the pitch station's pulse and the tour card both start on
+  the rig's own `settle` (a set of listeners on the bus), never on a timer of
+  `flightSeconds`, because the flight advances by a dt clamped to 0.1 s and
+  lands late under slow frames. Verified with temporary render counters: zero
+  renders of `WallCanvas`, `WallScene` and `CameraRig` across a view, the
+  whole tour and a palette switch; the profiler's and the dev fiber's
+  `actualStartTime` both count memo bailouts, so neither is proof on its own.
+- **"LED wall" is cased by register (I4, I6, I7; `059e469`, `5a16bb8`).** Prose
+  — page title, description, aria strings, tour card lines — writes "LED
+  wall" and "an LED wall" in English (the article follows how the acronym is
+  said) and "led wall" in Italian, as the dictionary already does in each
+  language. The mono HUD register is lowercased on screen by `text-transform:
+  lowercase` (`wall.css` since round 1; `globals.css` and the other demos do
+  the same), so HUD strings (`spec.wall` "led wall", `tour.label` "what is an
+  led wall? →", the cover subtitle literal in `Hud.tsx`) are written lowercase
+  in the source, so that source, screen and Chrome's accessible names (which
+  follow the transform) agree. An uppercase acronym island inside the register
+  would be the site's first and is the director's call, not a fix round's.
+  Also from F5: the demo's title carries its subtitle after a middle dot
+  ("Parete · LED Wall"; the layout appends " — Alberto Marocco.dev"), the
+  wall's description says palettes (the control changes the palette of the
+  one loop, Liminal Field) and is 155 / 159 characters; the index card
+  (`gd.demos.wall.desc`) says the same since `aa1c574`.
