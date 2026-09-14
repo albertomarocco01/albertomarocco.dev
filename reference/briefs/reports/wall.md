@@ -929,3 +929,227 @@ attached over CDP.
 - Nothing to change in a shared file.
 - The cover is unchanged; it is 07's to re-capture. If the tour should be in
   it, station 3 (the cabinets from the right, card on) is the frame.
+
+## Round 3 — the audit fixes
+
+Brief `round3/F-wall.md`, audit `round3/audit-2026-09-13.md`, worked 2026-09-13
+and 2026-09-14 on the same AMD Radeon integrated GPU as round 2
+(`ANGLE (AMD, AMD Radeon(TM) Graphics, D3D11)`), in headless Chrome on the dev
+server (Next 16.3.4, Turbopack). Two sessions: the first did the audit-verify
+pass and four commits and was cut off by an API session limit with F2 half
+applied; the second finished F2, did F5 and this report. No shared file was
+touched; the two card texts in the dictionary are a request to C below.
+Nothing installed.
+
+### Audit-verify
+
+- **B23** (the pitch pulse before the camera lands) — reproduced by hogging
+  the frame: at ~124 ms per frame the flight to station 2 took 2170 ms of
+  wall-clock against the pulse's 1400 ms timer, so the lamps dissolved with
+  the camera still in the air. The rig advances its tween by a `dt` clamped
+  to 0.1 s, which is right for the motion and wrong for a timer.
+- **S3** (the room on a phone) — at the iPhone 14 viewport, DPR 3 and the
+  full chain the entry long task was 1172 ms cold; the composer re-applied
+  its props and WallScene re-rendered on every tour step and every card fade
+  (`started`, `card`, `tour` were App state and Canvas props).
+- **I16** — `touch-action: none` sat on the whole stage, so the page could not
+  be pinch-zoomed. **I14, I13** — the exit link measured ~30 px tall and the
+  mono register ran to 9.3–10.6 px on a phone.
+- **I6, I4, I7, I5** as the audit had them: "switch loops" in the description
+  of a demo whose control changes palettes; "LED wall" three ways inside
+  English; a title that made three " — " segments; the apostrophes were in
+  fact already straight in this folder.
+
+### What changed, commit by commit
+
+| commit | items | what |
+|---|---|---|
+| `382c5a7` fix: pitch pulse waits for the camera to land | F3 · B23 | The pulse starts on the rig's own `settle`, the signal the card already waited for; the bus keeps a set of settle listeners so App and the scene both hear it. The rig's first-preset guard was keyed on the nonce rather than a flag StrictMode's double effect consumed (that guard is gone with F2, see below). |
+| `b0f08c2` fix: remove the context-loss listeners with the canvas | F6 · B24 | `webglcontextlost` / `restored` were inline closures added in `onCreated` and never removed; they now live in an effect keyed on the renderer and leave on unmount. |
+| `2ec2417` fix: pinch-zoom kept, 44 px targets, 11 px mono, ring focus | F4 · I16, I14, I13 | `touch-action: none` moves from the stage to the canvas (one finger orbits, two dolly, the chrome keeps the browser's gestures). On coarse pointers the exit link takes a 44 px hit area through an invisible `::before`, the tour's call grows to 44 px alongside the keys and the label the rule already covered. Nothing mono goes under 0.7rem (11.2 px): the title sub, the key line, the spec sheet, the keys, the tour label, the card's index and lines; on phones the tracking gives instead of the size so the four labels still share a 358 px row. Keyboard focus is the opaque amber `--ring`: a 2 px ring on the exit link, a 2 px underline on the keys and links. |
+| `217a089` perf: a mobile tier for the room | F1 · S3 | `TIER` in `wall.config.ts`, picked once at mount by `pickTier` (App.tsx). The mobile tier keeps the same room and the wall's loop and LED surface untouched; knobs below. |
+| `adce0ea` fix: own Open Graph card via pageMetadata (C) | B3 | `page.tsx` goes through `pageMetadata({ title, description, path })`. |
+| `e8ca023` perf: tour steps and swatches no longer re-render the Canvas | F2 · S3 | The view, the tour station and the loop's palette were props of WallCanvas: every tour step, card fade and first touch re-rendered `<Canvas>`, WallScene and the rig. They are now commands on the WallBus, each with a sequence number — `setPreset`, `setTour`, `setLoop(variant, sweep)` — applied at the top of the frame: the rig reads the view and the station at priority −2, before drei's controls update at −1, the scene reads the palette at −1, so a command lands in the frame it was asked for, and each setter buys that frame on the demand loop. Re-choosing the view you already stand on still re-frames the room because the count moves when the index does not (the `presetNonce` is gone). WallCanvas is `memo`ised; what stays a prop changes the tree or the renderer — `reduced`, `software`, `tier`, `frameloop`, the bus, two stable setters. App keeps the HUD's own state plus a ref of the loop index so ← / → compute the next palette synchronously for the bus. The rig's "seen" counters start at zero, not at the bus's count, so a view or the tour asked for in the beat before the rig mounts is applied on its first frame. The tour's effects in the rig (`setTouring`, `flyTo`) and the scene's (leaving the pitch station puts the lamps back) are per-frame reads of `bus.tour()` now. |
+| `059e469` fix: "Parete · LED Wall", palettes not loops, one casing | F5 · I7, I6, I4, I5 | `metaTitle` "Parete · LED Wall" (the layout appends " — Alberto Marocco.dev"); the description says palettes and "a generative loop", 155 / 159 characters; "an LED wall" and "LED wall" throughout the English prose; Italian keeps "led wall" lowercase as the dictionary's Italian does. It also wrote "LED wall" into the HUD strings and moved the cover subtitle into copy — undone by the next commit, see the decision below. |
+| `5a16bb8` fix: HUD strings written as the register shows them | F5 · I4 | The HUD's mono register lowercases everything on screen (`text-transform` in wall.css since round 1, the site's convention), so `spec.wall` is "led wall", the label "what is an led wall? →", and the subtitle is a literal in Hud.tsx again; the source reads as the screen does. |
+| this commit | report | this section. |
+
+### Decisions, and why
+
+- **"LED wall" is cased by register.** The audit asked for one casing inside
+  English. Prose — the title, the description, the aria strings, the card
+  lines — writes "LED wall" and "an LED wall" in English and "led wall" in
+  Italian, as the dictionary does in each language. The HUD is the site's
+  lowercase mono register: wall.css lowercases it with `text-transform` (since
+  round 1, as globals.css and the other demos do), so a source that says "LED
+  wall" there shows "led wall" anyway — and Chrome's accessible names follow
+  the transform. The first F5 commit wrote the acronym uppercase into the spec
+  label, the tour label and a per-locale subtitle; the English screenshot
+  showed it lowercased, so the follow-up writes those three as they render
+  ("led wall", "what is an led wall? →" — the article follows how the acronym
+  is said) and the subtitle is a literal in Hud.tsx again, English in both
+  locales like the other demos'. An uppercase island in the register would be
+  the site's first; that is the director's call, not a fix round's.
+- **Commands on the bus, not events.** A sequence number per command rather
+  than a queue: the room only ever needs the latest view, the latest station
+  and the latest palette, and a count that moves on every call is what lets
+  the same view be chosen twice. Reading them in `useFrame` at −2 (rig) and
+  −1 (scene) keeps the order the old effects had — the flight is set up
+  before the controls update, the palette before the loop draws — without an
+  effect that re-runs on a prop.
+- **Nothing was measured on a production build** — the shared rule forbids
+  `npm run build` in a round with siblings in the tree. Every number below is
+  the dev server's (unminified, dev React, the dev overlay live), which
+  inflates main-thread cost; the director re-measures.
+
+### New tunables
+
+- `wall.config.ts` — **`TIER`**: `mobileMaxWidth` 720 (CSS px), `mobileMaxMemoryGb`
+  4; `desktop` = `{ dpr 1.5, reflector { resolution 512, blur [400, 120] },
+  bloomLevels 8, smaa true, backLight "rect" }`; `mobile` = `{ dpr 1.25,
+  reflector { resolution 256, blur [200, 60] }, bloomLevels 4, smaa false,
+  backLight "point" }`. Picked once at mount by `pickTier()` in App.tsx on a
+  coarse pointer, `innerWidth < mobileMaxWidth`, or `navigator.deviceMemory ≤
+  mobileMaxMemoryGb`; `SOFTWARE` still overrides either tier. `REFLECTOR` lost
+  `resolution` / `blur` (per tier now) and `BLOOM` lost `smaa` and `levels`.
+- `wall.config.ts` — `ROOM.backLight.pointIntensity` 22 (candela, decay 2): the
+  service light on the mobile tier is a `PointLight` in the same place as the
+  desktop tier's second `RectAreaLight`, solved for about the same light on the
+  cabinet backs (`room-light.ts` `initBackLight(kind)`, `backLightIntensity(kind)`).
+- `wall.css` — the coarse-pointer rule now also covers the exit link (a 44 px
+  `::before` hit area) and the tour's call; `--ring` for keyboard focus.
+- `wall-bus.ts` — `setPreset` / `preset` / `presetSeq`, `setTour` / `tour` /
+  `tourSeq`, `setLoop` / `loop` / `loopSeq` / `loopSweep` (`setLoopSweep` is gone).
+
+### Verification
+
+agent-browser, headless Chrome on the real GPU, dev server, `console.error` /
+`warn` / `error` / `unhandledrejection` captured from document start by an
+init script, draw calls counted by wrapping the four `draw*` entry points.
+
+- **F2 — does anything re-render the Canvas?** Two readings, because the
+  profiler's and the fiber's numbers both count bailouts. (1) A temporary
+  `console.log` in the bodies of WallCanvas, WallScene and CameraRig (removed
+  before the commit; the tree was diffed): across `1`, the tour opened by `i`,
+  three `↓` steps, `Esc`, a swatch and `2` — **zero** renders of all three;
+  flipping `prefers-reduced-motion` in the same page (a real prop change)
+  logged 2 / 4 / 4 (StrictMode's doubles), so the probes were live. (2)
+  agent-browser's React profiler over the full scenario: App 30 re-renders
+  (its own state), Hud 30, Tour 17, WallCanvas listed 30 times at zero self
+  time (memo bailouts: the dev fiber's `actualStartTime` also moves on a
+  bailout, which is why the earlier stamp probe could not tell), R3F's `Canvas`
+  not at all. R3F's inner `CanvasImpl` showed 30 one-millisecond re-renders
+  from its own state, in step with Next's dev overlay re-rendering the root
+  (`Router`, `HotReload` 30×, `SegmentViewNode` mounting 150×) — a dev-only
+  cascade the wall's code does not reach; see Known limits.
+- **Every interaction, desktop 1440 × 900, Italian.** Keys 2 3 4 1 read 6.5 /
+  0.9 / 6.0 / 7.0 m with the pager following (`presetSeq` 1 → 4). The walk:
+  `d` held 1 s shifted the wall's projected extent on the row through its
+  centre from 254–1185 px to 437–1213 (read from the default framebuffer in a
+  microtask after the frame's last draw); `1` brought it back to 255–1185;
+  again by the pager's "frontale" after a second walk, 255–1185. The palette:
+  the teal swatch from amber set `loop teal, sweep +1` and the columns turned
+  left → right (column 0 at 250 ms, 0–3 at 550 ms, all eight at 850 ms); `←`
+  set `ember, −1` and the columns turned right → left (7 at 250 ms, 4–7 at
+  550 ms, all at 850 ms); `→` back to teal, +1. The tour from the front: `i`
+  → card `01 / 06` in 323 ms with focus on it; `↓` ×5 → 0.9 / 3.5 / 5.0 /
+  12.1 / 7.0 m, each card 1.8–1.9 s after the key (1.4 s flight + 0.3 s), the
+  palette stepping to violet on arriving at station 5; `↑` back to 5 (and the
+  palette stepped again, as documented); a wheel tick → 6 with the CTA;
+  `Esc` closed the tour and focus returned to the label. Settles recorded on
+  the bus: 0, 1, 2, 3, 4, 5, 4, 5. Console: nothing but R3F's `THREE.Clock`
+  notice.
+- **Keyboard only.** Tab from the exit link: frontale · obliqua · da vicino ·
+  retro → `cos'è un led wall? →` → amber · ember · teal · violet. Enter on the
+  focused violet selected it; Shift+Tab ×6 landed on "da vicino", Enter read
+  0.9 m.
+- **Reduced motion** (`set media reduced-motion`, live): 0 draws in 1 s at
+  rest; `4` cut to 6.0 m and the following second drew 75 calls (the cut's
+  frames) then nothing; `→` cut to teal, 0 draws after; `i` → card in 63 ms;
+  `↓` → station 2 in 52 ms; 0 draws in the next second (no pulse); `Esc`.
+- **Software** (SwiftShader, `ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device
+  (Subzero)))`): `software` true, frameloop `demand`; 0 draws in 1.5 s at rest;
+  `4` read 6.0 m within 600 ms and 0 draws followed; `→` cut to ember, 0 draws
+  followed; `i` opened the card; no errors.
+- **No WebGL** (every `getContext("webgl*")` returns null): the message in
+  `role="alert"`, the exit link, no canvas, no HUD, console clean; at 390 px
+  the exit link is 191 × 32 (its 44 px hit area is the coarse-pointer rule).
+- **Phone, iPhone 14 (390 × 844, DPR 3), Italian.** The mobile tier was picked
+  (`dpr 1.25, reflector 256, bloomLevels 4, smaa false, backLight point`),
+  drawing buffer 487 × 1055. rAF probe over 3 s: **60 fps at rest, p50 16.7
+  ms, p95 17.0, max 17.3, no frame over 33 ms; the same during the flight to
+  the oblique.** Entry long tasks on this hard load: 582 + 210 ms (dev server).
+  The label docked under the wall (97, 616, 197 × 59; English 213 wide); the
+  pager keys 88 × 32 and the swatches 88 × 48 without coarse-pointer
+  emulation (the `pointer: coarse` rule lifts the keys to 44 px; verified by
+  reading, as in rounds 2b and 2c); a tap on "retro"; a tap on the label opened
+  the tour, card at (16, 407, 358 × 267) over the spec line at 686 and the
+  keys at 748; a 140 px swipe up → station 2 (0.9 m), down → station 1; `Esc`
+  returned focus to the docked label. Spec and subtitle at 11.2 px.
+- **Exit / re-enter ×3** from `/graphic-designs`, opening the tour and stepping
+  to station 2 each time: mount 488 / 414 / 457 ms, exit 311 / 312 / 323 ms;
+  after each exit no `.wall`, no wall canvas, no card in the DOM, the site's
+  one field canvas only, `html` without `loading`, overflow visible; heap 41 /
+  50 / 45 MB (42 before); a fresh WebGL2 context obtainable afterwards; the
+  console carried three `THREE.Clock` notices (one per mount) and nothing else.
+- **English** after a cookie switch: `<title>` "Parete · LED Wall — Alberto
+  Marocco.dev", `og:title` / `og:description` / `og:url` the route's own (curl,
+  EN and IT); the spec `led wall · 6 × 3 m · pitch 2.6 mm · 12 × 6 cabinets
+  · …`, the label `what is an led wall? →` (251 px, clamped 16 px inside the
+  right edge at 1440; the screenshot is what caught the register lowercasing
+  the first commit's "LED"), the card's aria `what is an LED wall — a short
+  tour in six stations`, the live region `station 1 of 6 · What it is`.
+- `npx tsc --noEmit` clean and `npx eslint` on the folder zero findings before
+  each commit.
+
+### Left, and why
+
+- **F1's "entry long task under 400 ms" is not shown.** On the dev server the
+  mobile tier's entry is 582 + 210 ms (first session, GPU shader cache off:
+  442 + 972 + 275; the desktop tier 1172 cold). What remains is the first
+  frame's shader compile — drei's reflector, the bloom chain, the LED material
+  and the aura — which only a deferred first paint (`gl.compileAsync` with the
+  frameloop held at `never` until it resolves) could split, at the price of a
+  black canvas for longer and with the composer's own passes outside its
+  reach. Not attempted without a production number to judge it against; the
+  audit's 1445 + 553 ms was measured on a build.
+- **`CanvasImpl` re-renders in dev.** R3F's inner Canvas bridges every React
+  context above it (its-fine `useContextBridge`), so when Next's dev overlay
+  re-renders the root after each commit — which the profiler shows it doing —
+  CanvasImpl runs again (1 ms each, its own state). Not reachable from the
+  wall's code and not present in a production build, which has no dev overlay;
+  worth a look on the director's build profile.
+- **44 px targets and `pointer: coarse` verified by geometry**, as in rounds
+  2b and 2c: the emulated phone reports no coarse pointer and no touch points,
+  so the tier was selected by the width rule and the swipe was driven with
+  synthetic touch pointer events.
+- **The dictionary card** (`gd.demos.wall.desc`) still says "the generative
+  loops" and "a LED wall" — C's file; the exact text is in the request below.
+
+### How to test it in two minutes (round 3)
+
+1. On a phone (or a 390 px viewport): the room loads, the label sits under the
+   wall, the pager and the palette are two rows of four; drag, pinch-zoom the
+   page (it zooms), tap "retro", tap the label, swipe up through the stations.
+2. Desktop: open the tour with **i**, step with **↓** — each card comes on
+   only after the camera has landed, and at station 2 the lamps dissolve once
+   the camera is there, not before. **Esc**, **Esc** leaves.
+3. Press **1**, drag the room a quarter turn, press **1** again: it re-frames.
+   Click **teal**: the wipe runs left to right; press **←**: right to left.
+4. Tab from the exit link through the views, the label and the swatches: an
+   amber ring or underline on each.
+5. Read the tab title: "Parete · LED Wall — Alberto Marocco.dev"; the English
+   description says "an LED wall", the HUD "led wall" in both languages.
+
+### For the director and C
+
+- **C — `src/lib/dictionary.ts` `gd.demos.wall.desc`**, EN :401: "running the
+  generative loops live" → "running a generative loop live" (one loop, four
+  palettes — as the demo's own description now says) and "what a LED wall is
+  made of" → "what an LED wall is made of" (I4). IT :602: "con i loop
+  generativi che girano dal vivo" → "con un loop generativo che gira dal vivo".
+  The rest of both sentences stands.
+- **DECISIONS.md**: the wall's mobile tier and its selection rule; the
+  bus-with-sequence-numbers pattern for the room's commands (nothing that
+  changes per interaction is a Canvas prop); "LED wall" cased by register —
+  prose "LED wall" (EN) / "led wall" (IT), the lowercase HUD written lowercase.
