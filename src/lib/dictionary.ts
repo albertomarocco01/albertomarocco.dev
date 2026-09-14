@@ -398,7 +398,7 @@ const en: Dictionary = {
       wall: {
         title: "Parete — LED Wall",
         meta: "3d preview · led wall · 2026",
-        desc: "A 6 × 3 m LED wall in a dark room, running the generative loops live. Walk round the back to the cabinets and the cabling, switch palettes, or take the tour that shows what a LED wall is made of.",
+        desc: "A 6 × 3 m LED wall in a dark room, running a generative loop live. Walk round the back to the cabinets and the cabling, switch palettes, or take the tour that shows what an LED wall is made of.",
       },
     },
   },
@@ -599,7 +599,7 @@ const it: Dictionary = {
       wall: {
         title: "Parete — LED Wall",
         meta: "anteprima 3d · led wall · 2026",
-        desc: "Un led wall di 6 × 3 m in una stanza buia, con i loop generativi che girano dal vivo. Passa dietro, tra i cabinet e i cavi, cambia palette, o segui il tour che racconta com'è fatto un led wall.",
+        desc: "Un led wall di 6 × 3 m in una stanza buia, con un loop generativo che gira dal vivo. Passa dietro, tra i cabinet e i cavi, cambia palette, o segui il tour che racconta com'è fatto un led wall.",
       },
     },
   },
