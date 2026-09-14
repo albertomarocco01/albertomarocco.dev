@@ -15,12 +15,14 @@ import { useTabVisible } from "@/lib/use-tab-visible";
 /**
  * Parete — the chrome around the room.
  *
- * React here holds only what changes the tree: WebGL availability, context
- * loss, which preset and which loop are current, whether the visitor has
- * touched anything yet, the frameloop, and the tour — which station is in
- * view and whether its card is showing. The camera, the loop's clock, the
- * live distance, the walk keys and the tour label's position never pass
- * through it.
+ * React here holds only what changes the DOM: WebGL availability, context
+ * loss, which preset and which loop the HUD shows, whether the visitor has
+ * touched anything yet, the frameloop, and the tour's card — which station it
+ * shows and whether it is on. The room itself is told through the bus: the
+ * view, the station, the palette are commands the camera rig and the scene
+ * read in the next frame, so a tour step or a swatch never re-renders
+ * <Canvas>. The camera, the loop's clock, the live distance, the walk keys
+ * and the tour label's position never pass through React either.
  */
 
 const isChrome = (t: EventTarget | null) => t instanceof Element && t.closest("a, button") !== null;
@@ -54,11 +56,10 @@ export default function App({ copy }: { copy: WallCopy }) {
   const [tier] = useState(pickTier);
   const [bus] = useState(() => new WallBus());
   const [preset, setPreset] = useState(0);
-  // Bumped on every choice, including re-choosing the view you are already on:
-  // `setPreset(same)` is swallowed by React's state equality, and a pager button
-  // that does nothing after you have orbited away is the wrong answer.
-  const [presetNonce, setPresetNonce] = useState(0);
   const [loopIndex, setLoopIndex] = useState(0);
+  // the loop as the handlers see it, so a step can be computed synchronously
+  // and handed to the bus (React's own state is the HUD's)
+  const loopRef = useRef(0);
   const [started, setStarted] = useState(false);
   // The tour: the station the camera is flying to or standing on, or null.
   const [tour, setTour] = useState<number | null>(null);
@@ -92,21 +93,26 @@ export default function App({ copy }: { copy: WallCopy }) {
   const openTour = useCallback(() => {
     if (tourRef.current !== null) return;
     tourRef.current = 0;
+    bus.setTour(0);
     setTour(0);
     setCard({ station: 0, on: false });
     wake();
-  }, [wake]);
+  }, [bus, wake]);
 
   // `toLabel`: whether focus should go back to the label — yes for Esc and
   // the close button, no when the visitor simply took the wheel (a preset, a
   // walk key), where the focus is already where they put it.
-  const closeTour = useCallback((toLabel: boolean) => {
-    if (tourRef.current === null) return;
-    tourRef.current = null;
-    returnFocus.current = toLabel;
-    window.clearTimeout(cardTimer.current);
-    setTour(null);
-  }, []);
+  const closeTour = useCallback(
+    (toLabel: boolean) => {
+      if (tourRef.current === null) return;
+      tourRef.current = null;
+      returnFocus.current = toLabel;
+      window.clearTimeout(cardTimer.current);
+      bus.setTour(null);
+      setTour(null);
+    },
+    [bus],
+  );
 
   const stepTour = useCallback(
     (direction: number) => {
@@ -116,29 +122,35 @@ export default function App({ copy }: { copy: WallCopy }) {
       if (next === current) return;
       tourRef.current = next;
       window.clearTimeout(cardTimer.current);
+      bus.setTour(next);
       setTour(next);
       setCard((c) => ({ ...c, on: false }));
       wake();
     },
-    [wake],
+    [bus, wake],
   );
 
+  // The bus is told every time, including re-choosing the view you are already
+  // on: a pager button that does nothing after you have orbited away is the
+  // wrong answer, and React's state equality would swallow `setPreset(same)`.
   const choosePreset = useCallback(
     (index: number) => {
       closeTour(false); // choosing a view is taking the wheel: the tour ends
+      bus.setPreset(index);
       setPreset(index);
-      setPresetNonce((n) => n + 1);
       wake();
     },
-    [wake, closeTour],
+    [bus, wake, closeTour],
   );
 
   // ← / → cycle, and the wipe runs the way the arrow points
   const stepLoop = useCallback(
     (step: number) => {
       const count = LOOP.variants.length;
-      bus.setLoopSweep(step);
-      setLoopIndex((current) => (current + step + count) % count);
+      const next = (loopRef.current + step + count) % count;
+      loopRef.current = next;
+      bus.setLoop(LOOP.variants[next], step);
+      setLoopIndex(next);
       wake();
     },
     [bus, wake],
@@ -147,7 +159,8 @@ export default function App({ copy }: { copy: WallCopy }) {
   // a swatch: the wipe runs toward it, the way the palette row reads
   const chooseLoop = useCallback(
     (index: number, sweep: number) => {
-      bus.setLoopSweep(sweep);
+      loopRef.current = index;
+      bus.setLoop(LOOP.variants[index], sweep);
       setLoopIndex(index);
       wake();
     },
@@ -350,10 +363,6 @@ export default function App({ copy }: { copy: WallCopy }) {
     <div ref={stageRef} className="wall-stage" role="region" aria-label={copy.aria} tabIndex={-1}>
       {webgl && (
         <WallCanvas
-          variant={variant}
-          preset={preset}
-          presetNonce={presetNonce}
-          tour={tour}
           reduced={reduced}
           software={software}
           tier={tier}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { CameraControls, CameraControlsImpl } from "@react-three/drei";
 import * as THREE from "three";
@@ -218,32 +218,28 @@ function flyTo(
  *
  * The rig also places the tour's entry label: a DOM button that stands at a
  * point in the room, projected every frame and written through the bus.
+ *
+ * The chrome's commands — a view, a station, the tour closing — arrive
+ * through the bus too, each with a sequence number, and are applied at the
+ * top of the frame at priority −2: before drei's `controls.update` (−1), so
+ * the pose lands in the same frame it was asked for, on the demand loop too.
+ * Nothing here is a prop that a tour step would re-render.
  */
-export function CameraRig({
-  preset,
-  presetNonce,
-  tour,
-  reduced,
-  bus,
-}: {
-  preset: number;
-  presetNonce: number;
-  /** the tour station in view, or null when the tour is closed */
-  tour: number | null;
-  reduced: boolean;
-  bus: WallBus;
-}) {
+export function CameraRig({ reduced, bus }: { reduced: boolean; bus: WallBus }) {
   const invalidate = useThree((state) => state.invalidate);
   const ref = useRef<CameraControlsImpl | null>(null);
-  // read inside the framing effects, never a dependency of them: an OS "reduce
-  // motion" flip must not yank a visitor back to the pose they orbited away from
-  const reducedRef = useRef(reduced);
   const idle = useRef(0);
   const drifting = useRef(false);
   const driftT = useRef(0);
   const driftAz = useRef(0);
   const driftPolar = useRef(0);
   const seenWake = useRef(0);
+  // The last command of each kind applied. Zero, not the bus's current count:
+  // `attach` frames PRESETS[0] itself, and a view or the tour asked for in the
+  // beat between App mounting and this rig mounting is then applied on the
+  // first frame instead of being taken as already seen.
+  const seenPreset = useRef(0);
+  const seenTour = useRef(0);
   const flight = useRef<Flight | null>(null);
 
   // The instance is configured and framed the moment it exists, so the first
@@ -255,43 +251,6 @@ export function CameraRig({
     applyPreset(c, PRESETS[0], false);
   }, []);
 
-  useEffect(() => {
-    reducedRef.current = reduced;
-  }, [reduced]);
-
-  // Keyed on the nonce as well as the index, so choosing the view you are
-  // already on re-frames the room. `invalidate` is what makes that land on the
-  // demand frameloop, where no frame runs on its own. The mount is skipped on
-  // the nonce itself rather than a "first run" flag: StrictMode runs the
-  // effect twice at mount, and a flag consumed by the first run let the
-  // second one fly the camera to the pose it was already standing on.
-  useEffect(() => {
-    if (presetNonce === 0) return; // `attach` already framed PRESETS[0]
-    const c = ref.current;
-    if (!c) return;
-    idle.current = 0;
-    drifting.current = false;
-    flight.current = null; // a preset chosen mid-flight takes over
-    applyPreset(c, PRESETS[preset], !reducedRef.current);
-    invalidate();
-  }, [preset, presetNonce, invalidate]);
-
-  // The tour: a station flies the camera there; closing it hands the wheel
-  // and the finger back to the controls and leaves the camera where it is.
-  useEffect(() => {
-    const c = ref.current;
-    if (!c) return;
-    setTouring(c, tour !== null);
-    if (tour === null) {
-      flight.current = null;
-      return;
-    }
-    idle.current = 0;
-    drifting.current = false;
-    if (!flyTo(c, tour, TOUR.stations[tour], !reducedRef.current, flight)) bus.settle(tour);
-    invalidate();
-  }, [tour, invalidate, bus]);
-
   const wake = useCallback(() => bus.wake(), [bus]);
 
   useFrame((state, delta) => {
@@ -299,7 +258,32 @@ export function CameraRig({
     if (!c) return;
     bus.setDistance(c.distance);
     const dt = Math.min(delta, 0.1);
-    const touring = tour !== null;
+
+    // A view was chosen — also the one already showing, which re-frames the
+    // room. `reduced` is read here, never as a dependency: an OS "reduce
+    // motion" flip must not yank a visitor back to a pose they orbited from.
+    if (bus.presetSeq() !== seenPreset.current) {
+      seenPreset.current = bus.presetSeq();
+      idle.current = 0;
+      drifting.current = false;
+      flight.current = null; // a preset chosen mid-flight takes over
+      applyPreset(c, PRESETS[bus.preset()], !reduced);
+    }
+    // The tour: a station flies the camera there; closing it hands the wheel
+    // and the finger back to the controls and leaves the camera where it is.
+    if (bus.tourSeq() !== seenTour.current) {
+      seenTour.current = bus.tourSeq();
+      const station = bus.tour();
+      setTouring(c, station !== null);
+      if (station === null) {
+        flight.current = null;
+      } else {
+        idle.current = 0;
+        drifting.current = false;
+        if (!flyTo(c, station, TOUR.stations[station], !reduced, flight)) bus.settle(station);
+      }
+    }
+    const touring = bus.tour() !== null;
 
     // a flight to a station: the rig's own tween, written to the controls
     // without a transition so their damping adds no lag on top of the curve
@@ -391,7 +375,7 @@ export function CameraRig({
     // no transition: the sine is already the smoothing, and the damping would
     // only add a lag that makes the two periods beat against each other
     void c.rotateTo(az, polar, false);
-  });
+  }, -2);
 
   return <CameraControls ref={attach} makeDefault onControlStart={wake} onControl={wake} />;
 }

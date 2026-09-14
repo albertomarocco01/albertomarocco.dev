@@ -11,7 +11,6 @@ import {
   TOUR,
   WALL,
   WALL_CENTRE_Y,
-  type LoopVariant,
   type Tier,
 } from "../wall.config";
 import { CameraRig } from "./CameraRig";
@@ -26,9 +25,13 @@ import type { WallBus } from "./wall-bus";
  * one metre, so every number here is the number a client would be quoted.
  *
  * Order of work in a frame:
- *   −1  the loop is advanced and drawn into its render target (throttled to 30 Hz);
- *       a switch's front moves, the wall's material and the two lights follow;
- *       the tour's staging (a pulse of the lamps, the service light) is applied
+ *   −2  the camera rig applies the chrome's commands (a view, a station, the
+ *       tour closing), the flight, the walk, the drift; a landing is `settle`d
+ *   −1  drei's controls move the camera; a palette chosen in the chrome lands
+ *       in the loop source, the loop is advanced and drawn into its render
+ *       target (throttled to 30 Hz); a switch's front moves, the wall's
+ *       material and the two lights follow; the tour's staging (a pulse of the
+ *       lamps, the service light) is applied
  *    0  drei's reflector re-renders the room from under the floor
  *    1  the composer renders the room and adds the bloom
  */
@@ -44,20 +47,11 @@ function driveBackLight(light: THREE.Light, want: number, still: boolean, dt: nu
   light.intensity = still ? want : THREE.MathUtils.damp(light.intensity, want, TOUR.backLight.lambda, dt);
 }
 export function WallScene({
-  variant,
-  preset,
-  presetNonce,
-  tour,
   reduced,
   software,
   tier,
   bus,
 }: {
-  variant: LoopVariant;
-  preset: number;
-  presetNonce: number;
-  /** the tour station in view, or null — two stations stage something here */
-  tour: number | null;
   reduced: boolean;
   software: boolean;
   /** picked once at mount: the mirror's size, the bloom's depth, the service light's kind */
@@ -74,7 +68,9 @@ export function WallScene({
   // frame that was on the wall while the front crosses it (see loop-source.ts)
   const fbo = useFBO(LOOP.fboWidth, LOOP.fboHeight, TARGET);
   const held = useFBO(LOOP.fboWidth, LOOP.fboHeight, TARGET);
-  const [loop] = useState(() => new LoopSource([fbo, held], variant));
+  const [loop] = useState(() => new LoopSource([fbo, held], bus.loop()));
+  /** the last palette command applied — the constructor took the current one */
+  const seenLoop = useRef(bus.loopSeq());
   const [material] = useState(() => new LedWallMaterial(loop.texture, loop.snapshot));
   const [light] = useState(() => initRoomLight());
   const [backLight] = useState(() => initBackLight(tier.backLight));
@@ -116,11 +112,6 @@ export function WallScene({
     return () => canvas.removeEventListener("webglcontextrestored", onRestore);
   }, [gl, loop, invalidate]);
 
-  useEffect(() => {
-    loop.setVariant(variant, still, bus.loopSweep());
-    invalidate(); // when nothing is running, the change needs a frame of its own
-  }, [loop, variant, still, invalidate, bus]);
-
   // The pitch station: once the camera has landed at 0.9 m, the lamps
   // dissolve into a flat surface and resolve again — one beat, to show what
   // the pitch is. "Landed" is the rig's own `settle`, the same signal the card
@@ -134,21 +125,26 @@ export function WallScene({
       if (station === TOUR.pulseStation) pulseAt.current = 0;
     });
   }, [bus, still]);
-  // leaving the station — a step, a view, a close — puts the lamps back
-  useEffect(() => {
-    if (tour === TOUR.pulseStation) return;
-    pulseAt.current = -1;
-    material.setContrast(LED.contrast);
-  }, [tour, material]);
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.1);
+    // a palette chosen in the chrome lands here, in the frame it was asked for
+    if (bus.loopSeq() !== seenLoop.current) {
+      seenLoop.current = bus.loopSeq();
+      loop.setVariant(bus.loop(), still, bus.loopSweep());
+    }
     loop.update(state.gl, dt, still);
     material.setLoop(loop.texture, loop.snapshot, loop.wipe, loop.wipeDirection);
     const hot = loop.hot;
     light.color.copy(hot);
     backLight.color.copy(hot);
 
+    const tour = bus.tour();
+    // leaving the pitch station — a step, a view, a close — puts the lamps back
+    if (pulseAt.current >= 0 && tour !== TOUR.pulseStation) {
+      pulseAt.current = -1;
+      material.setContrast(LED.contrast);
+    }
     if (pulseAt.current >= 0) {
       pulseAt.current += dt;
       const t = pulseAt.current / TOUR.pulse.seconds;
@@ -232,7 +228,7 @@ export function WallScene({
         <primitive object={material} attach="material" />
       </mesh>
 
-      <CameraRig preset={preset} presetNonce={presetNonce} tour={tour} reduced={still} bus={bus} />
+      <CameraRig reduced={still} bus={bus} />
     </>
   );
 }

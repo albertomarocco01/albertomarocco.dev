@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { Canvas, type Frameloop, type RootState } from "@react-three/fiber";
 import type { WebGLRenderer } from "three";
 import { Bloom, EffectComposer, SMAA } from "@react-three/postprocessing";
-import { BLOOM, CAMERA, PRESETS, SOFTWARE, type LoopVariant, type Tier } from "../wall.config";
+import { BLOOM, CAMERA, PRESETS, SOFTWARE, type Tier } from "../wall.config";
 import { isSoftwareRenderer } from "@/lib/webgl-caps";
 import { WallScene } from "./WallScene";
 import type { WallBus } from "./wall-bus";
@@ -37,12 +37,13 @@ const CAMERA_PROPS = {
  * The frameloop is owned by App (visibility + reduced motion + the software
  * path): R3F re-applies the prop on every Canvas render, so it cannot be set
  * from inside the scene.
+ *
+ * Memoised, and the room's state — the view, the tour station, the palette —
+ * comes through the bus rather than as props: App re-renders on every tour
+ * step, card fade and first touch, and none of that should reach <Canvas>.
+ * What is left as props changes the tree or the renderer itself.
  */
-export function WallCanvas({
-  variant,
-  preset,
-  presetNonce,
-  tour,
+export const WallCanvas = memo(function WallCanvas({
   reduced,
   software,
   tier,
@@ -51,10 +52,6 @@ export function WallCanvas({
   onSoftware,
   onContextLost,
 }: {
-  variant: LoopVariant;
-  preset: number;
-  presetNonce: number;
-  tour: number | null;
   reduced: boolean;
   software: boolean;
   /** picked once at mount (App): DPR, mirror size, bloom depth, SMAA, the service light */
@@ -103,16 +100,7 @@ export function WallCanvas({
       gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }}
       onCreated={onCreated}
     >
-      <WallScene
-        variant={variant}
-        preset={preset}
-        presetNonce={presetNonce}
-        tour={tour}
-        reduced={reduced}
-        software={software}
-        tier={tier}
-        bus={bus}
-      />
+      <WallScene reduced={reduced} software={software} tier={tier} bus={bus} />
       {/* disabled, not unmounted: with `enabled` false the composer drops to
           render priority 0 and R3F's own render takes over, which is the whole
           saving on a CPU rasteriser */}
@@ -128,4 +116,4 @@ export function WallCanvas({
       </EffectComposer>
     </Canvas>
   );
-}
+});

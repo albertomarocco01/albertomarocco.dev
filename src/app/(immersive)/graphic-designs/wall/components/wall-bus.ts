@@ -1,11 +1,16 @@
-import { HUD, TOUR } from "../wall.config";
+import { HUD, LOOP, TOUR, type LoopVariant } from "../wall.config";
 
 /**
  * What crosses between the chrome and the room without a React render: the
  * live distance (the scene writes it straight into the HUD's span, throttled
  * and dead-banded), the "someone is here" stamp, the keyboard walk (which
- * keys are held, read by the camera rig every frame), and the tour's entry
- * label — a DOM button the camera rig places over its point in the room.
+ * keys are held, read by the camera rig every frame), the tour's entry
+ * label — a DOM button the camera rig places over its point in the room —
+ * and the chrome's commands: the view chosen, the tour station in view, the
+ * loop's palette. Those used to be props of the canvas, and every tour step
+ * re-rendered <Canvas> and the whole scene; now App sets them here and the
+ * rig and the scene pick them up in the next frame, keyed on a sequence
+ * number so choosing the view you are already on still re-frames the room.
  *
  * The same shape as the sibling demos' buses: one mutable object, mutated only
  * through its own methods, so nothing crosses a hook or a prop as a raw field.
@@ -20,7 +25,15 @@ export class WallBus {
   private wakeFrame: (() => void) | null = null;
   /** the held walk keys, as directions: orbit −1 | 0 | 1, dolly −1 | 0 | 1 */
   private readonly walking = { orbit: 0, dolly: 0 };
-  /** which way the next loop switch wipes: +1 left → right, −1 right → left */
+  /** the view chosen, and how many times one was — so re-choosing the current one counts */
+  private presetIndex = 0;
+  private presetsIssued = 0;
+  /** the tour station in view, or null when the tour is closed; its own count */
+  private tourStation: number | null = null;
+  private toursIssued = 0;
+  /** the loop's palette, its count, and which way the switch wipes: +1 left → right, −1 right → left */
+  private loopName: LoopVariant = LOOP.variants[0];
+  private loopsIssued = 0;
   private sweep = 1;
   /** "the camera has landed on station n": App's card and the scene's staging both listen */
   private readonly settleFns = new Set<(station: number) => void>();
@@ -32,9 +45,54 @@ export class WallBus {
   /** on a phone the label is docked by the CSS rather than placed from the room */
   private labelDocked = false;
 
-  /** App sets this just before it changes the loop; the scene reads it when the change lands. */
-  setLoopSweep(direction: number): void {
-    this.sweep = direction;
+  // ── commands. Each setter buys a frame on the demand loop: a stamp alone
+  //    changes nothing there until a frame runs. ──
+
+  /** A view was chosen (the pager, keys 1–4) — also when it is the current one. */
+  setPreset(index: number): void {
+    this.presetIndex = index;
+    this.presetsIssued++;
+    this.wakeFrame?.();
+  }
+
+  preset(): number {
+    return this.presetIndex;
+  }
+
+  /** A sequence number: the rig applies a command when it moves, whatever the index. */
+  presetSeq(): number {
+    return this.presetsIssued;
+  }
+
+  /** The tour: a station to fly to, or null to close it. */
+  setTour(station: number | null): void {
+    this.tourStation = station;
+    this.toursIssued++;
+    this.wakeFrame?.();
+  }
+
+  tour(): number | null {
+    return this.tourStation;
+  }
+
+  tourSeq(): number {
+    return this.toursIssued;
+  }
+
+  /** A palette, and the direction the wipe should run to reach it. */
+  setLoop(variant: LoopVariant, sweep: number): void {
+    this.loopName = variant;
+    this.sweep = sweep;
+    this.loopsIssued++;
+    this.wakeFrame?.();
+  }
+
+  loop(): LoopVariant {
+    return this.loopName;
+  }
+
+  loopSeq(): number {
+    return this.loopsIssued;
   }
 
   loopSweep(): number {
