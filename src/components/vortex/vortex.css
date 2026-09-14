@@ -163,17 +163,26 @@
   color: var(--ink);
   border-color: var(--ink-dim);
 }
-/* Keyboard focus gets the site's amber ring (I15); on touch the padding grows
-   so the two controls reach a 44 px target (I14). */
+/* Keyboard focus gets the site's amber ring (I15). On touch the two controls
+   take a 44 px tap through an invisible ::before centred on the pill (I14) —
+   the same idiom as .hands-exit, .darkroom-exit and .wall-exit, so the five
+   exits behave the same on phones and the visible pill never changes shape.
+   Both are position: fixed, so the pseudo-element is placed against them. */
 .vortex-exit:focus-visible,
 .vortex-back:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 3px;
 }
 @media (pointer: coarse) {
-  .vortex-exit,
-  .vortex-back {
-    padding: 0.85rem 1rem;
+  .vortex-exit::before,
+  .vortex-back::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: -6px;
+    right: -6px;
+    height: 44px;
+    transform: translateY(-50%);
   }
 }
 /* No-WebGL / context-lost message over the stage: the site's mono register, the
