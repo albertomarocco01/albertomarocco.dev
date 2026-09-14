@@ -82,7 +82,9 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
   / llvmpipe / WARP — i.e. headless Chrome / Lighthouse / no GPU), a fullscreen
   shader every frame is a long main-thread task, so the field paints a **single
   static frame** instead of looping (`WEBGL_debug_renderer_info` detection). Real
-  GPUs animate — their per-frame main-thread cost is sub-millisecond.
+  GPUs animate — their per-frame main-thread cost is sub-millisecond. Round 3
+  (S10) extended the guard to the home's name melt, which had been keeping the
+  demand loop alive under it — "Round 3 — B".
 - **DPR capped at 1.5** for the whole canvas (was 2). The continuous ambient
   field paints fullscreen; the soft noise reads identically at 1.5, and the
   gen-row aura is unaffected perceptually.
@@ -97,7 +99,9 @@ engineering calls. Paired with `reference/albertomarocco-build-spec.md` and
   (timing-fragile, often dim) frame, under `prefers-reduced-motion` the field
   never mounts and gen rows show their designed static amber plate. This honors
   no-motion *and* reduced-data (zero GPU work) and is deterministic — a "still",
-  which the spec accepts in place of a single static shader frame.
+  which the spec accepts in place of a single static shader frame. Round 3 (S1)
+  widened that gate: the field also stays off under save-data and on low-end
+  devices — `useFieldAllowed()`, "Round 3 — B".
 - **Aspect from the live DOM box.** drei's per-`View` size is captured at mount
   (when the reveal is collapsed), so the shader's `u_res` aspect is read from the
   reveal element each frame instead. `u_res` feeds only the aspect ratio.
@@ -723,6 +727,66 @@ ones above.
   `pointerType === "touch"` is ignored and both marks fade out on a
   `pointerout` with no `relatedTarget` (`.is-out`), so the dot never jumps
   under a finger on a touch laptop and never stands at the window edge.
+
+### B — site pages, home / about / work, canvas
+
+- **Ambient field gate (S1, `b5f9389`).** The shared WebGL field and everything
+  that rides it — the name melt, the /about cut-outs, the gen-row auras —
+  mount only when `useFieldAllowed()` (`components/canvas/field-gate.ts`)
+  holds: past first paint + an idle slot (`fieldReady`), not under
+  `prefers-reduced-motion`, and not on a device where the field cannot be
+  enjoyed — `navigator.connection.saveData`, or `navigator.deviceMemory <= 2`
+  (Chromium-only, reported in powers of two; Safari and Firefox never expose
+  it and are therefore not gated on it), or `navigator.hardwareConcurrency <=
+  2`. Where the field is skipped the designed statics stay — the DOM h1 is the
+  name, the `<img>` the figure, the amber `::before` plate the gen row — so
+  nothing is missing, only quieter. One gate shared by all four consumers
+  means none can mount a drei `<View>` onto a canvas that was never allowed to
+  exist. Thresholds live in `LOW_END` (`field-gate.ts`); verified with
+  `deviceMemory` forced to 1: no canvas, no melt, zero draw calls, no three
+  chunk on `/`, `/xperiments`, `/about`.
+- **Software renderer: one static frame, everywhere (S10, `39124f1`).**
+  `fieldState.staticOnly` is published from `Field.onCreated` when
+  `isSoftwareRenderer()` matches, alongside `lost`. `NameMeltView` refuses to
+  open the melt (no texture handover, no 20 fps idle floor) while it is set,
+  so the DOM h1 stays the name and no view keeps the demand loop alive: 0
+  draw calls/s at rest on the home under the guard. The "single static frame"
+  claim under *Rendering architecture* was true only for the field itself;
+  the melt had been defeating it.
+- **/websites preview box (S8, `f1d6b18`).** The 16:10 site captures
+  (2400 × 1500) stay under `object-fit: cover` rather than being cropped to
+  the desktop 3.5:1 box: `--reveal-h` is `clamp(220px, 36vh, 400px)` against
+  a ~92vw width, so the same box is ~1.2:1 on a phone — no single crop of the
+  source serves both. `sizes` follows the real content column:
+  `(max-width: 1280px) 90vw, 1152px` (100vw minus the wrap gutters up to the
+  1280 px wrap). Both previews load eagerly (collapsed rows in the first
+  viewport); no `fetchPriority` — the page's LCP is the lede. For future
+  audits: with a `w`-descriptor srcset, `img.naturalWidth` is
+  density-corrected (resource width ÷ (w / sizes)) — the audit's "1120 × 700
+  source" and "358 px served" were that artefact, not the files.
+- **/about keyboard model (B17, `121f479`).** A gesture that turns the page —
+  a key, a wheel notch, a swipe — also moves focus onto the arriving panel's
+  root (`<section tabIndex={-1}>`, `outline: none`, never a visible control),
+  so the next Tab continues inside that panel instead of landing on the
+  previous panel's next link and dragging the track back through the focusin
+  hatch. Focus-driven moves (Tab into a panel, the pager buttons, the
+  `#contact` CTA) never steal focus. Space on a control is left to the control
+  (`isControl`, `scroll-intent.ts`); arrows still page from a link. The pager
+  buttons carry a word before their index (`about.pagerItem`, "section 01" /
+  "sezione 01", I11).
+- **Home drivers and the document (B26, I18, I19; `7b1153f`, `77e9a15`,
+  `7738b9f`).** HomeSequence and AboutSequence hand `history.scrollRestoration`
+  back to the value they found, not a hard-coded `"auto"`. A run of the home
+  driver that follows an 860 px mode flip (`FLOW_MQ`) with the page already
+  composed hands the viewport over in flow mode without re-lock,
+  `scrollTo(0,0)` or the slide to the footer — a resize must move nothing;
+  into desktop mode the re-lock stands (one fixed viewport). Keys whose
+  target is a link, button or form control are the control's and never scrub
+  the sequence. Wheel/touch normalisation (`wheelDeltaPx`, `singleTouchY`),
+  the control guard and the touch-only predicate (`isTouchOnly`, `(hover:
+  none)`) live once in `lib/scroll-intent.ts` (three-free); AboutSequence no
+  longer re-reads the reduced-motion media query, since AppProvider's flag is
+  synchronous (A, above).
 
 ### C — copy, SEO, config, docs, covers
 
