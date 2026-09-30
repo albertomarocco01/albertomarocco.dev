@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Third-party wasm glue (mediapipe) + other static assets — not our source.
     "public/**",
+    // Agent worktrees (local copies of the repo) — not our source.
+    ".kilo/**",
     // Delivery vehicle for the Tarassaco experiment — already ported into
     // src/app/(immersive)/graphic-designs/tarassaco. Kept as an archive, not built.
     "src/Merge Designs/**",

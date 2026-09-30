@@ -73,11 +73,15 @@ public/
 ## Develop
 
 ```bash
+npm ci           # first time: install exact locked deps
 npm run dev      # dev server
 npm run build    # production build (also typechecks)
 npm run lint     # eslint
 npm start        # serve the production build
 ```
+
+On macOS, double-click `start.command` to install (if needed), start the dev
+server and open http://localhost:3000.
 
 ## Before launch
 
