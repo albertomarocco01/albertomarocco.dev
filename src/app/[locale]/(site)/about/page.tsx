@@ -152,7 +152,7 @@ export default async function About() {
               <AboutFigure
                 image={calisthenics}
                 alt={discipline.figureAlt}
-                bottom={0.3}
+                bottom={0.12}
               />
               <PanelCopy text={discipline} as="h2" id="about-discipline">
                 <div className="about-coaching rv" style={stagger(4)}>

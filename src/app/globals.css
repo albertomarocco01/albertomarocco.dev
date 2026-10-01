@@ -1699,6 +1699,12 @@ footer.foot a,
   max-width: 100%;
   aspect-ratio: var(--ar);
 }
+/* The graduation cut-out is a narrow standing figure: pinned to the column's
+   far edge it left a dead gap between it and the copy. Centred in its column
+   it answers the copy instead. */
+.about-panel:first-child .about-figure {
+  justify-self: center;
+}
 .about-panel--mirror .about-figure {
   justify-self: start;
 }

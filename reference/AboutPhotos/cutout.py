@@ -1,17 +1,24 @@
 """
 Cut the person out of the two /about reference photos and emit the web assets.
 
-    python reference/AboutPhotos/cutout.py [--model isnet-general-use] [--preview DIR]
+    python reference/AboutPhotos/cutout.py [--preview DIR] [--only NAME]
 
-Reads  Laurea.JPEG and Calisthenics.jpg from this folder, runs rembg
-(background removal, ONNX — first run downloads the model, ~170MB), trims the
-result to the silhouette's bounding box (with a little air around it), scales
-it to MAX_H tall and writes lossy WebP-with-alpha into src/assets/about/, which
-is what both the DOM <img> and the WebGL figure texture load (see
-src/components/about/AboutFigure.tsx). `--preview` also drops full-res PNGs
-somewhere for eyeballing the matte.
+Reads Laurea.JPEG and Calisthenics.jpg from this folder, runs rembg
+(background removal, ONNX — first run downloads the models: BiRefNet ~970MB,
+ISNet ~180MB), trims the result to the silhouette's bounding box (with a
+little air around it), scales it to MAX_H tall and writes lossy
+WebP-with-alpha into src/assets/about/, which is what both the DOM <img> and
+the WebGL figure texture load (see src/components/about/AboutFigure.tsx).
+`--preview` also drops full-res PNGs somewhere for eyeballing the matte.
 
-Deps (not part of the site): pip install rembg onnxruntime pillow
+BiRefNet is the matte: clean hair, no halo, no confetti, and it keeps the
+shoes on the calisthenics shot. It drops the hands there, though (they are
+inside the parallette's bracket), so that one window is taken from ISNet.
+
+Runs on the CPU provider: onnxruntime's CoreML provider stalls on BiRefNet
+on Apple silicon (the process sits idle at 0% forever).
+
+Deps (not part of the site): pip install rembg onnxruntime pillow scipy
 """
 
 from __future__ import annotations
@@ -21,7 +28,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 from rembg import new_session, remove
 from scipy import ndimage
 
@@ -31,30 +38,23 @@ OUT = HERE.parents[1] / "src" / "assets" / "about"
 # Output height in px. The figure is drawn at most ~85vh tall on a desktop at
 # DPR 1.5 (~1400px); 1800 keeps it crisp there while staying a few hundred KB.
 MAX_H = 1800
+# Working height: the sources are cut at this size (the Nikon frame is 5816
+# tall; the models infer at 1024 anyway). The hand-authored windows in
+# `clean_calisthenics` are in this space.
+WORK_H = 3000
 # Air around the silhouette, as a fraction of the bbox height, so the fade at
 # the feet and the blur of the orbs have room and nothing is shaved.
 PAD = 0.03
-WEBP_QUALITY = 82
+WEBP_QUALITY = 84
+
+MODEL = "birefnet-general"
+HANDS_MODEL = "isnet-general-use"
+PROVIDERS = ["CPUExecutionProvider"]
 
 SOURCES = {
     "laurea": "Laurea.JPEG",
     "calisthenics": "Calisthenics.jpg",
 }
-
-
-def largest_component(rgba: np.ndarray) -> np.ndarray:
-    """Keep only the biggest connected blob of the matte — the person. Drops
-    the stray fence post the model kept beside the graduation shot and any
-    speckle."""
-    a = rgba[..., 3]
-    lab, n = ndimage.label(a > 8, structure=np.ones((3, 3)))
-    if n <= 1:
-        return rgba
-    areas = ndimage.sum(np.ones_like(a), lab, index=range(1, n + 1))
-    keep = int(np.argmax(areas)) + 1
-    rgba = rgba.copy()
-    rgba[..., 3] = np.where(lab == keep, a, 0)
-    return rgba
 
 
 def rgb_to_hsv(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -73,97 +73,105 @@ def rgb_to_hsv(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return h * 60, s, v
 
 
-def clean_calisthenics(rgba: np.ndarray) -> np.ndarray:
-    """The general model keeps the rig the parallettes bolt to (the black post
-    under the white bracket, the red strap) and the plate behind the knee. Erase
-    them by hand: geometry for the post/strap, colour for the plate (dark olive
-    against sunlit skin). Coordinates were authored on the first-pass 730×1800
-    preview of this exact photo and scale with the crop, so they only hold for
-    Calisthenics.jpg — this is a one-off asset step, not a general tool."""
-    h, w = rgba.shape[:2]
-    fx, fy = w / 730, h / 1800
+def largest_component(a: np.ndarray) -> np.ndarray:
+    """Keep only the biggest connected blob of the matte — the person. Drops
+    stray confetti, the strap ends and any speckle."""
+    lab, n = ndimage.label(a > 8, structure=np.ones((3, 3)))
+    if n <= 1:
+        return a
+    areas = ndimage.sum(np.ones_like(a), lab, index=range(1, n + 1))
+    keep = int(np.argmax(areas)) + 1
+    return np.where(lab == keep, a, 0)
+
+
+def clean_laurea(rgb: np.ndarray, a: np.ndarray) -> np.ndarray:
+    """Confetti on the pavement touch the shoes, so they survive the
+    largest-blob pass: drop anything bright and strongly coloured around the
+    shoes. The navy hem and the blue glints on the leather are dark, so they
+    stay."""
+    h = a.shape[0]
+    y = np.arange(h)[:, None]
+    hue, sat, val = rgb_to_hsv(rgb)
+    bbox_bottom = np.nonzero((a > 8).any(1))[0].max()
+    shoes = y >= bbox_bottom - 0.09 * h
+    return np.where(shoes & (sat > 0.4) & (val > 0.5), 0, a)
+
+
+def clean_calisthenics(rgb: np.ndarray, a: np.ndarray, hands: np.ndarray) -> np.ndarray:
+    """Coordinates are authored on this photo at WORK_H and scale with it, so
+    they only hold for Calisthenics.jpg — a one-off asset step, not a tool."""
+    h, w = a.shape
+    f = h / WORK_H
     x = np.arange(w)[None, :]
     y = np.arange(h)[:, None]
-    rgba = rgba.copy()
-    a = rgba[..., 3]
-    # 1. the post under the bracket (and the strap loop on it), plus the strip
-    #    of post showing beside the bracket's left edge
-    a[(y >= 792 * fy) & (x < 477 * fx)] = 0
-    a[(y >= 695 * fy) & (y < 792 * fy) & (x < 390 * fx)] = 0
-    # 2. what is left of the red strap beside the bracket. Nothing else in that
-    #    window is saturated — the bracket is grey, the post black — so any
-    #    warm, saturated pixel there is strap (shadowed maroon included).
-    hue, sat, val = rgb_to_hsv(rgba[..., :3].astype(np.float32) / 255)
+    hue, sat, val = rgb_to_hsv(rgb)
+    a = a.astype(np.float32)
+
+    def win(x0, x1, y0, y1):
+        return (x >= x0 * f) & (x < x1 * f) & (y >= y0 * f) & (y < y1 * f)
+
+    # 1. The hands, inside the parallette's white bracket: BiRefNet drops
+    #    that block, ISNet keeps it (without the post under it — that starts
+    #    below this window). Left of the bracket's face only the fingers
+    #    belong (not the bolt, the post's edge); the red strap hanging off it
+    #    goes wherever it is.
     red = ((hue < 30) | (hue > 320)) & (sat > 0.28)
-    a[red & (y >= 690 * fy) & (y < 900 * fy) & (x < 480 * fx)] = 0
-    # 3. the plate behind the knee, to the right of the thigh's lit rim. Keep
-    #    only lit, warm skin there: everything else (the plate's dark olive
-    #    body, its lit rim, the mixed fringe) goes.
-    skin = (hue > 6) & (hue < 36) & (sat > 0.3) & (val > 0.3)
-    knee = (y >= 790 * fy) & (y < 990 * fy) & (x >= 548 * fx) & (x < 690 * fx)
-    a[~skin & knee] = 0
-    # The colour cut leaves a ragged edge and a few specks along the knee:
-    # open the matte there (drops the specks, smooths the cut) and feather it.
-    r = max(1, round(2 * fy))
+    grip = win(940, 1045, 1570, 1812)
+    a = np.where(grip & ~red, np.maximum(a, hands), a)
+    finger = (hue > 4) & (hue < 34) & (sat > 0.35)
+    a = np.where(win(900, 955, 1600, 1830) & ~finger, 0, a)
+    a = np.where(win(850, 1000, 1690, 2000) & red, 0, a)
+    # 2. The plate behind the knee. Skin there, lit or in shadow, is warm and
+    #    strongly saturated (hue < 34, sat > .45); the plate is olive-bronze,
+    #    duller (hue 40–55, sat < .55). Keep only skin, then open + feather
+    #    the colour cut so the calf's edge is smooth.
+    skin = (hue > 4) & (hue < 34) & (sat > 0.45)
+    knee = win(1040, 1250, 1845, 2095)
+    a = np.where(knee & ~skin, 0, a)
+    r = max(1, round(3 * f))
     opened = ndimage.binary_opening(a > 8, structure=np.ones((2 * r + 1, 2 * r + 1)))
-    a = np.where(knee & ~opened, 0, a).astype(np.float32)
-    soft = ndimage.gaussian_filter(a, sigma=1.2 * fy)
-    a = np.where(knee, soft, a)
-    # Small enclosed holes the colour test punched in the skin (a mole, a
-    # shadow) get filled; anything large is real negative space and stays.
-    solid = a > 8
-    filled = ndimage.binary_fill_holes(solid)
-    holes, n = ndimage.label(filled & ~solid)
-    if n:
-        sizes = ndimage.sum(np.ones_like(a), holes, index=range(1, n + 1))
-        small = np.isin(holes, [i + 1 for i, s in enumerate(sizes) if s < 900 * fx * fy])
-        a = np.where(small, 255, a)
-    rgba[..., 3] = np.clip(a, 0, 255).astype(np.uint8)
-    return rgba
+    a = np.where(knee & ~opened, 0, a)
+    a = np.where(knee, ndimage.gaussian_filter(a, sigma=1.2 * f), a)
+    # 3. The dip bar the toes rest against: a lit strip past the right toe.
+    a = np.where(win(1325, 99999, 2280, 2400), 0, a)
+    a = np.where(win(1292, 1325, 2280, 2357), 0, a)
+    return np.clip(a, 0, 255)
 
 
-def cutout(src: Path, session, *, preview: Path | None, name: str) -> Path:
-    img = Image.open(src)
+def cutout(src: Path, sessions, *, preview: Path | None, name: str) -> Path:
     # Honour the EXIF orientation before anything else (the iPhone shot is
     # stored rotated); rembg works on the pixels it is handed.
-    from PIL import ImageOps
-
-    img = ImageOps.exif_transpose(img).convert("RGB")
+    img = ImageOps.exif_transpose(Image.open(src)).convert("RGB")
     print(f"{name}: source {img.size[0]}x{img.size[1]}", file=sys.stderr)
+    if img.height > WORK_H:
+        img = img.resize((round(img.width * WORK_H / img.height), WORK_H), Image.LANCZOS)
 
-    out = remove(
-        img,
-        session=session,
-        # Trimap-based matting refines hair/leaf edges but needs pymatting and
-        # is slow at this size; the plain matte is clean enough on these.
-        alpha_matting=False,
-        post_process_mask=True,
-    ).convert("RGBA")
+    def matte(model: str) -> np.ndarray:
+        out = remove(img, session=sessions[model], post_process_mask=False)
+        return np.array(out.convert("RGBA"))[..., 3].astype(np.float32)
 
-    def crop_to_matte(img: Image.Image) -> Image.Image:
-        bbox = img.getchannel("A").getbbox()
-        if not bbox:
-            raise SystemExit(f"{name}: no foreground found")
-        l, t, r, b = bbox
-        pad = int((b - t) * PAD)
-        l, t = max(0, l - pad), max(0, t - pad)
-        r, b = min(img.width, r + pad), min(img.height, b + pad)
-        return img.crop((l, t, r, b))
-
-    out = crop_to_matte(out)
-    print(f"{name}: raw bbox {out.size[0]}x{out.size[1]}", file=sys.stderr)
-
-    # Clean the matte at full resolution, then crop again to what survived.
-    arr = np.array(out)
+    rgb = np.array(img)
+    a = matte(MODEL)
+    hsv_in = rgb.astype(np.float32) / 255
     if name == "calisthenics":
-        arr = clean_calisthenics(arr)
-    arr = largest_component(arr)
-    out = crop_to_matte(Image.fromarray(arr, "RGBA"))
-    print(f"{name}: clean bbox {out.size[0]}x{out.size[1]}", file=sys.stderr)
+        a = clean_calisthenics(hsv_in, a, matte(HANDS_MODEL))
+    elif name == "laurea":
+        a = clean_laurea(hsv_in, a)
+    a = largest_component(a)
+
+    # The colour comes from the source itself, never from rembg's output
+    # (which blacks out whatever its own matte dropped — the hands window).
+    out = Image.fromarray(np.dstack([rgb, np.clip(a, 0, 255).astype(np.uint8)]))
+    bbox = out.getchannel("A").getbbox()
+    if not bbox:
+        raise SystemExit(f"{name}: no foreground found")
+    l, t, r, b = bbox
+    pad = int((b - t) * PAD)
+    out = out.crop((max(0, l - pad), max(0, t - pad), min(out.width, r + pad), min(out.height, b + pad)))
+    print(f"{name}: bbox {out.size[0]}x{out.size[1]}", file=sys.stderr)
 
     if out.height > MAX_H:
-        w = round(out.width * MAX_H / out.height)
-        out = out.resize((w, MAX_H), Image.LANCZOS)
+        out = out.resize((round(out.width * MAX_H / out.height), MAX_H), Image.LANCZOS)
 
     OUT.mkdir(parents=True, exist_ok=True)
     dst = OUT / f"{name}.webp"
@@ -186,16 +194,15 @@ def cutout(src: Path, session, *, preview: Path | None, name: str) -> Path:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default="isnet-general-use")
     ap.add_argument("--preview", type=Path, default=None)
     ap.add_argument("--only", choices=list(SOURCES), default=None)
     args = ap.parse_args()
 
-    session = new_session(args.model)
-    for name, file in SOURCES.items():
-        if args.only and name != args.only:
-            continue
-        cutout(HERE / file, session, preview=args.preview, name=name)
+    names = [n for n in SOURCES if not args.only or n == args.only]
+    models = {MODEL} | ({HANDS_MODEL} if "calisthenics" in names else set())
+    sessions = {m: new_session(m, providers=PROVIDERS) for m in models}
+    for name in names:
+        cutout(HERE / SOURCES[name], sessions, preview=args.preview, name=name)
 
 
 if __name__ == "__main__":
