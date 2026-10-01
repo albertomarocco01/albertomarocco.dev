@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
+import { hasVeilPlayed } from "@/lib/veil";
 
 // Silence THREE.Clock deprecation warnings coming from React Three Fiber (R3F v9).
 // Scoped to an effect with a restore, not applied at module scope: patching on
@@ -81,12 +82,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => window.clearTimeout(id);
   }, []);
 
-  // The hero paints with zero 3D. Only after first paint + an idle slot do we
-  // let the WebGL field (and the gen-row aura chunks) mount — keeps 3D off the
-  // LCP path. Intentionally NOT gated on `entered`: the ambient white field
-  // readies as soon as the browser is idle.
+  // The hero paints with zero 3D: the WebGL field (and the gen-row aura
+  // chunks) only mount after hydration, so 3D is never on the LCP path.
+  // Intentionally NOT gated on `entered`.
+  //
+  // When the full loading veil is about to play, mount right away rather than
+  // on idle: the opaque veil is the one moment three's evaluation and the
+  // shader compile can run unseen, and the Loader parks its bar until the
+  // field's first frame (field-boot.ts). Waiting for idle instead pushed them
+  // under the reveal — a stutter as the veil lifted and, on a slow network,
+  // the field popping in after its own entrance. Under reduced motion there
+  // is no veil, and on a remount (back from a demo) it has already played:
+  // there the idle slot still decides.
   useEffect(() => {
     if (fieldReady) return;
+    if (!reducedMotion && !hasVeilPlayed()) {
+      // The next frame — hydration has committed, nothing else to wait for.
+      const id = requestAnimationFrame(() => setFieldReady(true));
+      return () => cancelAnimationFrame(id);
+    }
     const ric = window.requestIdleCallback as
       | typeof window.requestIdleCallback
       | undefined;
@@ -96,7 +110,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     const id = window.setTimeout(() => setFieldReady(true), 200);
     return () => window.clearTimeout(id);
-  }, [fieldReady]);
+  }, [fieldReady, reducedMotion]);
 
   const value = useMemo<AppState>(
     () => ({ entered, enter, reducedMotion, fieldReady }),

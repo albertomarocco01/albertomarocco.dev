@@ -6,6 +6,8 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { useApp } from "@/components/providers/AppProvider";
 import { registerGsap, FIELD_EASE } from "@/lib/motion";
+import { hasVeilPlayed, markVeilPlayed } from "@/lib/veil";
+import { fieldBooting, onFieldBoot } from "@/components/canvas/field-boot";
 
 // Crossfade (s) of the veil out onto the live field once the bar fills.
 const FADE = 0.5;
@@ -20,35 +22,24 @@ const NAV_OUT = 0.28;
 // A CSS-only `veil-out` in globals.css backs even this up, for the case where
 // no JS runs at all.
 const SAFETY_MS = 2000;
-// How long (ms) a full fill may wait for the page before the veil lifts anyway.
+// How long (ms) a full fill may wait for the page (and, on a first load, for
+// the field's first frame) before the veil lifts anyway.
 // Counted from the moment the fill parks, not from mount: (site)/loading.tsx's
 // fallback is the only thing it can be waiting on, and a page that has not
 // streamed in by then is better shown as it arrives than kept behind a veil.
 // Sized so the whole beat stays under the 4 s CSS fail-safe.
 const VEIL_HOLD_MS = 2400;
+// The field is waited for only until this point of the page load (ms since
+// navigation start, `performance.now()`): past it the bar resumes without it,
+// so the scripted reveal still lands before the CSS `veil-out` fail-safe (4 s)
+// would hide the veil on its own. A connection that slow gets the old
+// behaviour — the field blooms in after the reveal — rather than a veil that
+// vanishes under a page still locked as loading.
+const FIELD_WAIT_UNTIL_MS = 3500;
 // Once a fill resumes from a hold, how far (ms) the safety dismissal is pushed
 // back so the scripted last segment + fade can finish instead of being snapped.
 const SAFETY_AFTER_HOLD_MS = 1500;
 
-/**
- * Has the veil already played in this *page load*? Module-scoped, deliberately
- * not sessionStorage: the module is re-evaluated on every load, so a refresh
- * always pays the full deliberate opening, while a client-side navigation that
- * remounts this layout (returning from an immersive route) keeps the flag and
- * gets the fast dissolve instead of re-paying the beat. Set inside reveal(),
- * i.e. only once the veil has actually run — StrictMode's mount → cleanup →
- * remount kills the first timeline long before it gets there, so dev still
- * sees the real thing.
- */
-let veilPlayed = false;
-
-/**
- * Has the veil already run in this page load? For chrome that pays its own
- * opening beat once per load and not on every remount (Shell's topbar entrance).
- */
-export function hasVeilPlayed(): boolean {
-  return veilPlayed;
-}
 
 /**
  * The veil has finished dissolving. Park it — and retire the CSS `veil-out`
@@ -84,47 +75,71 @@ function pageReady(): boolean {
 }
 
 /**
- * A pause in `tl` that lasts until the page is in the DOM, or `maxMs`. Placed
- * with `.add(hold.start)`: when the playhead gets there and the page is already
- * in — the common case — nothing happens and the beat is unchanged; otherwise
- * the timeline pauses and a MutationObserver on `#main` plays it on the moment
- * the fallback goes. `onChange` reports the hold so the safety dismissal can
- * stand aside while it runs; `cancel` is for a navigation that interrupts the
- * sweep (or a StrictMode re-run) — it reports the hold over without playing.
+ * A pause in `tl` that lasts until the page is in the DOM — and, with
+ * `waitField`, until the WebGL field has drawn its first frame (field-boot.ts;
+ * no later than FIELD_WAIT_UNTIL_MS) — or `maxMs`. Placed with
+ * `.add(hold.start)`: when the playhead gets there and both are already in,
+ * nothing happens and the beat is unchanged; otherwise the timeline pauses, and
+ * a MutationObserver on `#main` plus the field's own signal play it on the
+ * moment the last one lands. `onChange` reports the hold so the safety
+ * dismissal can stand aside while it runs; `cancel` is for a navigation that
+ * interrupts the sweep (or a StrictMode re-run) — it reports the hold over
+ * without playing.
  */
 function holdForPage(
   tl: gsap.core.Timeline,
   maxMs: number,
   onChange: (holding: boolean) => void,
+  waitField = false,
 ) {
+  let holding = false;
   let observer: MutationObserver | null = null;
+  let unsubscribe: (() => void) | null = null;
   let timer = 0;
+  let deadline = 0;
+  const fieldPending = () =>
+    waitField && fieldBooting() && performance.now() < FIELD_WAIT_UNTIL_MS;
+  const ready = () => pageReady() && !fieldPending();
   const cancel = () => {
-    const wasHolding = observer !== null;
     observer?.disconnect();
     observer = null;
+    unsubscribe?.();
+    unsubscribe = null;
     window.clearTimeout(timer);
-    if (wasHolding) onChange(false);
+    window.clearTimeout(deadline);
+    if (holding) {
+      holding = false;
+      onChange(false);
+    }
   };
   const resume = () => {
-    if (!observer) return;
+    if (!holding) return;
     cancel();
     tl.play();
   };
+  const check = () => {
+    if (ready()) resume();
+  };
   const start = () => {
     const main = document.getElementById("main");
-    if (!main || pageReady()) return;
+    if (!main || ready()) return;
     tl.pause();
+    holding = true;
     onChange(true);
-    observer = new MutationObserver(() => {
-      if (pageReady()) resume();
-    });
+    observer = new MutationObserver(check);
     observer.observe(main, {
       childList: true,
       subtree: true,
       attributes: true,
       attributeFilter: ["aria-busy"],
     });
+    if (waitField) {
+      unsubscribe = onFieldBoot(check);
+      deadline = window.setTimeout(
+        check,
+        Math.max(0, FIELD_WAIT_UNTIL_MS - performance.now()),
+      );
+    }
     timer = window.setTimeout(resume, maxMs);
   };
   return { start, cancel };
@@ -187,7 +202,7 @@ export function Loader({ tag }: { tag: string }) {
   const reveal = useCallback(() => {
     if (doneRef.current) return;
     doneRef.current = true;
-    veilPlayed = true;
+    markVeilPlayed();
     document.documentElement.classList.remove("loading");
     enter();
   }, [enter]);
@@ -205,9 +220,9 @@ export function Loader({ tag }: { tag: string }) {
       // *within* that load — returning from an immersive route remounts this
       // layout — skips to a fast dissolve, so the beat isn't re-paid on
       // navigation. A refresh always gets the whole opening back (see
-      // `veilPlayed`).
+      // lib/veil.ts).
       holdRef.current?.cancel();
-      if (veilPlayed) {
+      if (hasVeilPlayed()) {
         reveal();
         // Even the fast dissolve waits for the page: back from a demo the
         // (site) route may still be streaming behind its fallback.
@@ -233,7 +248,9 @@ export function Loader({ tag }: { tag: string }) {
       paint();
 
       const tl = gsap.timeline({ onUpdate: paint });
-      const hold = holdForPage(tl, VEIL_HOLD_MS, onHold);
+      // The full veil also waits for the field: this is the one moment it can
+      // boot unseen (see field-boot.ts and AppProvider's early mount).
+      const hold = holdForPage(tl, VEIL_HOLD_MS, onHold, true);
       holdRef.current = hold;
       tl
         // Quick off the line, then two deliberate hesitations before settling —
@@ -244,10 +261,11 @@ export function Loader({ tag }: { tag: string }) {
         .to(prog, { v: 34, duration: 0.18, ease: "power2.out" })
         .to(prog, { v: 58, duration: 0.18, ease: "power1.inOut" }, "+=0.06")
         .to(prog, { v: 82, duration: 0.16, ease: "power1.inOut" }, "+=0.05")
-        // The page has to be in the DOM before the bar completes: on a slow
-        // connection this is where the fill parks (see `holdForPage`), and the
-        // last segment plays as the page lands. Nothing happens when it is
-        // already there, which on a normal load it is.
+        // The page — and the field's first frame — have to be in before the
+        // bar completes: on a slow connection this is where the fill parks
+        // (see `holdForPage`), with the bar still, so three's evaluation and
+        // the shader compile stall nothing on screen; the last segment plays
+        // as they land. Nothing happens when both are already there.
         .add(hold.start)
         .to(prog, { v: 100, duration: 0.18, ease: FIELD_EASE }, "+=0.04")
         // Fill is full: reveal the home now, so the topbar fade + field bloom
@@ -291,7 +309,7 @@ export function Loader({ tag }: { tag: string }) {
     if (prev === null || prev === pathname) return;
     // The first load's own timeline still owns the veil until it has revealed
     // the page; only after that does a sweep make sense.
-    if (!veilPlayed) return;
+    if (!hasVeilPlayed()) return;
 
     const root = rootRef.current;
     const fill = fillRef.current;
@@ -344,7 +362,7 @@ export function Loader({ tag }: { tag: string }) {
   // runs: locking here would add `loading` *after* its only release, and the
   // safety timer would see `doneRef` set and leave it on for good.
   useEffect(() => {
-    if (reducedMotion || veilPlayed) return;
+    if (reducedMotion || hasVeilPlayed()) return;
     const root = document.documentElement;
     root.classList.add("loading");
     const dismiss = () => {

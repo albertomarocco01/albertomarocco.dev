@@ -8,7 +8,7 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { useApp } from "@/components/providers/AppProvider";
 import { LocaleToggle } from "@/components/chrome/LocaleToggle";
-import { hasVeilPlayed } from "@/components/chrome/Loader";
+import { hasVeilPlayed } from "@/lib/veil";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import {
   registerGsap,

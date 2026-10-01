@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Canvas, type RootState } from "@react-three/fiber";
+import { Canvas, useFrame, type RootState } from "@react-three/fiber";
 import { View, Preload } from "@react-three/drei";
 import { useApp } from "@/components/providers/AppProvider";
 import { AmbientField } from "./AmbientField";
 import { fieldState } from "./field-state";
+import { setFieldBoot } from "./field-boot";
 import { isSoftwareRenderer } from "@/lib/webgl-caps";
 
 // Software-renderer detection lives in @/lib/webgl-caps (shared with the
@@ -17,6 +18,29 @@ import { isSoftwareRenderer } from "@/lib/webgl-caps";
 // constant because it is handed to R3F twice: at configure, and again whenever
 // the display's ratio changes (see onCreated).
 const DPR_RANGE: [number, number] = [1, 1.5];
+
+/**
+ * Reports the field `ready` (field-boot.ts) once it has really drawn: the
+ * ambient Aura has published a frame (field-state's counter), so its program is
+ * compiled and the View has painted — or paints later in this same tick, its
+ * render running at a higher useFrame priority than this — and one rAF later
+ * that GPU/main-thread work is behind us. Until then it keeps the demand loop
+ * asking for frames, since the Aura's own first frame may land in a tick where
+ * this callback ran before it. A handful of frames at most, then silent.
+ */
+function BootSignal() {
+  const done = useRef(false);
+  useFrame(({ invalidate }) => {
+    if (done.current) return;
+    if (fieldState.frame === 0) {
+      invalidate();
+      return;
+    }
+    done.current = true;
+    requestAnimationFrame(() => setFieldBoot("ready"));
+  });
+  return null;
+}
 
 /**
  * The single persistent WebGL canvas for the whole app. Fixed, transparent, and
@@ -159,6 +183,7 @@ export function Field() {
       >
         <View.Port />
         <Preload all />
+        <BootSignal />
       </Canvas>
     </>
   );

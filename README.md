@@ -50,7 +50,8 @@ src/
                   (3-panel paged driver)
     canvas/       Field (the shared canvas) + FieldMount (lazy mount),
                   Aura / AmbientField / GenAura (drei Views), aura-material,
-                  field-glsl (orb count + shared GLSL), field-state, excite;
+                  field-glsl (orb count + shared GLSL), field-state, field-boot
+                  (the veil waits on it), excite;
                   NameMelt / NameMeltView + melt-material (the home name);
                   FigureView + figure-material (the /about cut-outs);
                   BubbleControls / BubblePanel + bubble-params (dev-only
@@ -64,7 +65,8 @@ src/
                   per-route metadata), motion, track-motion, dictionary (+ i18n
                   server side; locale + boundary-copy are the client-safe
                   slices the route fallbacks import), use-locale,
-                  use-reduced-motion, use-tab-visible, webgl-caps
+                  use-reduced-motion, use-tab-visible, veil (has the
+                  veil played), webgl-caps
   assets/         about/ cut-outs (regenerate: reference/AboutPhotos/cutout.py),
                   work/ previews (sources: reference/WorkPhotos/), covers/ demo
                   covers (imported → hashed URLs), fonts/ the OG image's TTF

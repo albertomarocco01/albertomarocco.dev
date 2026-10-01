@@ -1158,3 +1158,35 @@ ones above.
   `public/` payloads untouched by the proxy, the `/xperiments/<id>` 308s,
   and in headless Chromium the client navigation between every (site) page,
   a demo and back, the locale toggle, and 404 → home.
+
+## The field boots behind the veil (2026-10-01)
+
+- **Why.** The field mounted on `requestIdleCallback` (timeout 1.5 s), which
+  on a first visit landed three's evaluation (~1 MB) and the fullscreen
+  shader compile right under the veil's reveal. Measured on the production
+  build, headless Chromium on a real GPU, CPU throttled 4×, fresh browser per
+  run (no shader cache): on a 4 Mbps / 150 ms link the canvas went live
+  ~300 ms *after* the reveal, with an ~80 ms long task and a dropped frame in
+  the fade — the field popped in after its own entrance burst. Second visits
+  were smooth (code and shader caches warm), which is why it read as "slow at
+  first, fine after".
+- **How.** On a load that will play the full veil, AppProvider sets
+  `fieldReady` on the first frame after hydration instead of on idle.
+  FieldMount reports `pending` (`components/canvas/field-boot.ts`, a tiny
+  module so the Loader's chunk carries no GLSL), Field reports `ready` once
+  the ambient Aura has published a frame and one rAF has passed (its View
+  draws at a higher useFrame priority, so the program is compiled by then).
+  The Loader's first-load hold now waits for the page *and* the field, with
+  the bar parked at 82 — still, so the long tasks stall nothing visible.
+  The fast dissolve (back from a demo) and the navigation sweeps do not wait;
+  under reduced motion or on a low-end device nothing is pending.
+- **Bounded twice.** The usual `VEIL_HOLD_MS` from the hold point, and
+  `FIELD_WAIT_UNTIL_MS` = 3.5 s since navigation start, so the scripted
+  reveal still lands before the CSS `veil-out` fail-safe (4 s). On a
+  connection too slow for that (1.6 Mbps / 300 ms: field ready at ~4.9 s)
+  the veil lifts at ~3.7 s and the field blooms in after, as it did before.
+- **Measured after.** 4 Mbps: canvas live ~2.25 s, reveal ~2.5 s (was 2.06 s,
+  with the field arriving at 2.37 s), zero frames over 50 ms in the 2.5 s
+  after the reveal. 10 Mbps: unchanged (the field was already ready first).
+- The veil flag moved from Loader.tsx to `lib/veil.ts`: AppProvider reads it
+  and the Loader already imports from the providers.

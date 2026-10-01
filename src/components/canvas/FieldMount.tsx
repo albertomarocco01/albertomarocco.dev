@@ -1,8 +1,9 @@
 "use client";
 
-import { Component, type ReactNode } from "react";
+import { Component, useEffect, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { useFieldAllowed } from "./field-gate";
+import { setFieldBoot } from "./field-boot";
 
 // Client-only, code-split: three/r3f never enter the initial chunk.
 const Field = dynamic(() => import("./Field").then((m) => m.Field), {
@@ -22,6 +23,11 @@ class FieldBoundary extends Component<{ children: ReactNode }, { dead: boolean }
     return { dead: true };
   }
 
+  // Nothing is coming: release a veil that is parked waiting for the field.
+  componentDidCatch() {
+    setFieldBoot("none");
+  }
+
   render() {
     return this.state.dead ? null : this.props.children;
   }
@@ -34,7 +40,15 @@ class FieldBoundary extends Component<{ children: ReactNode }, { dead: boolean }
  * <View> either, and the gen rows keep their designed static amber plate.
  */
 export function FieldMount() {
-  if (!useFieldAllowed()) return null;
+  const allowed = useFieldAllowed();
+  // `pending` from the moment the chunk is requested until Field reports its
+  // first frame (field-boot.ts) — the full loading veil waits on it.
+  useEffect(() => {
+    if (!allowed) return;
+    setFieldBoot("pending");
+    return () => setFieldBoot("none");
+  }, [allowed]);
+  if (!allowed) return null;
   return (
     <FieldBoundary>
       <Field />
