@@ -1,39 +1,30 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import "./globals.css";
+import "../globals.css";
+import { FONT_VARIABLES } from "../fonts";
 
 import { getDictionary, getLocale, OG_LOCALE, type Locale } from "@/lib/i18n";
+import { LOCALES } from "@/lib/locale";
 import { CONTACT } from "@/lib/contact";
-import { SITE_NAME, SITE_URL } from "@/lib/seo";
-
-// Distinctive display serif — variable, with italic + optical size. Not Inter.
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-fraunces",
-  style: ["normal", "italic"],
-  axes: ["opsz"],
-});
-
-// A real mono, self-hosted, so the site's whole meta/nav/ticker/loader register
-// looks identical on every OS instead of degrading to Consolas/SF Mono/Android
-// mono. Variable weight axis — no `weight` needed.
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-mono",
-});
+import { OG_IMAGE, SITE_NAME, SITE_URL } from "@/lib/seo";
 
 // The bare title, once: the site's name is a brand token (seo.ts spells out
 // which spelling goes where) and "Creative Technologist" is the same in both
 // locales — the site's own Italian copy uses it verbatim.
 const TITLE = `${SITE_NAME} — Creative Technologist`;
 
+// Every page is prerendered once per locale: `[locale]` is the root segment,
+// filled in by src/proxy.ts from the `locale` cookie (the visitor's URL never
+// shows it). The proxy only ever writes a supported locale there, so a typed
+// `/it/about` arrives as `/it/it/about` and falls to the [...missing] 404.
+// No `dynamicParams = false`: it is inherited, and would throw that 404 above
+// this layout — Next's bare error shell instead of [locale]/not-found.
+export function generateStaticParams() {
+  return LOCALES.map((locale) => ({ locale }));
+}
+
 // `generateMetadata`, not a static `metadata` object: the description and
-// `og:locale` follow the `locale` cookie, so they have to be resolved per
-// request. The whole tree is already dynamic (the layout below awaits
-// `cookies()`), so this costs nothing extra. Child pages replace the title,
+// `og:locale` follow the locale, resolved per prerendered locale. Child pages replace the title,
 // description, canonical, Open Graph and Twitter blocks through `pageMetadata`
 // (seo.ts); what stays from here is the base URL, the title template, the
 // icons/manifest links Next adds from the file conventions, and the OG image.
@@ -71,11 +62,13 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: SITE_NAME,
       title: TITLE,
       description,
+      images: [OG_IMAGE],
     },
     twitter: {
       card: "summary_large_image",
       title: TITLE,
       description,
+      images: [OG_IMAGE],
     },
     robots: { index: true, follow: true },
   };
@@ -110,15 +103,16 @@ const personLd = (locale: Locale) => ({
   sameAs: [CONTACT.instagram],
 });
 
-// Root layout holds only the document shell (html/body), fonts, metadata and
-// analytics. The site chrome (cursor, loader, Lenis, WebGL field, topbar) lives
-// in (site)/layout.tsx so immersive route groups can opt out of it entirely.
+// Root layout (under `[locale]`, see above) holds only the document shell
+// (html/body), fonts, metadata and analytics. The site chrome (cursor, loader,
+// Lenis, WebGL field, topbar) lives in (site)/layout.tsx so immersive route
+// groups can opt out of it entirely.
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const locale = await getLocale();
   return (
-    <html lang={locale} className={`${fraunces.variable} ${jetbrainsMono.variable}`}>
+    <html lang={locale} className={FONT_VARIABLES}>
       <body>
         <script
           type="application/ld+json"

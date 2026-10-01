@@ -20,8 +20,8 @@ import handsCover from "@/assets/covers/hands.webp";
 import wallCover from "@/assets/covers/wall.webp";
 
 // `generateMetadata` rather than a static object: the title and description come
-// from the active dictionary, so they have to be resolved per request. The route
-// is already dynamic (the root layout awaits `cookies()`).
+// from the active dictionary, so they are resolved per locale (the route is
+// prerendered once for each — see app/[locale]/layout.tsx).
 export async function generateMetadata(): Promise<Metadata> {
   const { gd } = getDictionary(await getLocale());
   return pageMetadata({

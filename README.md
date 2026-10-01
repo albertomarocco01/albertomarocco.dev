@@ -24,13 +24,17 @@ canonical look/timing/shader.
 
 ```
 src/
-  app/            root layout (document shell, fonts, metadata, JSON-LD),
-                  globals.css, not-found, sitemap / robots / icon /
-                  apple-icon / manifest / opengraph-image
-  app/(site)/     layout (providers + chrome: loader, cursor, Lenis, field,
+  proxy.ts        reads the `locale` cookie, rewrites /about → /it/about
+                  (the URL never shows it) so every page is prerendered
+  app/            globals.css, fonts, global-not-found (the 404), sitemap /
+                  robots / icon / apple-icon / manifest / opengraph-image
+  app/[locale]/   root layout (document shell, fonts, metadata, JSON-LD),
+                  prerendered once per locale; everything below lives here
+  app/[locale]/(site)/
+                  layout (providers + chrome: loader, cursor, Lenis, field,
                   topbar), home, about, websites, xperiments, graphic-designs
                   (the demo index)
-  app/(immersive)/graphic-designs/
+  app/[locale]/(immersive)/graphic-designs/
                   the five Merge demos, each at /graphic-designs/<id> — vortex,
                   tarassaco, darkroom (Camera Oscura), hands (Mani), wall
                   (Parete); /xperiments/<id> 308s to them. One folder each:

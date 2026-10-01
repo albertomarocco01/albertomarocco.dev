@@ -1,4 +1,4 @@
-// Site identity + per-route head metadata. Server-only (reads the locale cookie
+// Site identity + per-route head metadata. Server-only (reads the locale
 // through ./i18n).
 //
 // Brand spelling, one rule: "Alberto Marocco.dev" is the site's *name* (titles,
@@ -13,8 +13,9 @@ export const SITE_NAME = "Alberto Marocco.dev";
 
 // app/opengraph-image.tsx, by URL. A page that sets `openGraph` loses the file
 // image the root segment would otherwise lend it (measured: no og:image at all),
-// so the card is named again explicitly.
-const OG_IMAGE = {
+// so the card is named again explicitly — by the root layout too, which since
+// moving under `[locale]` is no longer in the segment that owns the file.
+export const OG_IMAGE = {
   url: "/opengraph-image",
   width: 1200,
   height: 630,

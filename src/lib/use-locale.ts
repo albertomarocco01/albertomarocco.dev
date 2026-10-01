@@ -9,9 +9,10 @@ const noopSubscribe = () => () => {};
 const serverSnapshot = (): Locale => DEFAULT_LOCALE;
 
 /**
- * `<html lang>`, which the root layout has already rendered from the `locale`
- * cookie. Reading the resolved attribute rather than re-parsing the cookie means
- * the client can never disagree with what the server decided.
+ * `<html lang>`, which the root layout has already rendered from the locale
+ * (the `locale` cookie, via src/proxy.ts). Reading the resolved attribute
+ * rather than re-parsing the cookie means the client can never disagree with
+ * what the server decided.
  */
 const clientSnapshot = (): Locale => {
   const lang = document.documentElement.lang;

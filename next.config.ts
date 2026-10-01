@@ -13,6 +13,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  // The 404 for unmatched URLs is app/global-not-found.tsx: the root layout
+  // lives under the dynamic `[locale]` segment (see src/proxy.ts), so there is
+  // no layout above an unmatched path for a plain `not-found` to render in.
+  experimental: {
+    globalNotFound: true,
+  },
   async headers() {
     return [
       // No Permissions-Policy header. Tarassaco (camera + microphone) and Mani

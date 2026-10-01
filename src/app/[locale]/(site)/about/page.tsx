@@ -12,8 +12,8 @@ import laurea from "@/assets/about/laurea.webp";
 import calisthenics from "@/assets/about/calisthenics.webp";
 
 // `generateMetadata` rather than a static object: the title and description come
-// from the active dictionary, so they have to be resolved per request. The route
-// is already dynamic (the root layout awaits `cookies()`). `pageMetadata` also
+// from the active dictionary, so they are resolved per locale (the route is
+// prerendered once for each — see app/[locale]/layout.tsx). `pageMetadata` also
 // writes the Open Graph / Twitter card, so a shared link previews this page and
 // not the home (a page's `openGraph` replaces the layout's, it is not merged).
 export async function generateMetadata(): Promise<Metadata> {

@@ -6,6 +6,8 @@
 
 export type Locale = "en" | "it";
 export const DEFAULT_LOCALE: Locale = "it";
+/** Every supported locale — one prerendered copy of the site each. */
+export const LOCALES: readonly Locale[] = ["it", "en"];
 
 /** Open Graph `og:locale` value per locale. */
 export const OG_LOCALE: Record<Locale, string> = {

@@ -1118,3 +1118,43 @@ ones above.
   wall's description says palettes (the control changes the palette of the
   one loop, Liminal Field) and is 155 / 159 characters; the index card
   (`gd.demos.wall.desc`) says the same since `aa1c574`.
+
+## Static pages, one copy per locale (2026-09-30)
+
+- **Why.** `getLocale()` read the `locale` cookie in the root layout, which
+  made every route dynamic (`ƒ` in the build): no CDN copy of any page, a
+  serverless render on every visit and every client navigation, and a cold
+  start on the first visit after a quiet spell — the "slow at first, fine
+  after" first impression on Vercel. The navigation veil also parks on the
+  full bar until the page has streamed (`holdForPage`), so that server time
+  was on screen.
+- **How.** The tree moved under a hidden `[locale]` root segment
+  (`app/[locale]/layout.tsx`, `generateStaticParams` → `it`, `en`), and
+  `src/proxy.ts` rewrites every page request by the cookie: `/about` →
+  `/it/about`. The URL the visitor sees is unchanged, the cookie is still
+  the choice (so the `hreflang` limit above still holds), and every page is
+  now `●` SSG. `getLocale()` keeps its signature and reads the segment
+  through `next/root-params` (16.3), so no page or component changed.
+  The proxy's matcher skips `_next/`, `_vercel/`, the `public/` payloads,
+  the root metadata routes and anything with an extension.
+- **The 404 is `app/global-not-found.tsx`** (`experimental.globalNotFound`).
+  With the root layout under a dynamic segment and every path prefixed,
+  there is no layout above an unmatched URL; a `[...missing]` catch-all
+  throwing `notFound()` reached the browser as Next's empty `__next_error__`
+  shell, painted only after hydration. The global one is its own document
+  (fonts from `app/fonts.ts`, `globals.css`, analytics) and reads the cookie
+  itself, so it is right in both languages from the first byte. A typed
+  `/it/about` arrives as `/it/it/about` and is a 404 too — no second URL for
+  the same page. Leaving the 404 for the site is a full load (another root
+  layout); acceptable for a page nobody should be on.
+- **No `dynamicParams = false`** on the `[locale]` layout: it is inherited
+  and turns an unknown path into a 404 thrown above the root layout, the
+  same empty shell. The proxy only ever writes a supported locale anyway.
+- **`og:image` on the home is named explicitly** (`OG_IMAGE` from seo.ts),
+  as the child pages already did: the root layout is no longer in the
+  segment that owns `app/opengraph-image.tsx`.
+- Verified on the production build: all routes 200 in both locales with the
+  right `lang` / title, 404s with `noindex` in both, metadata routes and
+  `public/` payloads untouched by the proxy, the `/xperiments/<id>` 308s,
+  and in headless Chromium the client navigation between every (site) page,
+  a demo and back, the locale toggle, and 404 → home.

@@ -1,12 +1,12 @@
-// Hand-rolled EN/IT localization. No i18n library, no [lang] routing, no
-// middleware: the active locale is read from a `locale` cookie on the server
-// (defaulting to Italian, the site's primary language) and the matching
-// dictionary is threaded to components as a prop. Proper nouns and tech/brand
+// Hand-rolled EN/IT localization. No i18n library and no locale in the URL:
+// the active locale is a `locale` cookie (defaulting to Italian, the site's
+// primary language), which src/proxy.ts turns into the hidden `[locale]` root
+// segment, and the matching dictionary is threaded to components as a prop. Proper nouns and tech/brand
 // tokens (names, "webgl", "touchdesigner", "led", years, the email, the domain,
 // "P.IVA") stay untranslated on purpose.
 //
-// This module is deliberately free of `next/headers`. `getLocale()`, which
-// reads the cookie and is server-only, lives in ./i18n.ts — which re-exports
+// This module is deliberately free of `next/root-params`. `getLocale()`, which
+// reads the `[locale]` segment and is server-only, lives in ./i18n.ts — which re-exports
 // everything here, so `@/lib/i18n` stays the single import for server code.
 // The locale primitives (./locale.ts) and the few strings the client-only
 // route fallbacks need (./boundary-copy.ts) are split out and re-exported: an
