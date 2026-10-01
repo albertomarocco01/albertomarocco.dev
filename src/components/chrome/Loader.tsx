@@ -14,9 +14,12 @@ const FADE = 0.5;
 // The navigation sweep (s): veil up, one uninterrupted fill, veil down. Short on
 // purpose — the deliberate first-load beat is a front door, not a toll to pay on
 // every click — but never skipped, so the veil reads as the site's one transition.
-const NAV_IN = 0.12;
-const NAV_FILL = 0.42;
-const NAV_OUT = 0.28;
+// Since every page is prerendered and prefetched, the route is almost always in
+// by the time the bar fills, so the sweep is the whole cost of a click: ~0.44s
+// (was ~0.7s, 2026-10-01). A route still streaming parks it at the full bar.
+const NAV_IN = 0.1;
+const NAV_FILL = 0.24;
+const NAV_OUT = 0.2;
 // Hard ceiling (ms) — dismiss the veil even if GSAP never runs (chunk failure,
 // CustomEase missing, etc.). Comfortably past the full fill + fade (~1.35s).
 // A CSS-only `veil-out` in globals.css backs even this up, for the case where

@@ -43,15 +43,16 @@ export interface WorkSection {
 export const WORK_SECTIONS: WorkSection[] = [
   {
     id: "websites",
+    // Rule: websites are listed in alphabetical order by title, and `index`
+    // follows that order — a new site goes where its name falls, the rest renumber.
     items: [
       {
-        id: "vini-montarello",
+        id: "baldisport",
         index: "01",
-        title: "Vini Montarello",
+        title: "Baldisport",
         type: "web",
-        href: "https://vinimontarello.it",
+        href: "https://baldisport.com",
         external: true,
-        image: viniMontarello,
       },
       {
         id: "toretto-blend",
@@ -61,6 +62,15 @@ export const WORK_SECTIONS: WorkSection[] = [
         href: "https://www.torettoblend.com",
         external: true,
         image: torettoBlend,
+      },
+      {
+        id: "vini-montarello",
+        index: "03",
+        title: "Vini Montarello",
+        type: "web",
+        href: "https://vinimontarello.it",
+        external: true,
+        image: viniMontarello,
       },
     ],
   },

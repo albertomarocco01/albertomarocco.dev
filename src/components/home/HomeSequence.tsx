@@ -102,10 +102,11 @@ const SPAN_VH = 0.72;
 const TOUCH_MULT = 0.9;
 const KEY_STEP = 0.12; // ArrowDown / ArrowUp
 const KEY_PAGE = 0.3; // Space / PageDown / PageUp
-// Compose if the sequence never got going, ~1.6× the slowest honest path to
-// P_COMPOSED: the veil (~1.4s) plus two idle beats (0.9 + 1.2) and two
-// movements (0.8 + 2.6) is ~6.9s unattended, so this must sit well clear of
-// it or it would cut the teasers in halfway through composing.
+// Compose if the sequence never got going. The honest path to P_COMPOSED is
+// the veil (~1.4s, up to ~3.7s on a slow link that waits for the field) plus
+// two idle beats (0.5 + 0.5) and two movements (0.6 + 1.4): ~4.4s unattended,
+// ~6.7s at worst, so this must sit well clear of it or it would cut the
+// teasers in halfway through composing.
 const HARD_MS = 11000;
 
 /** Movement boundaries on the shared accumulator. */
@@ -118,7 +119,7 @@ const P_COMPOSED = 2; // teasers fully composed — where the escape hatches lan
  *  direction; the 0.1 gap per tile keeps a jittery trackpad from fluttering
  *  the 0.9s transition, and the 0.2 spacing is what turns a flick into a
  *  stagger instead of a block reveal. The auto scrub crosses them at the same
- *  spacing, so the unattended show steps 01 → 02 → 03 too (~0.5s apart). */
+ *  spacing, so the unattended show steps 01 → 02 → 03 too (~0.3s apart). */
 const TEASER_IN = [1.5, 1.7, 1.9];
 const TEASER_OUT = [1.4, 1.6, 1.8];
 /** Once the page has composed, reverse input bottoms out here — just under the
@@ -145,14 +146,15 @@ const SLIDE_S = 1.1;
 
 /** What the clock scrubs towards, the idle beat it waits out first, and the
  *  scrub's own pace (seconds to cover the movement) — all indexed like GATES.
- *  The opening is brisk: a short beat once the title is landing, then the lede
- *  sweeps in well under a second and the teasers follow on a tightened beat at
- *  their original stride, so the 01 → 02 → 03 stagger stays legible. The
- *  curtain waits longest: composing the page is the show, but drawing the
+ *  The opening is brisk: a short beat while the title is still landing, then
+ *  the lede sweeps in and the teasers follow half a second later, stepping
+ *  01 → 02 → 03 ~0.3s apart — the links are in reach ~4s after the page
+ *  opens, not ~7s (2026-10-01; the old pace was [900, 1200] / [0.8, 2.6]).
+ *  The curtain waits longest: composing the page is the show, but drawing the
  *  footer over it is an interruption, and rushing it would feel pushy. */
 const GATES = [P_LEDE, P_COMPOSED, P_MAX];
-const IDLE_MS = [900, 1200, 2600];
-const AUTO_S = [0.8, 2.6, 2.6];
+const IDLE_MS = [500, 500, 2600];
+const AUTO_S = [0.6, 1.4, 2.6];
 /** Index of the first gate above `v`, or -1 with nothing left to compose. */
 const gateAbove = (v: number) => GATES.findIndex((g) => v < g - 1e-3);
 

@@ -213,7 +213,7 @@ const en: Dictionary = {
   nav: {
     skip: "skip to content",
     websites: "websites",
-    graphic: "graphic designs",
+    graphic: "merge//designs",
     xperiments: "xperiments",
     about: "about",
     primary: "primary",
@@ -239,6 +239,12 @@ const en: Dictionary = {
   },
   work: {
     items: {
+      baldisport: {
+        meta: "web · 2026",
+        description:
+          "Sports association in Baldissero Torinese. The whole stack behind the site — membership management back office and online payment system included.",
+        cue: "visit site",
+      },
       "vini-montarello": {
         meta: "web · 2025",
         description:
@@ -276,7 +282,7 @@ const en: Dictionary = {
   about: {
     metaTitle: "About",
     metaDescription:
-      "Computer scientist by training, creative technologist by choice; calisthenics endurance athlete and coach in Turin — and every way to get in touch.",
+      "I'm Alberto Marocco: I build websites in Turin and play with real-time graphics. I also compete in calisthenics and coach. Here's how to reach me.",
     pagerAria: "Page sections",
     pagerItem: "section",
     scrollCue: "scroll",
@@ -284,12 +290,12 @@ const en: Dictionary = {
       path: {
         eyebrow: "01 — path",
         headline: {
-          pre: "Computer scientist by training, ",
-          em: "creative technologist",
-          post: " by choice.",
+          pre: "Hi, I'm ",
+          em: "Alberto",
+          post: ".",
         },
-        body: "Computer Science degree, University of Turin, 2025. I work where web engineering meets real-time graphics: full-stack sites built to a performance budget, interfaces that follow your hand, generative loops for LED walls and installations. This site is the first example — the light moving behind these lines is a shader of mine, and the browser draws it live.",
-        meta: "turin · full-stack · webgl · touchdesigner",
+        body: "I graduated in Computer Science in Turin in 2025. These days I build websites and spend a lot of time playing with real-time graphics: shaders, interfaces you move with your hands, visuals for LED walls. The light behind this text is something I made too, and it's a good example of what I enjoy doing.",
+        meta: "turin · websites · webgl · touchdesigner",
         figureAlt:
           "Alberto Marocco on graduation day — laurel wreath, thesis in hand",
         links: { websites: "the websites", xperiments: "the xperiments" },
@@ -297,27 +303,27 @@ const en: Dictionary = {
       discipline: {
         eyebrow: "02 — calisthenics",
         headline: {
-          pre: "Athlete first, ",
-          em: "then coach",
+          pre: "Then there's ",
+          em: "calisthenics",
           post: ".",
         },
-        body: "Away from the screen I do calisthenics and compete in endurance: max-rep sets and timed rounds, where what counts is pacing and a technique that holds to the last rep. I also coach a small group of athletes, in Turin and online — from the first clean pull-up to a competition prep.",
-        meta: "endurance · turin · athlete & coach",
+        body: "When I'm not at the computer, I train. I compete in calisthenics endurance, where you have to keep your pace and your technique right up to the last rep. I also coach a few people, in Turin and online.",
+        meta: "endurance · turin · athlete and coach",
         figureAlt:
-          "Alberto Marocco holding a planche on the parallettes at a calisthenics competition",
+          "Alberto Marocco on the dip bars during a calisthenics competition",
         coachingLabel: "coaching",
         coaching: [
           {
             term: "endurance",
-            detail: "Competition prep: pacing, rep density, managing fatigue.",
+            detail: "Getting ready for a competition: pacing, volume, handling fatigue.",
           },
           {
-            term: "foundations",
-            detail: "First pull-up, first dip: technique before volume.",
+            term: "basics",
+            detail: "Starting from zero: the first pull-up, the first dip.",
           },
           {
-            term: "programming",
-            detail: "Tailored plans, in person in Turin or online.",
+            term: "plans",
+            detail: "Training plans made for you, in person in Turin or online.",
           },
         ],
         cta: "get in touch",
@@ -325,11 +331,11 @@ const en: Dictionary = {
       contact: {
         eyebrow: "03 — contact",
         headline: {
-          pre: "Have a project in mind? ",
-          em: "Let's talk",
+          pre: "Got an idea? ",
+          em: "Drop me a line",
           post: ".",
         },
-        body: "Available for new projects — sites, installations, LED walls — in Turin and remotely, and for new athletes to coach. One line is enough.",
+        body: "Whether it's a website, an installation or you want to start training, you'll find me here. A couple of lines is plenty.",
         labels: {
           email: "email",
           phone: "phone",
@@ -337,7 +343,7 @@ const en: Dictionary = {
           where: "where",
         },
         where: "Turin, Italy",
-        note: "replies within a couple of days · it / en",
+        note: "I usually reply within a couple of days · it / en",
       },
     },
   },
@@ -414,8 +420,8 @@ const it: Dictionary = {
   },
   nav: {
     skip: "salta al contenuto",
-    websites: "siti",
-    graphic: "graphic designs",
+    websites: "siti web",
+    graphic: "merge//designs",
     xperiments: "xperiments",
     about: "chi sono",
     primary: "principale",
@@ -441,6 +447,12 @@ const it: Dictionary = {
   },
   work: {
     items: {
+      baldisport: {
+        meta: "web · 2026",
+        description:
+          "Associazione sportiva di Baldissero Torinese. Tutto quello che c'è dietro al sito — gestionale per iscrizioni e soci e sistema di pagamenti online inclusi.",
+        cue: "visita il sito",
+      },
       "vini-montarello": {
         meta: "web · 2025",
         description:
@@ -478,7 +490,7 @@ const it: Dictionary = {
   about: {
     metaTitle: "Chi sono",
     metaDescription:
-      "Informatico per formazione, creative technologist per scelta; atleta di calisthenics endurance e coach a Torino — e tutti i modi per scrivermi.",
+      "Sono Alberto Marocco: faccio siti web a Torino e sperimento con la grafica in tempo reale. Gareggio e alleno nella calisthenics. Qui trovi come contattarmi.",
     pagerAria: "Sezioni della pagina",
     pagerItem: "sezione",
     scrollCue: "scorri",
@@ -486,12 +498,12 @@ const it: Dictionary = {
       path: {
         eyebrow: "01 — percorso",
         headline: {
-          pre: "Informatico per formazione, ",
-          em: "creative technologist",
-          post: " per scelta.",
+          pre: "Ciao, sono ",
+          em: "Alberto",
+          post: ".",
         },
-        body: "Laurea in Informatica all'Università di Torino, 2025. Lavoro dove l'ingegneria web incontra la grafica in tempo reale: siti full-stack costruiti su un budget di performance, interfacce che seguono la mano, loop generativi per led wall e installazioni. Questo sito è il primo esempio — la luce che si muove dietro queste righe è un mio shader, e il browser lo disegna dal vivo.",
-        meta: "torino · full-stack · webgl · touchdesigner",
+        body: "Mi sono laureato in Informatica a Torino nel 2025. Oggi faccio siti web e passo parecchio tempo a sperimentare con la grafica in tempo reale: shader, interfacce che si muovono con le mani, visual per led wall. Anche la luce dietro a questo testo l'ho fatta io, ed è un buon esempio di quello che mi piace fare.",
+        meta: "torino · siti web · webgl · touchdesigner",
         figureAlt:
           "Alberto Marocco il giorno della laurea — corona d'alloro, tesi in mano",
         links: { websites: "i siti web", xperiments: "gli xperiments" },
@@ -499,27 +511,27 @@ const it: Dictionary = {
       discipline: {
         eyebrow: "02 — calisthenics",
         headline: {
-          pre: "Prima atleta, ",
-          em: "poi coach",
+          pre: "Poi c'è la ",
+          em: "calisthenics",
           post: ".",
         },
-        body: "Fuori dallo schermo faccio calisthenics e gareggio nell'endurance: serie massimali e round a tempo, dove contano il ritmo e una tecnica che regge fino all'ultima ripetizione. Alleno anche un piccolo gruppo di atleti, a Torino e online — dalla prima trazione pulita alla preparazione di una gara.",
-        meta: "endurance · torino · atleta & coach",
+        body: "Quando non sono al computer mi alleno. Gareggio nella calisthenics endurance, dove bisogna tenere il ritmo e la tecnica fino all'ultima ripetizione. Seguo anche qualche ragazzo, a Torino e online.",
+        meta: "endurance · torino · atleta e coach",
         figureAlt:
-          "Alberto Marocco in planche sulle parallele, durante una gara di calisthenics",
+          "Alberto Marocco sulle parallele durante una gara di calisthenics",
         coachingLabel: "coaching",
         coaching: [
           {
             term: "endurance",
-            detail: "Preparazione gare: ritmo, densità, gestione della fatica.",
+            detail: "Prepararsi a una gara: ritmo, volume, gestione della fatica.",
           },
           {
             term: "basi",
-            detail: "Prima trazione, primo dip: la tecnica prima del volume.",
+            detail: "Per chi parte da zero: la prima trazione, il primo dip.",
           },
           {
-            term: "programmazione",
-            detail: "Piani su misura, in presenza a Torino o online.",
+            term: "schede",
+            detail: "Allenamenti pensati per te, dal vivo a Torino o online.",
           },
         ],
         cta: "scrivimi",
@@ -527,11 +539,11 @@ const it: Dictionary = {
       contact: {
         eyebrow: "03 — contatti",
         headline: {
-          pre: "Hai un progetto in mente? ",
-          em: "Parliamone",
+          pre: "Hai un'idea? ",
+          em: "Scrivimi",
           post: ".",
         },
-        body: "Disponibile per nuovi progetti — siti, installazioni, led wall — a Torino e da remoto, e per nuovi atleti da allenare. Basta una riga.",
+        body: "Che sia un sito, un'installazione o vuoi iniziare ad allenarti, mi trovi qui. Bastano due righe.",
         labels: {
           email: "email",
           phone: "telefono",
@@ -539,7 +551,7 @@ const it: Dictionary = {
           where: "dove",
         },
         where: "Torino, Italia",
-        note: "rispondo entro un paio di giorni · it / en",
+        note: "di solito rispondo in un paio di giorni · it / en",
       },
     },
   },

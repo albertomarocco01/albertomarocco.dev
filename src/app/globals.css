@@ -630,7 +630,7 @@ footer.foot a,
   .hero .name .nw,
   .hero .lede .w {
     --from-op: 0;
-    --from-blur: 8px;
+    --from-blur: 5px;
     --from-y: 10px;
     opacity: var(--from-op);
     filter: blur(var(--from-blur));
@@ -648,16 +648,16 @@ footer.foot a,
   /* The name is the LCP element. An element at `opacity: 0` is skipped by the
      LCP algorithm entirely, which would push the metric from first paint out to
      the end of the reveal — so it starts *painted*, at a low-but-non-zero
-     opacity. Under blur(14px) that is imperceptible, and LCP still times the
+     opacity. Under blur(8px) that is imperceptible, and LCP still times the
      real first paint. Do not set this to 0. */
   .hero .name .nw {
     --from-op: 0.12;
-    --from-blur: 14px;
+    --from-blur: 8px;
     --from-y: 0.32em;
   }
 
   .hero .lede .w {
-    --from-blur: 6px;
+    --from-blur: 3px;
     --from-y: 8px;
   }
 
@@ -670,12 +670,23 @@ footer.foot a,
 
      The water drift runs alongside all of this untouched: it is a transform
      animation on *other* boxes (the word spans inside — see the water section
-     below), so the reveal's own animation never meets it. */
+     below), so the reveal's own animation never meets it.
+
+     Fill `backwards`, not `both`, with the revealed values as the rule's own:
+     the delay still holds the hidden `from` frame, and once the reveal ends the
+     words rest on `filter: none`. A forwards fill would freeze the interpolated
+     end — `blur(0px)`, still a filter, on the LCP name for the page's life. */
+  html.hero-in .hero .eyebrow,
+  html.hero-in .hero .name .nw {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
   html.hero-in .hero .eyebrow {
-    animation: hero-reveal 0.7s var(--ease) both;
+    animation: hero-reveal 0.7s var(--ease) backwards;
   }
   html.hero-in .hero .name .nw {
-    animation: hero-reveal 0.95s var(--ease) 0.12s both;
+    animation: hero-reveal 0.95s var(--ease) 0.12s backwards;
   }
   html.hero-in .hero .name .nw:nth-of-type(2) {
     /* "Marocco" trails "Alberto" by 240ms. */
@@ -699,7 +710,7 @@ footer.foot a,
   }
   html.hero-in .hero .lede .w.is-in {
     opacity: 1;
-    filter: blur(0);
+    filter: none;
     transform: none;
   }
 
@@ -715,7 +726,7 @@ footer.foot a,
   html.hero-done .hero .name .nw,
   html.hero-done .hero .lede .w {
     opacity: 1;
-    filter: blur(0);
+    filter: none;
     transform: none;
     /* Cancelling the fail-safe is the job here — its `both` fill would
        otherwise keep beating the values above. The water drift lives on
@@ -723,6 +734,13 @@ footer.foot a,
     animation: none;
   }
 }
+/* Every revealed state here (and the teasers', and /about's copy) settles on
+   `filter: none`, not `blur(0)`: a zero blur is still a filter, kept on each
+   word for the life of the page while the water drift moves the boxes inside
+   it, so the engine could re-run it every frame of an idle home. `none`
+   interpolates from a blur as a blur to 0, so the reveal looks the same. The
+   radii were also roughly halved (2026-10-01) — per-word blur is the heaviest
+   part of the opening on Safari and phones. */
 /* Same movement, two names on purpose — see the `hero-in` block above: swapping
    the animation *name* is what forces the reveal to replay from frame 0. The
    `from` values are per-element custom properties, so one pair of keyframes
@@ -735,7 +753,7 @@ footer.foot a,
   }
   to {
     opacity: 1;
-    filter: blur(0);
+    filter: none;
     transform: none;
   }
 }
@@ -747,7 +765,7 @@ footer.foot a,
   }
   to {
     opacity: 1;
-    filter: blur(0);
+    filter: none;
     transform: none;
   }
 }
@@ -888,7 +906,7 @@ footer.foot a,
   html.home-live .teaser {
     opacity: 0;
     pointer-events: none;
-    filter: blur(10px);
+    filter: blur(6px);
     transform: translateY(16px);
     transition:
       opacity 0.9s var(--ease),
@@ -901,7 +919,7 @@ footer.foot a,
   html.home-live .teaser.is-in {
     opacity: 1;
     pointer-events: auto;
-    filter: blur(0);
+    filter: none;
     transform: none;
   }
 }
@@ -1869,7 +1887,7 @@ html.about-live .about-figure {
 @media (prefers-reduced-motion: no-preference) {
   .about-panel .rv {
     opacity: 0;
-    filter: blur(8px);
+    filter: blur(5px);
     transform: translateY(14px);
     animation: about-failsafe 0.6s var(--ease) 6.5s both;
   }
@@ -1882,7 +1900,7 @@ html.about-live .about-figure {
   }
   html.about-live .about-panel.is-active .rv {
     opacity: 1;
-    filter: blur(0);
+    filter: none;
     transform: none;
     transition-delay: calc(0.35s + var(--i, 0) * 0.09s);
   }
@@ -1890,7 +1908,7 @@ html.about-live .about-figure {
 @keyframes about-failsafe {
   to {
     opacity: 1;
-    filter: blur(0);
+    filter: none;
     transform: none;
   }
 }

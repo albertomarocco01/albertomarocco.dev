@@ -61,8 +61,8 @@ export function Shell({
   // Had the veil already played when this Shell mounted? Only on a remount
   // within the page load — back from an immersive route, which remounts the
   // whole (site) layout. The opening is paid once per load, like the veil's own
-  // beat: on such a remount the bar shows outright instead of hiding for 1.15s
-  // and fading back in while the veil does its fast dissolve. Read once, at
+  // beat: on such a remount the bar shows outright instead of hiding for a
+  // beat and fading back in while the veil does its fast dissolve. Read once, at
   // mount, deliberately: by the time `entered` flips on a first load the veil
   // has *just* played, and reading it then would skip the real opening. Lazy
   // initialiser, so the module flag is read on the client at mount and never
@@ -88,19 +88,23 @@ export function Shell({
         onComplete: () => root.classList.remove("entering"),
       });
 
-      // The topbar now arrives *after* the hero name has finished generating
-      // (eyebrow at 0s, "Alberto" at 0.12s, "Marocco." at 0.36s + 0.95s — see
-      // the `hero-in` rules in globals.css), so the opening reads as one
-      // sequence instead of everything landing at once. `from` renders its
-      // start value immediately, so the bar stays hidden through the delay.
-      // The 2.35s total also outlasts the 1.8s field bloom, so removing
-      // `entering` never cuts the brightness pulse short.
+      // The topbar arrives while the hero name is still generating (eyebrow
+      // at 0s, "Alberto" at 0.12s, "Marocco." at 0.36s + 0.95s — see the
+      // `hero-in` rules in globals.css): a short beat after the name starts,
+      // so the opening still reads as a sequence, but the navigation is in
+      // reach ~0.8s after the reveal instead of ~2.35s (2026-10-01; it used to
+      // wait 1.15s and fade over 1.2s). `from` renders its start value
+      // immediately, so the bar stays hidden through the delay.
       tl.from(".topbar", {
         autoAlpha: 0,
-        duration: 1.2,
-        delay: 1.15,
+        duration: 0.5,
+        delay: 0.3,
         ease: FIELD_EASE,
-      });
+      })
+        // Hold `entering` for the whole 1.8s field bloom: the bar is done well
+        // before it, and dropping the class early would cut the brightness
+        // pulse short.
+        .add(() => {}, 1.8);
     },
     { dependencies: [entered, reducedMotion, entranceDone] },
   );

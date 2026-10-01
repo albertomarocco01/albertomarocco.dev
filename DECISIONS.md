@@ -1190,3 +1190,24 @@ ones above.
   after the reveal. 10 Mbps: unchanged (the field was already ready first).
 - The veil flag moved from Loader.tsx to `lib/veil.ts`: AppProvider reads it
   and the Loader already imports from the providers.
+
+## A brisker first impression (2026-10-01)
+
+- **Pace.** Unattended, a first visitor reached the topbar ~3.7 s after load
+  and the home's teaser links ~6.9 s after it; every click paid a ~0.7 s
+  sweep. Chosen profile, "more responsive": the topbar fades in 0.3 s after
+  the reveal over 0.5 s (was 1.15 s + 1.2 s; `entering` is still held the
+  full 1.8 s so the field bloom is never cut); HomeSequence `IDLE_MS`
+  [500, 500, 2600] and `AUTO_S` [0.6, 1.4, 2.6] (was [900, 1200, 2600] /
+  [0.8, 2.6, 2.6]; the curtain keeps its pace); the navigation sweep
+  0.1 / 0.24 / 0.2 s (was 0.12 / 0.42 / 0.28). Measured on the production
+  build: topbar fully in 0.63 s after the reveal, first teaser 2.3 s, all
+  three 3.5 s, sweep 0.44 s — a route still streaming parks it as before.
+- **Blur.** Per-word blur radii roughly halved (eyebrow 8→5, name 14→8, lede
+  6→3, teasers 10→6, /about copy 8→5 px), and every revealed state rests on
+  `filter: none` rather than `blur(0)`. The eyebrow and name reveal use fill
+  `backwards` with the revealed values as the rule's own: a forwards fill
+  froze the interpolated `blur(0px)` on the LCP name for the page's life,
+  under the infinite water drift. Measured: 0 filtered elements in the
+  hero/teasers at rest (was 3 after the intro, more after a skip), no frame
+  over 50 ms in the opening across runs.
