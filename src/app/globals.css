@@ -1824,11 +1824,23 @@ html.about-live .about-pager {
 /* The live stage: fixed to the viewport, the document locked (shift-free,
    thanks to scrollbar-gutter), Lenis told to ignore the input
    (`data-lenis-prevent` on <body>, set by the driver). The track slides by
-   whole viewports; `--panel` is the driver's one output. */
-html.about-live,
-html.about-live body {
+   whole viewports; `--panel` is the driver's one output.
+
+   The lock is on <html> alone, and <body> is explicitly *un*-clipped. Once the
+   stage is fixed nothing is left in flow, so <body> is zero pixels tall; with
+   an overflow of its own (the base `overflow-x: hidden`, or `hidden` from this
+   lock or the veil's) it becomes a zero-height clip box, and WebKit on iOS
+   clips the fixed stage to it — the panels paged, hit-testing worked, and not
+   one glyph of the copy or the pager was painted (seen on an iPhone 16,
+   iOS 26, in Chrome's WKWebView; desktop WebKit does not do it). <html>'s
+   `hidden` is the one that reaches the viewport, so the document stays locked
+   without it. */
+html.about-live {
   overflow: hidden;
   overscroll-behavior: none;
+}
+html.about-live body {
+  overflow: visible;
 }
 html.about-live .about-stage {
   position: fixed;
