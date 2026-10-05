@@ -1211,3 +1211,34 @@ ones above.
   under the infinite water drift. Measured: 0 filtered elements in the
   hero/teasers at rest (was 3 after the intro, more after a skip), no frame
   over 50 ms in the opening across runs.
+
+## /about on a real phone (2026-10-05)
+
+- **Nothing painted on iOS.** On an iPhone 16 (iOS 26, Chrome) the panels
+  paged and the links answered taps, but the copy and the pager were never
+  drawn: computed styles said visible, hit-testing found the text, the screen
+  showed only the topbar and the two figures (those are painted by the
+  canvas, outside the stage). Cause: once the stage is `position: fixed`
+  nothing is left in flow and `<body>` is 0 px tall, and the lock gave
+  `<body>` an overflow of its own — a zero-height clip box, which WebKit on
+  iOS applies to the fixed stage. Desktop WebKit (and Playwright's iPhone
+  emulation on it) does not, so no emulated run showed it. The lock is now on
+  `<html>` alone and `<body>` is `overflow: visible` while `about-live` is set
+  (`859ab43`). Found on the device through Web Inspector, by switching rules
+  off one at a time.
+- **Narrow layout: the figure beside the copy, not behind it.** Up to 860 px
+  the figure used to sit under the copy — bottom corner, half dimmed, bled
+  past the screen edge. On the phone that read as a collision (a face under
+  the links, a body under the coaching rows). It is now whole and at full
+  strength in a slim column of its own: right of the first panel's lines, left
+  of the second panel's body, everything after back at the full width.
+  `.about-copy` is `display: contents` there, so its lines and the `<figure>`
+  are rows of one grid — no DOM reorder. A little air came out between the
+  lines so the second panel lands on one 665 px screen.
+- **Pager on phones: ticks on the right edge.** Along the bottom it sat on the
+  last line of every panel. It is back where the desktop has it (right edge,
+  mid-height), as ticks without numerals, in the gutter; the buttons keep
+  their `aria-label` and a hit box that reaches in from the edge.
+- **Still true.** A phone shorter than ~650 px of viewport (SE, mini) cannot
+  hold the second panel: it scrolls inside itself before the track moves, as
+  before. Only emulated; not yet seen on such a device.

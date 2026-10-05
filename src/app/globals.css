@@ -1688,7 +1688,7 @@ footer.foot a,
    and the figure stands on the bottom edge of its panel, planted on the page's
    floor. */
 .about-figure {
-  --fig-dim: 1; /* phones dim it behind the copy; FigureView mirrors this on the GPU */
+  --fig-dim: 1; /* a layout that sets the figure behind copy dims it here; FigureView mirrors it on the GPU */
   --fig-fade: 8%; /* bottom dissolve — set inline from the panel's `bottom` */
   position: relative;
   margin: 0;
@@ -1887,10 +1887,16 @@ html.about-live .about-panel {
    copy the near one — on the same ease, compositor-only. The GPU copy follows
    the box wherever it goes (track-motion.ts keeps it at full rate meanwhile). */
 html.about-live .about-figure {
-  width: auto;
-  height: min(90%, 960px);
   transform: translate3d(0, calc((var(--panel, 0) - var(--k, 0)) * 12vh), 0);
   transition: transform 1.15s var(--ease);
+}
+/* Two columns only: the narrow layout below sizes the figure from its own
+   column's width instead. */
+@media (min-width: 861px) {
+  html.about-live .about-figure {
+    width: auto;
+    height: min(90%, 960px);
+  }
 }
 
 /* The copy composes line by line as its panel arrives — opacity / blur /
@@ -1931,10 +1937,22 @@ html.about-live .about-figure {
   }
 }
 
-/* Narrow: the two columns stop fitting, so the copy takes the panel and the
-   figure moves behind it — bottom corner, dimmed, the person as atmosphere
-   rather than a column of its own. In flow (the fallback) it simply follows
-   the copy. */
+/* Narrow: the two columns stop fitting at the desktop's proportions, so the
+   panel keeps them only where they still read — the figure whole and at full
+   strength in a slim column of its own, beside the lines that introduce it,
+   and everything after those lines back at the full width. Same in flow (the
+   fallback) and on the live stage.
+
+   `.about-copy` steps out of the box tree (`display: contents`) so its lines
+   and the <figure> are items of one grid on `.about-inner`, each on a named
+   row: no DOM reorder, and no line ever wraps *under* the figure. The figure's
+   column is `--fig-w`, set per panel from the viewport (width, capped by
+   height so a short phone gets a shorter figure, and in rem so a tablet does
+   not get a giant one); the box takes its height from `--ar`.
+
+   This used to put the figure behind the copy — bottom corner, half dimmed,
+   bled past the screen edge — which on a real phone read as a collision: a
+   face under the links, a body under the coaching rows. */
 @media (max-width: 860px) {
   .about-inner {
     display: block;
@@ -1944,71 +1962,159 @@ html.about-live .about-figure {
     max-width: none;
     padding-bottom: 0;
   }
-  .about-figure {
-    --fig-dim: 0.5;
-    height: min(52svh, 480px);
-    margin-top: 2rem;
+  .about-panel:not(.about-panel--contact) .about-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--fig-w);
+    grid-template-rows: none;
+    column-gap: 0.9rem;
+    align-items: start;
+    align-content: start;
   }
-  /* The second panel's copy runs on to the coaching rows and the CTA, so
-     more of it sits over the figure — dim that one a little further. */
-  .about-panel--mirror .about-figure {
-    --fig-dim: 0.4;
+  .about-panel--mirror:not(.about-panel--contact) .about-inner {
+    grid-template-columns: var(--fig-w) minmax(0, 1fr);
+  }
+  .about-panel:not(.about-panel--contact) .about-copy {
+    display: contents;
+  }
+  /* One row per line of the copy; full width unless a panel says otherwise. */
+  .about-copy > * {
+    grid-column: 1 / -1;
+  }
+  .about-eyebrow {
+    grid-row: 1;
   }
   .about-headline {
+    grid-row: 2;
+  }
+  .about-body {
+    grid-row: 3;
+  }
+  .about-meta {
+    grid-row: 4;
+  }
+  .about-coaching {
+    grid-row: 5;
+  }
+  .about-links {
+    grid-row: 6;
+  }
+  .about-panel .about-figure {
+    width: 100%;
+    height: auto;
+    max-width: none;
+    justify-self: stretch;
+    align-self: start;
+  }
+  /* 01 — the standing figure, right, from the eyebrow down to the meta line.
+     Out of flow inside its grid area (explicit end lines: an `auto` line on an
+     absolutely positioned item is the container's padding edge), so a figure
+     taller than those four rows hangs past them instead of stretching the
+     gaps between the lines. */
+  .about-panel:first-child {
+    --fig-w: min(27vw, 16.5svh, 10rem);
+  }
+  .about-panel:first-child .about-eyebrow,
+  .about-panel:first-child .about-headline,
+  .about-panel:first-child .about-body,
+  .about-panel:first-child .about-meta {
+    grid-column: 1;
+  }
+  .about-panel:first-child .about-figure {
+    position: absolute;
+    top: 0;
+    right: 0;
+    grid-column: 2 / 3;
+    grid-row: 1 / 5;
+  }
+  /* 02 — mirrored: the athlete left, beside the body and the meta line. The
+     headline keeps the full width (it is the long one, and a wrapped headline
+     is a line the coaching rows below cannot spare); the top margin is the
+     body's, so the head lines up with its first line. */
+  .about-panel--mirror {
+    --fig-w: min(26vw, 15svh, 8rem);
+  }
+  .about-panel--mirror .about-body,
+  .about-panel--mirror .about-meta {
+    grid-column: 2;
+  }
+  .about-panel--mirror .about-figure {
+    grid-column: 1;
+    grid-row: 3 / span 2;
+    margin-top: 1.35rem;
+  }
+  /* A phone's height is the scarce axis, and the second panel is the full one:
+     a little less air between the lines so it lands on one screen (iPhone 16:
+     665px of viewport in Chrome) rather than scrolling inside itself by a
+     finger's width before the track moves. */
+  .about-headline {
     font-size: clamp(1.8rem, 7.5vw, 2.7rem);
+    margin-top: 0.9rem;
   }
   .about-body {
     font-size: clamp(0.95rem, 3.8vw, 1.05rem);
+    line-height: 1.55;
+    margin-top: 1.2rem;
+  }
+  .about-meta {
+    margin-top: 1.1rem;
+  }
+  .about-coaching {
+    margin-top: 1.1rem;
+  }
+  .about-list-row {
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    padding: 0.4rem 0;
+  }
+  .about-list dd {
+    line-height: 1.45;
+  }
+  .about-links {
+    margin-top: 1.2rem;
   }
   .about-cue {
     left: clamp(1.1rem, 5vw, 1.6rem);
   }
   html.about-live .about-inner {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
     padding-left: clamp(1.1rem, 5vw, 1.6rem);
     padding-right: clamp(1.1rem, 5vw, 1.6rem);
+    padding-bottom: calc(1.2rem + env(safe-area-inset-bottom, 0px));
   }
-  html.about-live .about-copy {
-    position: relative;
-    z-index: 1;
-  }
-  html.about-live .about-figure {
-    position: absolute;
-    right: -4vw;
-    bottom: 0;
-    height: 56%;
-    width: auto;
-    margin: 0;
-    z-index: 0;
-  }
-  html.about-live .about-panel--mirror .about-figure {
-    right: auto;
-    left: -6vw;
-    height: 50%;
-  }
+  /* The pager stays where the desktop has it — right edge, mid-height — as
+     ticks alone, in the gutter beside the copy. Along the bottom edge it sat on
+     the last line of every panel (the links, the contact note). The numerals
+     go; each button keeps its accessible name (`aria-label`) and its hit box,
+     which reaches in from the edge. */
   html.about-live .about-pager {
-    top: auto;
-    bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
-    right: clamp(1.1rem, 5vw, 1.6rem);
-    transform: none;
-    flex-direction: row;
-    gap: 1.1rem;
+    right: 0.4rem;
+    gap: 0.85rem;
+  }
+  html.about-live .about-pager button {
+    gap: 0;
+    font-size: 0;
+    padding: 0.3rem 0;
+  }
+  html.about-live .about-pager button::before {
+    width: 0.5rem;
+  }
+  html.about-live .about-pager button[aria-current="true"]::before {
+    width: 0.85rem;
+  }
+  html.about-live .about-pager button::after {
+    inset: -0.45rem -0.4rem -0.45rem -1.4rem;
   }
   /* The contact panel stacks: copy, then the list, at the copy's width. Each
      row stacks too — the key over the value — so the value has the full
      width and the email fits a phone in one line, never broken mid-word. */
   .about-panel--contact .about-inner {
-    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(1.4rem + env(safe-area-inset-bottom, 0px));
   }
   .about-panel--contact .contact-block {
-    margin-top: 2rem;
+    margin-top: 1.6rem;
     max-width: none;
   }
   .about-panel--contact .contact-row {
     display: block;
-    padding: 0.8rem 0;
+    padding: 0.7rem 0;
   }
   .about-panel--contact .contact-key {
     display: block;
@@ -2016,9 +2122,6 @@ html.about-live .about-figure {
   }
   .about-panel--contact .contact-val {
     font-size: clamp(1.15rem, 5.6vw, 1.6rem);
-  }
-  .about-list-row {
-    grid-template-columns: 6.5rem minmax(0, 1fr);
   }
 }
 /* Short viewport: height is the scarce axis — tighter type, the figure taller
@@ -2038,8 +2141,10 @@ html.about-live .about-figure {
     font-size: clamp(0.85rem, 2.6vh, 1rem);
     line-height: 1.45;
   }
-  html.about-live .about-figure {
-    height: 90%;
+  @media (min-width: 861px) {
+    html.about-live .about-figure {
+      height: 90%;
+    }
   }
   .about-panel--contact .contact-row {
     padding: 0.7rem 0;

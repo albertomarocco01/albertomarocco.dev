@@ -48,7 +48,7 @@ type FigureIO = {
   /** the nearest clipping ancestor (the panel): the canvas is not clipped by
    *  the DOM, so its box is handed to the shader as u_clip */
   clip: HTMLElement | null;
-  /** `--fig-dim` from CSS: phones dim the figure behind the copy */
+  /** `--fig-dim` from CSS: a layout that sets the figure behind copy dims it */
   dim: number;
   /** bottom dissolve, as a fraction of the box (mirrors the <img>'s mask) */
   bottom: number;
@@ -275,8 +275,9 @@ export function FigureView({ src, bottom }: { src: string; bottom: number }) {
     io.clip = track.closest<HTMLElement>(".about-panel");
     io.bottom = bottom;
 
-    // Phones dim the figure behind the copy through a CSS custom property on
-    // the <figure>; the GPU copy can't read CSS, so mirror it here on resize.
+    // A layout can dim the figure through a CSS custom property on the
+    // <figure> (1 everywhere today); the GPU copy can't read CSS, so mirror it
+    // here on resize.
     const readDim = () => {
       const raw = io.host
         ? parseFloat(getComputedStyle(io.host).getPropertyValue("--fig-dim"))
